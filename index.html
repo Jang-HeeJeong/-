@@ -338,6 +338,66 @@
 </head>
 <body>
 
+<!-- LOGIN OVERLAY START -->
+<div id="login-overlay" style="
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  background:#f0f4f8; display:flex; align-items:center;
+  justify-content:center; z-index:99999; font-family:'Malgun Gothic',sans-serif;">
+  <div style="background:#fff; padding:40px 50px; border-radius:12px;
+    box-shadow:0 4px 24px rgba(0,0,0,0.12); text-align:center; min-width:320px;">
+    <h2 style="margin-bottom:8px; color:#1e3a8a;">의약품 표준제조기준 검토</h2>
+    <p style="color:#888; font-size:13px; margin-bottom:24px;">로그인이 필요합니다</p>
+    <input id="login-id" type="text" placeholder="아이디"
+      style="width:100%; padding:10px 14px; margin-bottom:12px;
+      border:1px solid #ddd; border-radius:8px; font-size:15px; box-sizing:border-box; outline:none;">
+    <input id="login-pw" type="password" placeholder="비밀번호"
+      style="width:100%; padding:10px 14px; margin-bottom:16px;
+      border:1px solid #ddd; border-radius:8px; font-size:15px; box-sizing:border-box; outline:none;">
+    <div id="login-error" style="color:#e53e3e; font-size:13px;
+      margin-bottom:12px; display:none;">아이디 또는 비밀번호가 올바르지 않습니다.</div>
+    <button onclick="doLogin()"
+      style="width:100%; padding:12px; background:#1e40af; color:#fff;
+      border:none; border-radius:8px; font-size:16px; cursor:pointer;">로그인</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  if (sessionStorage.getItem('rp_auth') === 'ok') {
+    document.getElementById('login-overlay').style.display = 'none';
+  }
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
+})();
+
+async function doLogin() {
+  const id = document.getElementById('login-id').value.trim();
+  const pw = document.getElementById('login-pw').value;
+  const errEl = document.getElementById('login-error');
+
+  if (id !== 'RPbioOTC') {
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const encoder = new TextEncoder();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(pw));
+  const hashHex = Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+
+  // 비밀번호의 SHA-256 해시만 저장 (평문 비밀번호 없음)
+  if (hashHex === '7a8c30961fa35345b2cd64e108bfec23bbecbe7ed2dec8cb800d2c482e50f898') {
+    sessionStorage.setItem('rp_auth', 'ok');
+    document.getElementById('login-overlay').style.display = 'none';
+    errEl.style.display = 'none';
+  } else {
+    errEl.style.display = 'block';
+  }
+}
+</script>
+<!-- LOGIN OVERLAY END -->
+
 <header>
   <h1>의약품 표준제조기준 검토 툴</h1>
   <small>— 식약처 고시 제2025-3호(2025.1.16 시행) 기준</small>
