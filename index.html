@@ -372,11 +372,11 @@
 })();
 
 function _h(s) {
-  // 순수 JS 해시 (HTTP/HTTPS 모두 동작)
+  // 순수 JS 해시 (HTTP/HTTPS 모두 동작, Math.imul로 32비트 정수 정확도 보장)
   var h = 0x811c9dc5;
   for (var i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);
-    h = (h * 0x01000193) >>> 0;
+    h = Math.imul(h >>> 0, 0x01000193) >>> 0;
   }
   return h.toString(16).padStart(8,'0') + btoa(s.split('').reverse().join('')).replace(/=/g,'');
 }
