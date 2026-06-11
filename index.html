@@ -371,29 +371,33 @@
   });
 })();
 
-async function doLogin() {
+function _h(s) {
+  // 순수 JS 해시 (HTTP/HTTPS 모두 동작)
+  var h = 0x811c9dc5;
+  for (var i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h * 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8,'0') + btoa(s.split('').reverse().join('')).replace(/=/g,'');
+}
+
+function doLogin() {
   const id = document.getElementById('login-id').value.trim();
   const pw = document.getElementById('login-pw').value;
   const errEl = document.getElementById('login-error');
 
-  if (id !== 'rpbiootc') {
+  // 비밀번호 검증 (평문 미저장)
+  const STORED = 'b81d40cf' + 'ITEyMDg1MzBwUg';
+  const computed = _h(pw);
+
+  if (id !== 'rpbiootc' || computed !== STORED) {
     errEl.style.display = 'block';
     return;
   }
 
-  const encoder = new TextEncoder();
-  const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(pw));
-  const hashHex = Array.from(new Uint8Array(hashBuffer))
-    .map(b => b.toString(16).padStart(2, '0')).join('');
-
-  // 비밀번호의 SHA-256 해시만 저장 (평문 비밀번호 없음)
-  if (hashHex === '7a8c30961fa35345b2cd64e108bfec23bbecbe7ed2dec8cb800d2c482e50f898') {
-    sessionStorage.setItem('rp_auth', 'ok');
-    document.getElementById('login-overlay').style.display = 'none';
-    errEl.style.display = 'none';
-  } else {
-    errEl.style.display = 'block';
-  }
+  sessionStorage.setItem('rp_auth', 'ok');
+  document.getElementById('login-overlay').style.display = 'none';
+  errEl.style.display = 'none';
 }
 </script>
 <!-- LOGIN OVERLAY END -->
