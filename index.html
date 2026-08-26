@@ -807,18 +807,18 @@
 </main>
 
 <!-- 표준제조기준 데이터 (개정 시 수정 대상) -->
-<script src="app/data.js"></script>
+<script src="app/표제기_데이터.js"></script>
 <!-- 판정 로직 (배합 규칙 개정 시 수정 대상) -->
-<script src="app/rules.js"></script>
+<script src="app/판정_규칙.js"></script>
 
 <script>
-// 표준제조기준 데이터는 app/data.js 로 분리됨 (__EMBEDDED_DB__)
+// 표준제조기준 데이터는 app/표제기_데이터.js 로 분리됨 (__EMBEDDED_DB__)
 </script>
 <script>
 // ════════════════════════════════════════════════════════════════════
 // 상태
 // ════════════════════════════════════════════════════════════════════
-// DB · chaptersMap 선언은 app/rules.js 로 이동
+// DB · chaptersMap 선언은 app/판정_규칙.js 로 이동
 let currentKey     = null;
 let currentForm    = '';     // 선택된 제형
 let ingredientRows = [];     // [{ id, gubun, ingr, dose, unit }]  — ch1 전용
