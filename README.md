@@ -7,6 +7,7 @@
 |---|---|
 | **검토 툴** | https://jang-heejeong.github.io/-/ |
 | 테스트 확인 | https://jang-heejeong.github.io/-/tests.html |
+| 새 UI (작업 중) | https://jang-heejeong.github.io/-/new.html |
 
 ---
 
@@ -14,6 +15,7 @@
 
 ```
 📄 index.html                    검토 툴 화면 ← 사이트 첫 페이지
+📄 new.html                      새 UI 작업본 (완성되면 index.html과 교체)
 
 📁 app/                          프로그램 본체
    📄 표제기_데이터.js            ★ 성분·분량·연령계수 데이터
