@@ -1,0 +1,90 @@
+/* ═══════════════════════════════════════════════════════════════════
+   전환 흐름 테스트 — 제품·장을 갈아끼울 때 이전 상태가 남지 않는지 확인
+
+   판정 로직 테스트(cases.js)는 "값을 넣으면 올바른 답이 나오는가"를 보고,
+   이쪽은 "화면을 갈아끼울 때 이전 제품 내용이 섞이지 않는가"를 본다.
+
+   이번 세션에 실제로 났던 버그들이 여기 들어 있다.
+     - 두 제품 성분이 섞여 실재하지 않는 처방이 만들어짐
+     - 제품을 바꿔도 적용 기준(장)이 안 바뀜
+     - 이전 제품의 안내 문구가 남음
+     - 첨가제·연령 선택이 이전 제품 것으로 남음
+
+   기대값은 스냅샷이 아니라 손으로 적은 값이다. "이렇게 동작해야 한다"는
+   의도를 적어 두는 것이므로, 실패하면 코드를 의심하는 게 먼저다.
+   ═══════════════════════════════════════════════════════════════════ */
+
+window.FLOW_CASES = [
+  {
+    id: 'flow-chapter-switch',
+    desc: '장이 다른 제품으로 전환 — 제1장 ↔ 제3장 왕복',
+    steps: [
+      { pick: '부스트젤리',
+        expect: { chapter: '제1장_비타민미네랄', form: '경구용젤리제', filled: 5 } },
+      { pick: '미리코프파워연질캡슐',
+        expect: { chapter: '제3장_감기약', filled: 4 } },
+      { pick: '부스트젤리',
+        expect: { chapter: '제1장_비타민미네랄', form: '경구용젤리제', filled: 5 } },
+    ],
+  },
+  {
+    id: 'flow-same-chapter-no-mix',
+    desc: '같은 장의 다른 제품 — 이전 제품 성분이 섞이지 않아야 함',
+    steps: [
+      { pick: '부스트젤리',
+        expect: { chapter: '제1장_비타민미네랄', filled: 5 } },
+      // 엠지파워는 성분 2개 중 토코페롤만 표에 매칭된다 (산화마그네슘은 복합염 별도 입력)
+      { pick: '엠지파워연질캡슐',
+        expect: { chapter: '제1장_비타민미네랄', filled: 1,
+                  filledHas: ['토코페롤아세테이트(비타민E로서)'],
+                  filledHasNot: ['아스코르브산', '티아민질산염', '아미노에틸설폰산(타우린)'] } },
+      { pick: '부스트젤리',
+        expect: { chapter: '제1장_비타민미네랄', filled: 5,
+                  filledHasNot: ['토코페롤아세테이트(비타민E로서)'] } },
+    ],
+  },
+  {
+    id: 'flow-excipients-cleared',
+    desc: '첨가제가 있는 제품 → 없는 제품으로 전환 시 첨가제가 비워져야 함',
+    steps: [
+      { restore: { name: '테스트제품(첨가제)', chapter: '제2장_해열진통제', form: '캡슐제',
+                   excipients: ['대두유'],
+                   dosageRows: [{ age: '만 15세 이상', freqMin: 1, freqMax: 3, amtMin: 1, amtMax: 1 }],
+                   matrix: { shown: [], custom: [], doses: { '이부프로펜': '200' } } },
+        expect: { chapter: '제2장_해열진통제', excipients: ['대두유'] } },
+      { pick: '부스트젤리',
+        expect: { chapter: '제1장_비타민미네랄', excipients: [] } },
+    ],
+  },
+  {
+    id: 'flow-age-back-to-auto',
+    desc: '작업자가 고른 연령은 제품이 바뀌면 자동값으로 돌아가야 함',
+    steps: [
+      { pick: '부스트젤리', expect: { ageUserSet: [false] } },
+      { chooseFirstAge: true, expect: { ageUserSet: [true] } },
+      { pick: '엠지파워연질캡슐', expect: { ageUserSet: [false] } },
+    ],
+  },
+  {
+    id: 'flow-user-chapter-respected',
+    desc: '작업자가 직접 고른 장은 부분 일치 제품에도 유지되어야 함',
+    steps: [
+      { setChapter: '제1장_비타민미네랄', expect: { chapter: '제1장_비타민미네랄', chapterUserSet: true } },
+      { pick: '엠지파워연질캡슐',
+        expect: { chapter: '제1장_비타민미네랄', chapterUserSet: true } },
+    ],
+  },
+  {
+    id: 'flow-notice-not-stale',
+    desc: '이전 제품의 안내 문구가 다음 제품 화면에 남지 않아야 함',
+    steps: [
+      // 표제기 대상이 아닌 품목 → 경고 문구가 뜬다
+      { pick: '알피레보플록사신정250mg(레보플록사신수화물)',
+        expect: { chapter: '', noticeHas: '표준제조기준 대상 품목이 아닐 수 있습니다' } },
+      // 다음 제품으로 넘어가면 그 문구는 사라져야 한다
+      { pick: '부스트젤리',
+        expect: { chapter: '제1장_비타민미네랄',
+                  noticeHasNot: '표준제조기준 대상 품목이 아닐 수 있습니다' } },
+    ],
+  },
+];

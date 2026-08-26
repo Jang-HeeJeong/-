@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 테스트 페이지 자체가 캐시돼 옛 버전이 뜨는 것을 막는다 -->
+<meta http-equiv="Cache-Control" content="no-store">
+<title>표제기 검토 툴 — 회귀 테스트</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    background: #f0f2f5; color: #333; font-size: 14px; padding: 18px 22px 60px;
+  }
+  header { border-top: 3px solid #1e40af; background: #fff; border: 1px solid #e2e8f0;
+           border-radius: 6px; padding: 12px 16px; margin-bottom: 14px; }
+  h1 { font-size: 17px; color: #1e3a8a; margin-bottom: 3px; }
+  header p { font-size: 12px; color: #64748b; line-height: 1.6; }
+
+  #summary { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+             margin: 14px 0; padding: 12px 16px; background: #fff;
+             border: 1px solid #e2e8f0; border-radius: 6px; }
+  .pill { padding: 4px 14px; border-radius: 13px; font-weight: 700; font-size: 13px; }
+  .pill.pass { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+  .pill.fail { background: #fdecea; color: #c62828; border: 1px solid #f5c6c2; }
+  .pill.err  { background: #fff4e5; color: #9a3412; border: 1px solid #fed7aa; }
+  #summary .verdict { font-size: 15px; font-weight: 700; margin-left: 4px; }
+  #summary .spacer { flex: 1; }
+
+  button { font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+           padding: 6px 14px; border-radius: 4px; border: 1.5px solid #bfdbfe;
+           background: #fff; color: #1e40af; white-space: nowrap; }
+  button:hover { background: #eff6ff; }
+  button.primary { background: #1a4b8c; color: #fff; border-color: #1a4b8c; }
+  button.primary:hover { background: #153d72; }
+  button.copied { background: #15803d; border-color: #15803d; color: #fff; }
+
+  section { background: #fff; border: 1px solid #e2e8f0; border-radius: 6px;
+            margin-bottom: 12px; overflow: hidden; }
+  section > h2 { font-size: 12px; font-weight: 700; color: #64748b; letter-spacing: 0.06em;
+                 padding: 9px 16px; background: #f7f9fc; border-bottom: 1px solid #e2e8f0; }
+
+  .case { border-top: 1px solid #f1f5f9; padding: 8px 16px; }
+  .case:first-of-type { border-top: none; }
+  .case-head { display: flex; align-items: baseline; gap: 9px; }
+  .mark { flex: 0 0 auto; font-weight: 700; font-size: 12px; width: 46px; }
+  .mark.pass { color: #7aa87d; }
+  .mark.fail { color: #c62828; }
+  .mark.err  { color: #9a3412; }
+  .mark.new  { color: #1565c0; }
+  .case-id { font-family: Consolas, monospace; font-size: 11px; color: #94a3b8; flex: 0 0 auto; }
+  .case-desc { color: #1e293b; font-size: 12.5px; }
+  .diff { margin: 6px 0 2px 55px; border: 1px solid #f5c6c2; border-radius: 4px;
+          background: #fffafa; padding: 7px 10px; font-size: 11px; overflow-x: auto; }
+  .diff table { border-collapse: collapse; font-family: Consolas, monospace; font-size: 11px; }
+  .diff td { padding: 2px 9px 2px 0; vertical-align: top; white-space: pre; }
+  .diff .lbl { color: #94a3b8; }
+  .diff .was { color: #c62828; }
+  .diff .now { color: #1565c0; }
+  .note { margin: 6px 0 2px 55px; font-size: 11px; color: #9a3412; }
+
+  #baseline { margin-top: 14px; padding: 12px 16px; background: #fff;
+              border: 1px solid #e2e8f0; border-radius: 6px; }
+  #baseline p { font-size: 12px; color: #64748b; line-height: 1.7; margin-bottom: 8px; }
+  #baseline textarea { width: 100%; height: 190px; font-family: Consolas, monospace;
+                       font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px;
+                       padding: 8px; resize: vertical; display: none; }
+  iframe { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>표제기 검토 툴 — 회귀 테스트</h1>
+  <p>
+    <code>index.html</code>의 검증 로직을 그대로 호출해 <b>판정 결과가 바뀌지 않았는지</b> 확인합니다.
+    본 파일은 index.html을 수정하지 않습니다 (iframe으로 읽기만 함).<br>
+    코드를 고친 뒤 이 페이지를 새로고침해서 전부 통과하면, 판정에 영향을 주지 않았다는 뜻입니다.
+  </p>
+</header>
+
+<div id="summary"><span style="color:#64748b;">실행 중…</span></div>
+
+<div id="report"></div>
+
+<div id="baseline">
+  <p>
+    <b>표제기가 개정되어 판정이 의도적으로 바뀐 경우</b>에만 기준값을 갱신하세요.
+    아래 버튼을 눌러 나온 내용을 <code>tests/baseline.js</code> 파일 전체를 교체하면 됩니다.
+    <b style="color:#9a3412;">갱신 전에 위의 실패 항목이 전부 개정 내용과 일치하는지 반드시 확인하세요.</b>
+  </p>
+  <button id="btn-baseline">기준값 새로 저장 (JSON 출력)</button>
+  <button id="btn-copy" style="display:none;">클립보드로 복사</button>
+  <textarea id="baseline-out" readonly></textarea>
+</div>
+
+<iframe id="app"></iframe>
+
+<script>
+/* 캐시 무효화 — index.html·cases.js·baseline.js를 고친 뒤 새로고침했을 때
+   브라우저가 옛 파일을 재사용하면 "고치기 전 코드"를 테스트하게 된다. */
+window.__BUST = '?t=' + Date.now();
+window.__filesReady = (function () {
+  const load = src => new Promise((res, rej) => {
+    const el = document.createElement('script');
+    el.src = src + window.__BUST;
+    el.onload = res;
+    el.onerror = () => rej(new Error(src + ' 로딩 실패'));
+    document.head.appendChild(el);
+  });
+  return Promise.all([load('tests/cases.js'), load('tests/baseline.js'), load('tests/flows.js')]);
+})();
+</script>
+<script>
+/* ── iframe 안의 앱이 준비될 때까지 대기 ──
+   주의: index.html의 DB·chaptersMap은 `let`으로 선언돼 있어 window 프로퍼티가
+   아니다. 같은 출처이므로 win.eval()로 렉시컬 스코프를 통해 참조한다.
+   (함수 선언은 window에 붙으므로 win.fn() 형태로 바로 호출 가능) */
+function appScope(win) {
+  return {
+    DB: win.eval('typeof DB !== "undefined" ? DB : null'),
+    chaptersMap: win.eval('typeof chaptersMap !== "undefined" ? chaptersMap : null'),
+  };
+}
+function waitForApp(win, timeoutMs = 15000) {
+  const t0 = Date.now();
+  return new Promise((resolve, reject) => {
+    (function poll() {
+      try {
+        const sc = appScope(win);
+        if (sc.DB && sc.chaptersMap && typeof win.validateChapter1 === 'function') return resolve(sc);
+      } catch (e) { /* 아직 로딩 중 */ }
+      if (Date.now() - t0 > timeoutMs) return reject(new Error('앱 로딩 시간 초과'));
+      setTimeout(poll, 60);
+    })();
+  });
+}
+
+/* ── 검증 결과를 비교 가능한 최소 형태로 정규화 ──
+   화면 문구가 바뀌어도 실패하지 않도록 "판정에 영향을 주는 값"만 남긴다. */
+function normalize(v) {
+  const num = x => (x == null ? null : +(+x).toFixed(4));
+  return {
+    items: (v.itemResults ?? []).map(r => {
+      // 제2장은 결과 구조가 달라(allowed/actual) 별도로 펼친다
+      const al = r.allowed ?? {}, ac = r.actual ?? {};
+      return {
+        ingr: r.ingr,
+        ok: r.ok,
+        dailyMin: num(r.dailyMin ?? ac.min1d), dailyMax: num(r.dailyMax ?? ac.max1d),
+        critMin:  num(r.critMin  ?? al.min1d), critMax:  num(r.critMax  ?? al.max1d),
+        dose1Min: num(ac.min1dose), dose1Max: num(ac.max1dose),
+        crit1Min: num(al.min1dose), crit1Max: num(al.max1dose),
+        unit: r.useUnit ?? r.unit ?? null,
+        reason: r.ok === true ? '' : (r.reason ?? ''),
+      };
+    }),
+    sums:  (v.sumResults  ?? []).map(r => ({ key: r.key, ok: r.ok })),
+    rules: (v.ruleErrors  ?? []).map(r => ({ key: r.key, ok: r.ok })),
+    prop:  v.propResult ? { ok: v.propResult.ok } : null,
+    coeff: v.coeff ?? null,
+  };
+}
+
+const VALIDATORS = {
+  '제1장_비타민미네랄': 'validateChapter1',
+  '제2장_해열진통제':   'validateChapter2',
+  '제3장_감기약':       'validateChapter3',
+  '제7장_진해거담제':   'validateChapter7',
+  '제9장_비염용경구제': 'validateChapter9',
+};
+
+function runValidationCase(win, scope, c) {
+  const fnName = VALIDATORS[c.chapter];
+  const tables = scope.DB[c.chapter]?.['표'];
+  if (!tables) throw new Error(`DB에 ${c.chapter} 없음`);
+  const rows = c.rows.map((r, i) => ({ ...r, id: i + 1 }));
+  return normalize(win[fnName](tables, c.form, c.age, rows, c.dosage));
+}
+
+function runMatchCase(win, m) {
+  return win.ingrMatchLevel(m.a, m.b);
+}
+
+function runInferCase(win, c) {
+  const parsed = win._parseExcelIngredients(c.ingr);
+  const ranked = win.rankChaptersByIngredients(parsed);
+  return ranked.length ? ranked[0].key : null;
+}
+
+/* ══════════ 전환 흐름 실행기 ══════════
+   iframe 안의 앱을 실제로 조작해서 이전 제품 상태가 남지 않는지 본다. */
+
+function flowSnapshot(win) {
+  const d = win.document;
+  // 주의: 테스트용 iframe은 display:none이라 offsetParent로는 판단할 수 없다.
+  //       인라인 style.display로 어느 표가 켜져 있는지 본다.
+  const wrapId = ['ch1-integrated-wrap', 'ch2-integrated-wrap']
+    .find(id => { const e = d.getElementById(id); return e && e.style.display !== 'none'; });
+  const inputs = wrapId ? [...d.querySelectorAll('#' + wrapId + ' .mx-dose-input')] : [];
+  const filledRows = inputs.filter(i => i.value).map(i => {
+    const tds = i.closest('tr').querySelectorAll('td');
+    return tds[2]?.querySelector('select')?.value ?? tds[1]?.textContent.trim() ?? '?';
+  });
+  const noticeEl = d.getElementById('excel-ingr-ref');
+  const noticeVisible = noticeEl && noticeEl.style.display !== 'none';
+  return {
+    chapter: d.getElementById('sel-chapter').value,
+    form: d.getElementById('sel-dosage-form').value,
+    product: d.getElementById('product-name').value,
+    filled: filledRows.length,
+    filledNames: filledRows,
+    excipients: [...win.eval('(selectedExcipients)')],
+    ages: win.eval('(dosageRows)').map(r => r.age),
+    ageUserSet: win.eval('(dosageRows)').map(r => !!r.ageUserSet),
+    chapterUserSet: win.eval('(chapterUserSet)'),
+    notice: noticeVisible ? noticeEl.textContent.replace(/\s+/g, ' ').trim() : '',
+  };
+}
+
+function flowStep(win, step) {
+  const d = win.document;
+  if (step.pick != null) {
+    const u = d.getElementById('unified-search');
+    u.value = step.pick;
+    win.searchUnified(step.pick);
+    const row = d.querySelector('#unified-results div[onmousedown]');
+    if (!row) throw new Error(`검색 결과 없음: ${step.pick}`);
+    row.dispatchEvent(new win.MouseEvent('mousedown', { bubbles: true }));
+  } else if (step.setChapter != null) {
+    const c = d.getElementById('sel-chapter');
+    c.value = step.setChapter;
+    c.dispatchEvent(new win.Event('change', { bubbles: true }));
+  } else if (step.restore != null) {
+    win.restoreProductState(step.restore);
+  } else if (step.chooseFirstAge) {
+    const cb = d.querySelector('.js-ch1-age-cb, .js-ch2-age');
+    if (!cb) throw new Error('연령 선택 요소를 찾지 못함');
+    if (cb.type === 'checkbox') { cb.checked = true; cb.dispatchEvent(new win.Event('change', { bubbles: true })); }
+    else { cb.dispatchEvent(new win.Event('change', { bubbles: true })); }
+  } else {
+    throw new Error('알 수 없는 step: ' + JSON.stringify(step));
+  }
+  return flowSnapshot(win);
+}
+
+/* 기대값과 실제 스냅샷 비교 — 적어 둔 항목만 본다 */
+function flowCheck(expect, snap) {
+  const diffs = [];
+  const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  for (const [k, want] of Object.entries(expect)) {
+    if (k === 'filledHas') {
+      for (const n of want) if (!snap.filledNames.includes(n))
+        diffs.push({ path: `성분 포함: ${n}`, was: '있어야 함', now: '없음' });
+    } else if (k === 'filledHasNot') {
+      for (const n of want) if (snap.filledNames.includes(n))
+        diffs.push({ path: `성분 없어야: ${n}`, was: '없어야 함', now: '남아 있음' });
+    } else if (k === 'noticeHas') {
+      if (!snap.notice.includes(want)) diffs.push({ path: '안내 문구', was: `"${want}" 포함`, now: snap.notice || '(없음)' });
+    } else if (k === 'noticeHasNot') {
+      if (snap.notice.includes(want)) diffs.push({ path: '안내 문구', was: `"${want}" 없어야`, now: snap.notice });
+    } else if (!eq(want, snap[k])) {
+      diffs.push({ path: k, was: want, now: snap[k] });
+    }
+  }
+  return diffs;
+}
+
+/* ── 두 값의 차이를 사람이 읽을 수 있게 ── */
+function diffOf(expected, actual) {
+  const out = [];
+  const walk = (path, e, a) => {
+    if (JSON.stringify(e) === JSON.stringify(a)) return;
+    const isObj = x => x && typeof x === 'object';
+    if (isObj(e) && isObj(a) && Array.isArray(e) === Array.isArray(a)) {
+      const keys = [...new Set([...Object.keys(e), ...Object.keys(a)])];
+      for (const k of keys) walk(path ? `${path}.${k}` : k, e?.[k], a?.[k]);
+      return;
+    }
+    out.push({ path, was: e, now: a });
+  };
+  walk('', expected, actual);
+  return out.slice(0, 12);
+}
+
+function fmtVal(v) {
+  if (v === undefined) return '(없음)';
+  if (v === null) return 'null';
+  return typeof v === 'object' ? JSON.stringify(v) : String(v);
+}
+
+/* ── 실행 ── */
+const results = { pass: 0, fail: 0, err: 0, isNew: 0 };
+const actuals = { validation: {}, match: {}, infer: {} };
+
+function renderCase(container, mark, id, desc, diffs, note) {
+  const el = document.createElement('div');
+  el.className = 'case';
+  const label = { pass: '통과', fail: '실패', err: '오류', new: '신규' }[mark];
+  let h = `<div class="case-head">
+      <span class="mark ${mark}">${mark === 'pass' ? '✓' : mark === 'fail' ? '✕' : mark === 'err' ? '!' : '＋'} ${label}</span>
+      <span class="case-id">${id}</span>
+      <span class="case-desc">${desc}</span>
+    </div>`;
+  if (note) h += `<div class="note">${note}</div>`;
+  if (diffs && diffs.length) {
+    h += `<div class="diff"><table>`;
+    h += `<tr><td class="lbl"></td><td class="lbl was">기준값(이전)</td><td class="lbl now">현재 결과</td></tr>`;
+    for (const d of diffs) {
+      h += `<tr><td class="lbl">${d.path}</td><td class="was">${fmtVal(d.was)}</td><td class="now">${fmtVal(d.now)}</td></tr>`;
+    }
+    h += `</table></div>`;
+  }
+  el.innerHTML = h;
+  container.appendChild(el);
+}
+
+function section(title) {
+  const s = document.createElement('section');
+  s.innerHTML = `<h2>${title}</h2>`;
+  document.getElementById('report').appendChild(s);
+  return s;
+}
+
+async function main() {
+  const win = document.getElementById('app').contentWindow;
+  let scope;
+  try {
+    scope = await waitForApp(win);
+  } catch (e) {
+    document.getElementById('summary').innerHTML =
+      `<span class="pill err">앱 로딩 실패</span><span>${e.message} — index.html이 같은 폴더에 있는지, 서버로 열었는지 확인하세요.</span>`;
+    return;
+  }
+
+  const EXPECTED = window.EXPECTED ?? null;
+
+  // 1) 판정 결과
+  const s1 = section(`판정 결과 — 장별 검증 로직 (${window.TEST_CASES.length}건)`);
+  for (const c of window.TEST_CASES) {
+    let actual;
+    try {
+      actual = runValidationCase(win, scope, c);
+    } catch (e) {
+      results.err++;
+      renderCase(s1, 'err', c.id, c.desc, null, `실행 중 오류: ${e.message}`);
+      continue;
+    }
+    actuals.validation[c.id] = actual;
+    const exp = EXPECTED?.validation?.[c.id];
+    if (!exp) {
+      results.isNew++;
+      renderCase(s1, 'new', c.id, c.desc, null, '기준값 없음 — [기준값 새로 저장]으로 고정하세요.');
+      continue;
+    }
+    const diffs = diffOf(exp, actual);
+    if (diffs.length) { results.fail++; renderCase(s1, 'fail', c.id, c.desc, diffs); }
+    else { results.pass++; renderCase(s1, 'pass', c.id, c.desc); }
+  }
+
+  // 2) 성분명 매칭
+  const s2 = section(`성분명 매칭 규칙 (${window.MATCH_CASES.length}건)`);
+  window.MATCH_CASES.forEach((m, i) => {
+    const id = `match-${i}`;
+    let actual;
+    try { actual = runMatchCase(win, m); }
+    catch (e) { results.err++; renderCase(s2, 'err', id, m.desc, null, `오류: ${e.message}`); return; }
+    actuals.match[id] = actual;
+    const desc = `${m.desc} — "${m.a}" vs "${m.b}"`;
+    if (actual === m.expect) { results.pass++; renderCase(s2, 'pass', id, desc); }
+    else { results.fail++; renderCase(s2, 'fail', id, desc, [{ path: '일치강도', was: m.expect, now: actual }]); }
+  });
+
+  // 3) 적용 기준 자동 추정
+  const s3 = section(`적용 기준(장) 자동 추정 (${window.INFER_CASES.length}건)`);
+  window.INFER_CASES.forEach((c, i) => {
+    const id = `infer-${i}`;
+    let actual;
+    try { actual = runInferCase(win, c); }
+    catch (e) { results.err++; renderCase(s3, 'err', id, c.desc, null, `오류: ${e.message}`); return; }
+    actuals.infer[id] = actual;
+    if (actual === c.expectKey) { results.pass++; renderCase(s3, 'pass', id, c.desc); }
+    else { results.fail++; renderCase(s3, 'fail', id, c.desc, [{ path: '추정 장', was: c.expectKey, now: actual }]); }
+  });
+
+  // 4) 전환 흐름
+  const s4 = section(`전환 흐름 — 제품·장 갈아끼우기 (${(window.FLOW_CASES ?? []).length}건)`);
+  for (const f of (window.FLOW_CASES ?? [])) {
+    // 흐름마다 깨끗한 상태에서 시작
+    try {
+      const c = win.document.getElementById('sel-chapter');
+      c.value = ''; c.dispatchEvent(new win.Event('change', { bubbles: true }));
+    } catch (e) { /* 무시 */ }
+
+    let diffs = [], errMsg = null;
+    for (let i = 0; i < f.steps.length; i++) {
+      const step = f.steps[i];
+      let snap;
+      try { snap = flowStep(win, step); }
+      catch (e) { errMsg = `${i + 1}단계에서 오류: ${e.message}`; break; }
+      const d = flowCheck(step.expect ?? {}, snap);
+      if (d.length) {
+        diffs = d.map(x => ({ ...x, path: `${i + 1}단계 · ${x.path}` }));
+        break;
+      }
+    }
+    const label = f.steps.map(st => st.pick ?? st.setChapter?.split('_')[0] ?? (st.restore ? '저장제품' : '연령선택')).join(' → ');
+    if (errMsg)      { results.err++;  renderCase(s4, 'err',  f.id, f.desc, null, errMsg); }
+    else if (diffs.length) { results.fail++; renderCase(s4, 'fail', f.id, `${f.desc}  [${label}]`, diffs); }
+    else             { results.pass++; renderCase(s4, 'pass', f.id, `${f.desc}  [${label}]`); }
+  }
+
+  // 요약
+  const total = results.pass + results.fail + results.err + results.isNew;
+  const allGood = results.fail === 0 && results.err === 0;
+  document.getElementById('summary').innerHTML =
+      `<span class="pill pass">통과 ${results.pass}</span>`
+    + `<span class="pill fail" ${results.fail ? '' : 'style="opacity:.45"'}>실패 ${results.fail}</span>`
+    + (results.err ? `<span class="pill err">오류 ${results.err}</span>` : '')
+    + (results.isNew ? `<span class="pill err">신규 ${results.isNew}</span>` : '')
+    + `<span class="verdict" style="color:${allGood ? '#2e7d32' : '#c62828'};">`
+    + (results.isNew ? '기준값을 저장하세요' : allGood ? '판정 결과 변화 없음' : '판정이 바뀌었습니다 — 개정 내용과 대조하세요')
+    + `</span><span class="spacer"></span>`
+    + `<span style="font-size:12px;color:#94a3b8;">총 ${total}건</span>`
+    + `<button onclick="location.reload()">다시 실행</button>`;
+
+  window.__actuals = actuals;
+}
+
+document.getElementById('btn-baseline').addEventListener('click', () => {
+  const ta = document.getElementById('baseline-out');
+  // validation 스냅샷만 저장 (match·infer는 cases.js에 기대값이 직접 적혀 있음)
+  ta.value = 'window.EXPECTED = ' + JSON.stringify({ validation: window.__actuals.validation }, null, 2) + ';\n';
+  ta.style.display = 'block';
+  document.getElementById('btn-copy').style.display = 'inline-block';
+});
+
+document.getElementById('btn-copy').addEventListener('click', function () {
+  const ta = document.getElementById('baseline-out');
+  const done = () => {
+    this.textContent = '복사됨 ✓'; this.classList.add('copied');
+    setTimeout(() => { this.textContent = '클립보드로 복사'; this.classList.remove('copied'); }, 1500);
+  };
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(ta.value).then(done).catch(() => { ta.select(); });
+  else { ta.select(); document.execCommand('copy'); done(); }
+});
+
+/* 케이스·기준값 파일을 먼저 읽고, 그다음 index.html을 캐시 없이 띄운다 */
+let __started = false;
+function startOnce() { if (__started) return; __started = true; main(); }
+
+window.__filesReady
+  .then(() => {
+    const f = document.getElementById('app');
+    f.addEventListener('load', startOnce);
+    f.src = 'index.html' + window.__BUST;
+  })
+  .catch(e => {
+    document.getElementById('summary').innerHTML =
+      `<span class="pill err">파일 로딩 실패</span><span>${e.message}</span>`;
+  });
+</script>
+</body>
+</html>
