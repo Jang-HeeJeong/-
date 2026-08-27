@@ -2545,7 +2545,7 @@ function renderPrecautions(sections) {
       return `${subHdr}<tr><td style="${ts}${extraStyle}">${it.displayNum}) ${esc(cleanText).replace(/\n/g,'<br>')}${badge}</td></tr>`;
     }).join('');
     return `<div style="margin-bottom:10px;">
-      <div style="font-size:11px;font-weight:700;color:#1e40af;padding:3px 0 4px;border-bottom:1px solid #e2e8f0;margin-bottom:2px;">${secIdx + 1}. ${esc(sec.label)}</div>
+      <div style="font-size:11.5px;font-weight:600;color:var(--obsidian);padding:3px 0 5px;border-bottom:1px solid var(--hairline);margin-bottom:3px;">${secIdx + 1}. ${esc(sec.label)}</div>
       <table style="width:100%;border-collapse:collapse;"><tbody>${rows}</tbody></table>
     </div>`;
   }).join('');
@@ -2555,9 +2555,9 @@ function renderPrecautions(sections) {
       ${resCopyBtn('__precCopyText')}
     </div>
     ${sectHtml}
-    <div style="margin-top:12px;padding-top:10px;border-top:1px solid #f1f5f9;">
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--hairline);">
       <button onclick="generateFullWordDoc()"
-        style="padding:8px 20px;background:#1e40af;color:#fff;border:none;border-radius:5px;font-size:13px;cursor:pointer;font-weight:700;letter-spacing:0.02em;font-family:inherit;">
+        style="padding:8px 20px;background:#2e2e2e;color:#fff;border:none;border-radius:var(--r);font-size:13px;cursor:pointer;font-weight:500;font-family:inherit;">
         ⬇ 최종 검토 워드 파일 다운로드
       </button>
     </div>
@@ -2779,13 +2779,13 @@ function renderCriteriaSection(chapterKey, validations, allDosageRows) {
         <tbody>${rows}</tbody>
       </table>`;
 
-    return `<div style="margin-bottom:14px;padding:10px 14px;background:#fff;border:1px solid #dde3ef;border-radius:6px;">
-      <div style="font-size:11px;font-weight:700;color:#555;letter-spacing:0.06em;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #eee;">📋 2. 기준 적합여부</div>
-      <div style="font-size:11px;font-weight:700;color:#1a4b8c;margin-bottom:3px;">▸ 유효성분의 종류</div>
-      ${kindsDb.length ? tableHtml(kindsRows) : '<p style="color:#aaa;font-size:11px;">DB 데이터 없음</p>'}
-      <div style="font-size:11px;font-weight:700;color:#1a4b8c;margin:6px 0 3px;">▸ 유효성분의 분량</div>
-      ${amtsDb.length ? tableHtml(amtsRows) : '<p style="color:#aaa;font-size:11px;">DB 데이터 없음</p>'}
-      <div style="font-size:11px;font-weight:700;color:#1a4b8c;margin:6px 0 3px;">▸ 기타 기준</div>
+    return `<div style="margin-bottom:14px;padding:10px 14px;background:var(--white);box-shadow:var(--ring2);border-radius:var(--r);">
+      <div style="font-size:12px;font-weight:600;color:var(--obsidian);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--hairline);">2. 기준 적합여부</div>
+      <div style="font-size:11px;font-weight:600;color:var(--charcoal);margin-bottom:3px;">▸ 유효성분의 종류</div>
+      ${kindsDb.length ? tableHtml(kindsRows) : '<p style="color:var(--graphite);font-size:11px;">DB 데이터 없음</p>'}
+      <div style="font-size:11px;font-weight:600;color:var(--charcoal);margin:6px 0 3px;">▸ 유효성분의 분량</div>
+      ${amtsDb.length ? tableHtml(amtsRows) : '<p style="color:var(--graphite);font-size:11px;">DB 데이터 없음</p>'}
+      <div style="font-size:11px;font-weight:600;color:var(--charcoal);margin:6px 0 3px;">▸ 기타 기준</div>
       ${tableHtml(extraRows)}
     </div>`;
   }
@@ -2800,8 +2800,8 @@ function renderAgeHeader(dr) {
   const unitDisplay = dosageUnit || '정';
   const freqStr = dr.freqMin === dr.freqMax ? `${dr.freqMax}회` : `${dr.freqMin}~${dr.freqMax}회`;
   const amtStr  = dr.amtMin  === dr.amtMax  ? `${dr.amtMax}${unitDisplay}` : `${dr.amtMin}~${dr.amtMax}${unitDisplay}`;
-  return `<div style="margin-top:14px;margin-bottom:4px;padding:5px 10px;background:#1a4b8c;color:#fff;
-    border-radius:4px;font-size:11px;font-weight:700;letter-spacing:0.04em;">
+  return `<div style="margin-top:14px;margin-bottom:4px;padding:6px 10px;background:var(--std-head);color:var(--std-head-fg);
+    border-radius:var(--r);font-size:11px;font-weight:500;">
     ▸ ${esc(displayAgeLabel(dr.age, currentKey, currentForm) || '연령 미선택')} &nbsp;|&nbsp; 1일 ${esc(freqStr)}, 1회 ${esc(amtStr)}
   </div>`;
 }

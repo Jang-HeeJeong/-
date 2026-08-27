@@ -1,0 +1,143 @@
+/* ═══════════════════════════════════════════════════════════════════
+   공용 디자인 — 디자인_가이드.md 적용 (Vercel 스타일, 업무 화면용 조정)
+
+   index.html과 new.html이 같은 파일을 씁니다.
+   색·서체·간격을 바꾸려면 여기만 고치면 두 화면에 함께 반영됩니다.
+
+   원문과 다르게 가져간 것 (근거는 디자인_가이드.md「이 앱에 적용할 때」)
+     · 기준 vs 제품은 색조 대신 명도로 구분
+     · 부적합 빨강 유지 — 검토 도구라 안전이 우선
+     · 작업자가 채워야 하는 칸은 노란 음영
+     · 숫자도 본문 서체 (Mono의 0이 읽기를 방해)
+     · 넓은 면의 검정은 한 단계 옅게
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* 색 — 원문 팔레트 */
+  --paper:     #fafafa;   --white:  #ffffff;  --hairline: #ebebeb;
+  --ash:       #c9c9c9;   --smoke:  #a8a8a8;  --graphite: #8f8f8f;
+  --slate:     #7d7d7d;   --stone:  #666666;  --charcoal: #4d4d4d;
+  --obsidian:  #171717;   --carbon: #000000;
+
+  --green: #1a7f37;  --green-bg: #eaf6ec;   /* 적합 */
+  --red:   #c62828;  --red-bg:   #fdecea;   /* 부적합 */
+
+  /* 표제기 기준 vs 제품 함량 — 색조가 아니라 명도 차이로 */
+  --std-bg:  #f4f4f4;  --std-head:  #575757;  --std-head-fg:  #ffffff;
+  --prod-bg: #ffffff;  --prod-head: #ebebeb;  --prod-head-fg: #3d3d3d;
+
+  /* 작업자가 채워야 하는 곳 */
+  --input-bg: #fff8db;  --input-line: #e8d071;  --input-focus: #b8912a;
+  --input-zone: #fffdf0;
+
+  /* 서체 — 라틴은 Geist, 한글은 Pretendard가 이어받는다.
+     숫자도 본문과 같은 서체를 쓰고 자릿수만 tabular-nums로 맞춘다. */
+  --sans: 'Geist', 'Pretendard Variable', 'Pretendard', system-ui, sans-serif;
+  --mono: var(--sans);
+
+  --r: 6px;
+  --ring:  0 0 0 1px rgba(0,0,0,.08);
+  --ring2: 0 0 0 1px var(--hairline);
+}
+
+/* ── 기본 ── */
+body {
+  font-family: var(--sans);
+  color: var(--obsidian);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "calt" 0, "rlig", "ss11";
+}
+
+select, input[type="text"], input[type="number"], input[type="search"] {
+  font-family: var(--sans); color: var(--obsidian);
+  background: var(--white); border: none; box-shadow: var(--ring2);
+  border-radius: var(--r); outline: none;
+}
+select:focus, input:focus { box-shadow: 0 0 0 1px var(--obsidian); }
+select:disabled, input:disabled { color: var(--ash); background: var(--paper); cursor: not-allowed; }
+
+input[type="number"] {
+  text-align: right; font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield; appearance: textfield;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* ── 버튼 ── */
+.btn {
+  font-family: var(--sans); font-weight: 400; cursor: pointer;
+  border: none; border-radius: var(--r); white-space: nowrap;
+  transition: background .12s;
+}
+.btn-primary { background: #2e2e2e; color: var(--white); }
+.btn-primary:hover:not(:disabled) { background: var(--obsidian); }
+.btn-primary:disabled { background: var(--ash); cursor: not-allowed; }
+.btn-add, .btn-ghost {
+  background: transparent; color: var(--charcoal);
+  border: none; box-shadow: var(--ring2);
+}
+.btn-add:hover:not(:disabled), .btn-ghost:hover { background: var(--white); }
+.btn-add:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ── 카드 / 패널 ── */
+.panel, .card {
+  background: var(--white);
+  border: none; border-radius: var(--r);
+  box-shadow: var(--ring), 0 0 0 2px var(--paper);
+}
+.panel-header, .card-head {
+  background: transparent; border: none;
+  box-shadow: 0 1px 0 var(--hairline);
+  color: var(--obsidian);
+}
+.panel-footer, .card-foot {
+  background: var(--paper); border: none;
+  box-shadow: 0 -1px 0 var(--hairline);
+}
+
+/* 섹션 제목 — 한글에는 대문자 변환이 통하지 않으므로 크기·굵기로 세운다 */
+.eyebrow, .section-title, .panel-header {
+  font-size: 12.5px; font-weight: 600; letter-spacing: -.01em;
+  color: var(--obsidian); text-transform: none;
+}
+.section-title::after { border-top-color: var(--hairline); }
+
+/* 채워야 하는 곳 표시 */
+.need {
+  font-size: 10.5px; font-weight: 500; color: #8a6d1a; letter-spacing: 0;
+  background: var(--input-bg); border-radius: 3px; padding: 1px 6px; margin-left: 6px;
+}
+.fill-zone {
+  padding: 8px 10px; border-radius: var(--r);
+  background: var(--input-zone); box-shadow: 0 0 0 1px #f2e6b8;
+}
+select.need-input, input.need-input, button.need-input {
+  background: var(--input-bg); box-shadow: 0 0 0 1px var(--input-line);
+  border: none; border-radius: var(--r);
+  color: var(--obsidian); font-family: var(--sans);
+}
+select.need-input:focus, input.need-input:focus, button.need-input:focus {
+  outline: none; background: #fffdf3; box-shadow: 0 0 0 2px var(--input-focus);
+}
+select.need-input:disabled, button.need-input:disabled {
+  background: var(--paper); box-shadow: var(--ring2); color: var(--ash);
+}
+
+/* ── 판정 (적합 / 부적합 / 미입력) ── */
+.v-ok, .v-fail, .v-na, .mx-ok, .mx-fail, .mx-na {
+  display: inline-block; border-radius: 4px; padding: 2px 8px;
+  font-size: 11px; font-weight: 500; letter-spacing: -.01em;
+}
+.v-ok,   .mx-ok   { background: var(--green-bg); color: var(--green); box-shadow: 0 0 0 1px #cfe6d4; }
+.v-fail, .mx-fail { background: var(--red); color: #fff; font-weight: 600; }
+.v-na,   .mx-na   { background: var(--paper); color: var(--graphite); box-shadow: var(--ring2); }
+.v-why {
+  display: block; font-size: 10px; color: var(--red);
+  white-space: normal; margin-top: 2px; font-weight: 500;
+}
+
+/* ── 숫자 ── */
+.num {
+  font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap;
+}
