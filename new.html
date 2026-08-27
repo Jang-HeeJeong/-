@@ -731,12 +731,18 @@ function runReview() {
     </div></div>`;
 
   h += `<div class="tbl-wrap"><table class="tbl">
-    <thead><tr class="h1">
-      <th style="text-align:left;min-width:150px;">성분명</th>
-      <th class="g-std">기준 최소</th><th class="g-std">기준 최대</th>
-      <th class="g-prod">1일 최소</th><th class="g-prod">1일 최대</th>
-      <th style="min-width:58px;">판정</th>
-    </tr></thead><tbody>`;
+    <thead>
+      <tr class="h1">
+        <th rowspan="2" style="text-align:left;min-width:150px;">성분명</th>
+        <th colspan="2" class="g-std">표제기 기준 (1일)</th>
+        <th colspan="2" class="g-prod">제품 함량 (1일)</th>
+        <th rowspan="2" style="min-width:58px;">판정</th>
+      </tr>
+      <tr class="h2">
+        <th class="g-std">최소</th><th class="g-std">최대</th>
+        <th class="g-prod">최소</th><th class="g-prod">최대</th>
+      </tr>
+    </thead><tbody>`;
   for (const r of items) {
     const al = r.allowed ?? {}, ac = r.actual ?? {};
     h += `<tr class="${r.ok === false ? 'fail' : ''}">
@@ -751,7 +757,7 @@ function runReview() {
   for (const r of rules.filter(x => x.ok === false)) {
     h += `<tr class="fail"><td class="name" colspan="5">
       <span class="item-no">배합 규칙</span>${esc(r.key)} — ${esc(r.reason ?? '')}</td>
-      <td class="verdict">${verdict(false, '')}</td></tr>`;
+      <td class="verdict">${verdict(false, '')}</td></tr>`;   // 성분명+4열 = 5
   }
   for (const r of sums.filter(x => x.ok === false)) {
     h += `<tr class="fail"><td class="name" colspan="5">
@@ -796,22 +802,39 @@ function docBlock(title, key, lines) {
     }</div></div>`;
 }
 
-/* 생성기 결과를 화면용 줄 목록으로 (구조가 장마다 달라 유연하게 훑는다) */
+/* 효능효과 — generateEfficacy는 { basicText, basicItems, items, finalTexts }를 준다.
+   제1장(비타민)은 basicText/basicItems/items로 조립하고,
+   그 외 장은 finalTexts를 그대로 쓴다. 기존 화면과 같은 형식이다.
+
+     ○ 다음경우의 비타민 B1, B2, C의 보급
+     - 육체피로
+     - 이 약에 함유된 비타민 등의 효능ㆍ효과는 다음과 같다.
+     ㆍ다음 증상의 완화 : 신경통, 근육통 …                                   */
 function effText(eff) {
   const out = [];
-  const push = (t, lv) => { const v = String(t ?? '').trim(); if (v) out.push({ text: v, lv }); };
   if (!eff) return out;
-  const walk = (v, lv) => {
-    if (v == null) return;
-    if (typeof v === 'string') { push(v, lv); return; }
-    if (Array.isArray(v)) { v.forEach(x => walk(x, lv)); return; }
-    if (typeof v === 'object') {
-      for (const k of ['기본기재', 'basic', 'header', 'text', 'label']) if (v[k]) walk(v[k], lv);
-      for (const k of ['세부항목', 'items', 'texts', 'list', 'details']) if (v[k]) walk(v[k], lv + 1);
-    }
-  };
-  for (const k of ['final', 'okBasic', 'okItems', 'lines', 'texts', 'result']) if (eff[k]) walk(eff[k], 1);
-  if (!out.length) walk(eff, 1);
+  const { items, basicText, basicItems, finalTexts } = eff;
+
+  // "(비타민 B1, B2, C 함유시)" 같은 조건 표기는 문구에서 뺀다
+  const condPat = /[（(][^）)]*함유시[）)]/g;
+  const clean = t => String(t ?? '').replace(condPat, '').trim();
+  const push = (t, lv) => { const v = clean(t); if (v) out.push({ text: v, lv }); };
+
+  const isVitamin = !!basicText || (basicItems?.length ?? 0) > 0;
+  if (!isVitamin) {
+    const ft = finalTexts ?? [];
+    ft.forEach((t, i) => push((ft.length > 1 ? `${i + 1}) ` : '') + applyEasyTerms(t), 1));
+    return out;
+  }
+
+  if (basicText) push('○ ' + basicText, 1);
+  for (const it of (basicItems ?? []).filter(x => x.ok)) push('- ' + it.label, 2);
+
+  const okItems = (items ?? []).filter(x => x.ok);
+  if (okItems.length) {
+    push('- 이 약에 함유된 비타민 등의 효능ㆍ효과는 다음과 같다.', 1);
+    for (const it of okItems) for (const t of (it.texts ?? [])) push('ㆍ' + t, 2);
+  }
   return out;
 }
 
