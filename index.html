@@ -200,21 +200,31 @@
       font-size: 12px;
       white-space: nowrap;
     }
-    /* 표제기 기준 = 어두운 헤더, 제품 = 밝은 헤더 (색조 아닌 명도로 구분) */
+    /* 머리글은 밝은 바탕이 기본.
+       "표제기 기준"만 어두운 회색으로 눌러 제품 함량과 구분한다 (색조 아닌 명도). */
+    .mx-table thead th {
+      text-align: center; border: none;
+      position: sticky; z-index: 3;
+    }
     .mx-table thead tr.mx-hdr1 th {
-      background: var(--std-head); color: var(--std-head-fg);
-      text-align: center; font-size: 10.5px; font-weight: 500;
-      padding: 6px 5px; border: none;
-      position: sticky; top: 0; z-index: 3;
+      background: var(--paper); color: var(--charcoal);
+      font-size: 10.5px; font-weight: 600;
+      padding: 6px 5px; top: 0;
+      box-shadow: inset 0 -1px 0 var(--hairline);
     }
-    .mx-table thead tr.mx-hdr1 th.mx-th-prod { background: var(--prod-head); color: var(--prod-head-fg); }
     .mx-table thead tr.mx-hdr2 th {
-      background: #6e6e6e; color: #fff;
-      text-align: center; font-size: 10px; font-weight: 500;
-      padding: 4px 5px; border: none;
-      position: sticky; top: 27px; z-index: 3;
+      background: var(--paper); color: var(--graphite);
+      font-size: 10px; font-weight: 500;
+      padding: 4px 5px; top: 27px;
+      box-shadow: inset 0 -1px 0 var(--hairline);
     }
-    .mx-table thead tr.mx-hdr2 th.mx-th-prod { background: #f4f4f4; color: var(--stone); }
+    /* 표제기 기준 (어두움) / 제품 함량 (밝음) */
+    .mx-table thead th.mx-th-std  { background: var(--std-head)  !important; color: var(--std-head-fg)  !important; box-shadow: none; }
+    .mx-table thead th.mx-th-prod { background: var(--prod-head) !important; color: var(--prod-head-fg) !important; box-shadow: none; }
+    .mx-table thead tr.mx-hdr2 th.mx-th-std  { background: #6e6e6e !important; }
+    .mx-table thead tr.mx-hdr2 th.mx-th-prod { background: #f4f4f4 !important; color: var(--stone) !important; }
+    /* 작업자가 채우는 열 — 머리글에도 같은 노랑 */
+    .mx-table thead th.mx-th-input { background: #fdf3c4 !important; color: #6b5410 !important; box-shadow: none; }
     .mx-table tbody td {
       padding: 3px 6px;
       border: none; border-bottom: 1px solid #f3f3f3;
@@ -530,7 +540,6 @@
 
   <!-- ═══════════ 입력부 ═══════════ -->
   <section class="panel" id="panel-input">
-    <div class="panel-header">입력</div>
     <div class="panel-body">
 
       <!-- 기본 정보 2열 -->
@@ -1928,15 +1937,15 @@ function renderCh1Integrated() {
         <th rowspan="2" style="width:24px;"></th>
         <th rowspan="2" style="min-width:60px;text-align:center;white-space:nowrap;">항목</th>
         <th rowspan="2" style="min-width:140px;text-align:center;">성분명</th>
-        <th rowspan="2" style="min-width:68px;">배합량</th>
-        <th rowspan="2" class="mx-th-unit">단위</th>
-        <th colspan="2">표제기 기준 (1일)</th>
+        <th rowspan="2" class="mx-th-input" style="min-width:68px;">배합량 ✎</th>
+        <th rowspan="2" class="mx-th-input mx-th-unit">단위 ✎</th>
+        <th colspan="2" class="mx-th-std">표제기 기준 (1일)</th>
         <th colspan="2" class="mx-th-prod">제품 1일 함량</th>
-        <th rowspan="2" class="mx-th-prod" style="min-width:32px;">가능<br>여부</th>
         <th rowspan="2" style="min-width:130px;text-align:center;">비고</th>
+        <th rowspan="2" style="min-width:62px;">판정</th>
       </tr>
       <tr class="mx-hdr2">
-        <th>최소</th><th>최대</th>
+        <th class="mx-th-std">최소</th><th class="mx-th-std">최대</th>
         <th class="mx-th-prod">최소</th><th class="mx-th-prod">최대</th>
       </tr>
     </thead>`;
@@ -2062,9 +2071,9 @@ function renderCh1Integrated() {
         const mgActDMax = mgIsActive ? +(totalMgAs * amtMax * freqMax).toFixed(4) : null;
         const mgOk = mgActDMax != null ? mgActDMax <= mgCritMax : null;
         let mgOkHtml;
-        if (mgOk === null) mgOkHtml = '<span class="mx-na">—</span>';
-        else if (mgOk) mgOkHtml = '<span class="mx-ok">O</span>';
-        else mgOkHtml = '<span class="mx-fail">X</span>';
+        if (mgOk === null) mgOkHtml = '<span class="mx-na">미입력</span>';
+        else if (mgOk) mgOkHtml = '<span class="mx-ok">적합</span>';
+        else mgOkHtml = '<span class="mx-fail">부적합</span>';
 
         const canRemoveMg = isFirst && !row.isMain;
         rows += `<tr class="mx-row mx-active mg-subtotal-row" data-id="${row.id}">`;
@@ -2160,14 +2169,14 @@ function renderCh1Integrated() {
       }
       let okHtml;
       if (ok === null) {
-        okHtml = '<span class="mx-na">—</span>';
+        okHtml = '<span class="mx-na">미입력</span>';
       } else if (ok) {
-        okHtml = '<span class="mx-ok">O</span>';
+        okHtml = '<span class="mx-ok">적합</span>';
       } else if (vr?.elevHint) {
         const yr = Math.round(vr.elevHint.threshMonths / 12);
-        okHtml = `<span class="mx-fail">X</span><br><span style="font-size:9px;color:#1565c0;white-space:nowrap;">💡${yr}세+ O</span>`;
+        okHtml = `<span class="mx-fail">부적합</span><br><span style="font-size:9px;color:var(--stone);white-space:nowrap;">${yr}세 이상이면 적합</span>`;
       } else {
-        okHtml = '<span class="mx-fail">X</span>';
+        okHtml = '<span class="mx-fail">부적합</span>';
       }
       const rowCls = isActive ? 'mx-row mx-active' : 'mx-row';
       const canRemove = isFirst && !row.isMain;
@@ -2209,7 +2218,6 @@ function renderCh1Integrated() {
       rows += `<td class="mx-std" data-col="critMax">${stdMaxHtml}</td>`;
       rows += `<td class="mx-prod" data-col="actDMin">${fmtN(actDMin)}</td>`;
       rows += `<td class="mx-prod" data-col="actDMax">${fmtN(actDMax)}</td>`;
-      rows += `<td data-col="ok" style="text-align:center;">${okHtml}</td>`;
       // 비고 셀
       let noteHtml = '';
       if (isActive) {
@@ -2231,6 +2239,7 @@ function renderCh1Integrated() {
         }
       }
       rows += `<td data-col="note" style="padding:3px 6px;font-size:10.5px;vertical-align:middle;">${noteHtml}</td>`;
+      rows += `<td data-col="ok" style="text-align:center;">${okHtml}</td>`;
       rows += `</tr>`;
     }
     return rows;
@@ -2605,9 +2614,9 @@ function updateCh1BlockAmts(drId) {
       set('actDMax', fmtN(mgActDMax));
       set('critMax', mgCritMax != null ? `${fmtN(mgCritMax)}<br><span style="color:var(--graphite);font-size:9px;">mg</span>` : '—');
       let mgOkHtml;
-      if (mgOk === null) mgOkHtml = '<span class="mx-na">—</span>';
-      else if (mgOk) mgOkHtml = '<span class="mx-ok">O</span>';
-      else mgOkHtml = '<span class="mx-fail">X</span>';
+      if (mgOk === null) mgOkHtml = '<span class="mx-na">미입력</span>';
+      else if (mgOk) mgOkHtml = '<span class="mx-ok">적합</span>';
+      else mgOkHtml = '<span class="mx-fail">부적합</span>';
       set('ok', mgOkHtml);
       return;
     }
@@ -2679,14 +2688,14 @@ function updateCh1BlockAmts(drId) {
     set('critMax', critMax != null ? `${fmtN(critMax)}${unitSpan}` : '—');
     let okHtml;
     if (ok === null) {
-      okHtml = '<span class="mx-na">—</span>';
+      okHtml = '<span class="mx-na">미입력</span>';
     } else if (ok) {
-      okHtml = '<span class="mx-ok">O</span>';
+      okHtml = '<span class="mx-ok">적합</span>';
     } else if (vr?.elevHint) {
       const yr = Math.round(vr.elevHint.threshMonths / 12);
-      okHtml = `<span class="mx-fail">X</span><br><span style="font-size:9px;color:#1565c0;white-space:nowrap;">💡${yr}세+ O</span>`;
+      okHtml = `<span class="mx-fail">부적합</span><br><span style="font-size:9px;color:var(--stone);white-space:nowrap;">${yr}세 이상이면 적합</span>`;
     } else {
-      okHtml = '<span class="mx-fail">X</span>';
+      okHtml = '<span class="mx-fail">부적합</span>';
     }
     set('ok', okHtml);
     // 비고 셀 업데이트
@@ -2788,14 +2797,14 @@ function renderCh2Integrated() {
       <tr class="mx-hdr1">
         <th rowspan="2" style="width:30px;"></th>
         <th rowspan="2" style="min-width:110px;text-align:left;padding-left:6px;">성분명</th>
-        <th colspan="${stdColspan}">표제기 기준 (mg)</th>
-        <th rowspan="2" style="min-width:58px;">단위당<br>함량(mg)</th>
+        <th colspan="${stdColspan}" class="mx-th-std">표제기 기준 (mg)</th>
+        <th rowspan="2" class="mx-th-input" style="min-width:58px;">단위당<br>함량(mg) ✎</th>
         <th colspan="4" class="mx-th-prod">제품 함량 (mg)</th>
-        <th rowspan="2" class="mx-th-prod" style="min-width:32px;">가능<br>여부</th>
+        <th rowspan="2" style="min-width:62px;">판정</th>
       </tr>
       <tr class="mx-hdr2">
-        ${hasStd1dose ? '<th>1회최소</th><th>1회최대</th>' : ''}
-        <th>1일최소</th><th>1일최대</th>
+        ${hasStd1dose ? '<th class="mx-th-std">1회최소</th><th class="mx-th-std">1회최대</th>' : ''}
+        <th class="mx-th-std">1일최소</th><th class="mx-th-std">1일최대</th>
         <th class="mx-th-prod">1회최소</th><th class="mx-th-prod">1회최대</th>
         <th class="mx-th-prod">1일최소</th><th class="mx-th-prod">1일최대</th>
       </tr>
@@ -2896,8 +2905,8 @@ function renderCh2Integrated() {
                  (dispMax1d!=null&&act1dmax>dispMax1d)||(dispMin1d!=null&&act1dmin<dispMin1d));
         }
       }
-      const okHtml = ok===null ? '<span class="mx-na">—</span>'
-                   : ok ? '<span class="mx-ok">O</span>' : '<span class="mx-fail">X</span>';
+      const okHtml = ok===null ? '<span class="mx-na">미입력</span>'
+                   : ok ? '<span class="mx-ok">적합</span>' : '<span class="mx-fail">부적합</span>';
       const rowCls = isActive ? 'mx-row mx-active' : 'mx-row';
       const canRemove = isFirst && !row.isMain && row.isShown;
       const nameCell = row.isCustom
@@ -3132,7 +3141,7 @@ function updateCh2BlockAmts(drId) {
     set('act1max', fmtN(act1max));
     set('act1dmin', fmtN(act1dmin));
     set('act1dmax', fmtN(act1dmax));
-    const okHtml = ok===null?'<span class="mx-na">—</span>':ok?'<span class="mx-ok">O</span>':'<span class="mx-fail">X</span>';
+    const okHtml = ok===null?'<span class="mx-na">미입력</span>':ok?'<span class="mx-ok">적합</span>':'<span class="mx-fail">부적합</span>';
     set('ok', okHtml);
     tr.className = dose!==null ? 'mx-row mx-active' : 'mx-row';
   });
@@ -3400,9 +3409,9 @@ function renderMatrix() {
       ok = !bad;
     }
 
-    const okHtml = ok === null ? '<span class="mx-na">—</span>'
-                 : ok ? '<span class="mx-ok">O</span>'
-                      : '<span class="mx-fail">X</span>';
+    const okHtml = ok === null ? '<span class="mx-na">미입력</span>'
+                 : ok ? '<span class="mx-ok">적합</span>'
+                      : '<span class="mx-fail">부적합</span>';
     const rowCls = isActive ? 'mx-row mx-active' : 'mx-row';
 
     const nameCell = row.isCustom
@@ -3497,9 +3506,9 @@ function updateMatrixRow(id) {
       ok = !bad;
     }
   }
-  const okHtml = ok === null ? '<span class="mx-na">—</span>'
-               : ok ? '<span class="mx-ok">O</span>'
-                    : '<span class="mx-fail">X</span>';
+  const okHtml = ok === null ? '<span class="mx-na">미입력</span>'
+               : ok ? '<span class="mx-ok">적합</span>'
+                    : '<span class="mx-fail">부적합</span>';
   tr.className = isActive ? 'mx-row mx-active' : 'mx-row';
   const set = (col, val) => { const td = tr.querySelector(`td[data-col="${col}"]`); if (td) td.innerHTML = val; };
   set('act1min',  fmtN(act1min));
@@ -3826,7 +3835,7 @@ function resRowBg(ok) {
 
 /* 판정 셀 — 부적합만 칩으로 강조, 적합은 조용하게 */
 function resVerdictCell(ok, reason) {
-  if (ok === true)  return '<span class="v-ok">✓ 적합</span>';
+  if (ok === true)  return '<span class="v-ok">적합</span>';
   if (ok === false) return `<span class="v-fail">부적합</span>`
     + (reason && reason !== '부적합' ? `<span class="v-reason">${esc(reason)}</span>` : '');
   return '<span class="v-na">확인불가</span>'
