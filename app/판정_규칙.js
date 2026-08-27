@@ -18,6 +18,11 @@
 let DB = null;
 let chaptersMap = {};
 
+/* 화면이 채워 주는 값 — 생성기가 참조한다.
+   index.html과 new.html이 각자 자기 상태를 여기에 넣는다. */
+let dosageUnit = '캡슐';
+let selectedExcipients = [];
+
 /* ══════════ 1) 규칙 상수 ══════════ */
 
 const CHAPTER_ORDER = [
@@ -1434,3 +1439,2829 @@ function _parseExcelIngredients(ingrStr) {
     return { name: part, dose: '', unit: 'mg' };
   });
 }
+
+
+/* ══════════ 5) 효능효과 · 사용상 주의사항 자동 생성 ══════════
+   배합된 성분과 첨가제로 허가사항 문구를 만든다.
+   화면(DOM)을 건드리지 않으므로 어느 화면에서든 재사용된다. */
+
+function getFreqRange(chapterKey, form) {
+  const f = form || '';
+  if (chapterKey === '제3장_감기약') {
+    if (/내용액제|시럽/.test(f)) return { min:4, max:4, locked:true };
+    return { min:3, max:3, locked:true };
+  }
+  if (chapterKey === '제7장_진해거담제') {
+    if (f.includes('트로키')) return { min:6, max:6, locked:true };
+    return { min:3, max:4, locked:false };
+  }
+  if (chapterKey === '제9장_비염용경구제') {
+    if (/내용액제|시럽/.test(f)) return { min:6, max:6, locked:true };
+    return { min:3, max:3, locked:true };
+  }
+  return { min:1, max:3, locked:false };
+}
+
+function formToUnit(form) {
+  if (!form) return null;
+  if (form.includes('캡슐')) return '캡슐';
+  if (form.includes('젤리')) return '젤리';
+  if (form.includes('구강용해필름')) return '매';
+  if (/정제|추어블정|환제|구강용/.test(form)) return '정';
+  if (/산제|과립/.test(form)) return '포';
+  if (/액제|시럽|트로키/.test(form)) return 'mL';
+  return null;
+}
+
+function parseThresholdStr(s) {
+  if (!s) return null;
+  const m = s.replace(/,/g,'').match(/([\d.]+)\s*(IU|mg|g|μg|mcg)/);
+  return m ? { value: parseFloat(m[1]), unit: m[2] } : null;
+}
+
+function extractVitType(항목) {
+  const m = (항목 ?? '').match(/[（(]([^）)]+)[）)]/);
+  return m ? m[1] : null;
+}
+
+function calcEffDaily(row, refUnit, amtMax, freqMax) {
+  let v = parseFloat(row.dose);
+  if (!isFinite(v)) return null;
+  if (row.unit !== refUnit) {
+    const cv = convertToUnit(v, row.unit, refUnit);
+    if (!cv) return null;
+    v = cv.value;
+  }
+  return +(v * amtMax * freqMax).toFixed(6);
+}
+
+function generateEfficacy(chapterKey, form, activeRows, dosage) {
+  const { amtMax = 1, freqMax = 1 } = dosage;
+  const ch = DB[chapterKey];
+  if (!ch) return null;
+  const tables = ch['표'];
+  const kijun  = ch['기준'] ?? {};
+
+  /* ── 제2장 해열진통제 ── */
+  if (chapterKey === '제2장_해열진통제') {
+    const texts = kijun['효능효과'] ?? [];
+    return { finalTexts: Array.isArray(texts) ? texts : [texts], items: [] };
+  }
+
+  /* ── 제9장 비염용경구제 ── */
+  if (chapterKey === '제9장_비염용경구제') {
+    const t = kijun['효능효과'] ?? '';
+    return { finalTexts: t ? [t] : [], items: [] };
+  }
+
+  /* ── 제3장 감기약 ── */
+  if (chapterKey === '제3장_감기약') {
+    const table1e = tables['표1_유효성분']        ?? [];
+    const table1h = tables['표1_생약_및_한약처방'] ?? [];
+
+    const hasGubun = p => activeRows.some(r => {
+      const ref = table1e.find(t => t['성분명'] === r.ingr);
+      return ref && (ref['구분'] ?? '').startsWith(p);
+    });
+    const hasHan = lan => activeRows.some(r =>
+      !!table1h.find(t => t['성분명'] === r.ingr && t['구분'] === lan));
+    const hasIngrName = name => activeRows.some(r => r.ingr === name);
+
+    // 콧물·코막힘·재채기: Ⅲ항 or Ⅵ항
+    const okNose = hasGubun('Ⅲ항') || hasGubun('Ⅵ항');
+    // 기침: Ⅳ항 or Ⅴ항 or 가란
+    const okCough = hasGubun('Ⅳ항') || hasGubun('Ⅴ항') || hasHan('가란');
+    // 가래: Ⅳ항 특정성분, Ⅴ항, Ⅶ항, Ⅺ항, 가란, 나란
+    const okPhlegm = hasIngrName('구연산티페피딘') || hasIngrName('히벤즈산티페피딘')
+      || hasGubun('Ⅴ항') || hasGubun('Ⅶ항') || hasGubun('Ⅺ항')
+      || hasHan('가란') || hasHan('나란');
+
+    // 표준 원문 순서·표현으로 증상 목록 구성
+    const symptoms = [];
+    if (okNose)   symptoms.push('콧물', '코막힘', '재채기');
+    symptoms.push('인후(목구멍)통');
+    if (okCough)  symptoms.push('기침');
+    if (okPhlegm) symptoms.push('가래');
+    symptoms.push('오한(춥고 떨리는 증상)', '발열', '두통', '관절통', '근육통');
+
+    const finalText = `감기의 제증상(${symptoms.join(', ')})의 완화`;
+
+    // 조건부 항목 검토 결과 (결과 화면 표시용)
+    const items = [
+      { label: '콧물·코막힘·재채기', ok: okNose,
+        reason: okNose ? '' : 'Ⅲ항(항히스타민제) 또는 Ⅵ항(항콜린제) 미포함' },
+      { label: '기침', ok: okCough,
+        reason: okCough ? '' : 'Ⅳ항(진해제), Ⅴ항(기관지확장제), 가란 생약 미포함' },
+      { label: '가래', ok: okPhlegm,
+        reason: okPhlegm ? '' : 'Ⅳ항 티페피딘계, Ⅴ항, Ⅶ항, Ⅺ항, 가란/나란 미포함' },
+    ];
+    return { finalTexts: [finalText], items };
+  }
+
+  /* ── 제7장 진해거담제 ── */
+  if (chapterKey === '제7장_진해거담제') {
+    const effData = kijun['효능효과'] ?? {};
+    const table1e = tables['표1_유효성분'] ?? [];
+    const table1h = tables['표1_생약']    ?? [];
+    const isTroki = form.includes('트로키');
+
+    const hasGubun = p => activeRows.some(r => {
+      const ref = table1e.find(t => t['성분명'] === r.ingr);
+      return ref && (ref['구분'] ?? '').startsWith(p);
+    });
+    const hasHan = lan => activeRows.some(r =>
+      !!table1h.find(t => t['성분명'] === r.ingr && t['구분'] === lan));
+    const hasIngrName = name => activeRows.some(r => r.ingr === name);
+
+    const has1항 = hasGubun('1항');
+    const okCough  = has1항 || hasGubun('2항') || hasGubun('3항') || hasHan('가란');
+    const okPhlegm = hasGubun('2항') || hasGubun('4항') || hasGubun('5항')
+      || hasHan('가란') || hasHan('나란')
+      || hasIngrName('구연산티페피딘') || hasIngrName('히벤즈산티페피딘');
+    const hasAsthmaSrc = hasGubun('2항') || hasGubun('4항') || hasHan('가란');
+    const okAsthma = hasAsthmaSrc && !has1항;
+
+    const items = [
+      { label: '기침', texts: ['기침'],
+        ok: okCough, reason: okCough ? '' : '1항(중추성진해제), 2항(기관지확장제), 3항(말초성진해제), 가란 미포함' },
+      { label: '가래', texts: ['가래'],
+        ok: okPhlegm, reason: okPhlegm ? '' : '2항, 4항(거담제), 5항, 가란, 나란, 구연산/히벤즈산티페피딘 미포함' },
+      { label: '천식', texts: ['천식'],
+        ok: okAsthma, reason: okAsthma ? '' :
+          !hasAsthmaSrc ? '2항(기관지확장제), 4항(크산틴계), 가란 미포함' :
+          '1항(중추성진해제)과 동시 배합 시 천식 효능효과 기재 불가' },
+    ];
+
+    if (isTroki && hasGubun('9항')) {
+      const trokiText = effData['트로키제_추가효능'] ?? '구내염, 편도염, 인·후두염 관련';
+      items.push({ label: '구강·인후 (트로키 9항)', texts: [trokiText], ok: true, reason: '' });
+    }
+
+    const qualifying = items.filter(it => it.ok).flatMap(it => it.texts);
+    return { finalTexts: qualifying.length > 0 ? [qualifying.join(', ')] : [], items };
+  }
+
+  /* ── 제1장 비타민미네랄 ── */
+  if (chapterKey === '제1장_비타민미네랄') {
+    const table1  = tables['표1_비타민']     ?? [];
+    const table2  = tables['표2_미네랄']     ?? [];
+    const table4  = tables['표4_생약']       ?? [];
+    const 표6     = tables['표6_효능효과']   ?? [];
+    const effData = kijun['효능효과'] ?? {};
+    const conds   = effData['1일_보급량_기준_기재조건'] ?? [];
+    const 추가    = effData['추가효능'] ?? [];
+    const items   = [];
+
+    /* 기본기재 + 세부항목 */
+    const 기본기재    = effData['기본기재'] ?? '';
+    const 세부항목arr = effData['세부항목'] ?? [];
+    const _parseSebuCond = s => {
+      const t = s.replace(/\s*함유시\s*$/, '').trim();
+      const names = [];
+      if (t.includes('간유')) names.push('간유');
+      const vm = t.match(/비타민\s+(.+)$/);
+      if (vm) vm[1].split(/,\s*/).forEach(p => {
+        const n = p.trim().replace(/\s+/g, ''); if (n) names.push('비타민' + n);
+      });
+      return names;
+    };
+    const _vitPresent = vn => {
+      if (vn === '간유') return activeRows.some(r => r.ingr.includes('간유'));
+      return activeRows.some(r =>
+        table1.some(vr => extractVitType(vr['항목']) === vn && nameMatches(vr['성분명'], r.ingr)));
+    };
+    const VIT_SHORT_MAP = { '비타민A':'A','비타민D':'D','비타민E':'E','비타민B1':'B1','비타민B2':'B2','비타민B6':'B6','비타민C':'C' };
+    const presentVitShort = Object.entries(VIT_SHORT_MAP).filter(([vn]) => _vitPresent(vn)).map(([, s]) => s);
+    const basicText = (기본기재 && presentVitShort.length)
+      ? 기본기재.replace(/X\s*\([^)]+\)/, presentVitShort.join(', ')) : null;
+    const basicItems = 세부항목arr.map(txt => {
+      const m = txt.match(/^([^(（]+)[（(]([^）)]+)[）)]/);
+      if (!m) return { label: txt, ok: false, cond: '' };
+      const condVits = _parseSebuCond(m[2]);
+      return { label: m[1].trim(), ok: condVits.some(_vitPresent), cond: m[2] };
+    });
+
+    /* 비타민별 효능효과 */
+    for (const cond of conds) {
+      const vitName = cond['성분'];
+      const thresh  = parseThresholdStr(cond['기재조건']);
+      const 표6row  = 표6.find(r => r['제제'] === `${vitName}함유제제`);
+      const effTexts = 표6row?.['효능효과'] ?? [];
+      if (!effTexts.length) continue;
+
+      const relevant = activeRows.filter(r =>
+        table1.some(vr => extractVitType(vr['항목']) === vitName && nameMatches(vr['성분명'], r.ingr))
+      );
+
+      if (!relevant.length) {
+        items.push({ label: vitName, texts: effTexts, ok: false, reason: `${vitName} 성분 미포함` });
+        continue;
+      }
+      if (!thresh) {
+        items.push({ label: vitName, texts: effTexts, ok: true, reason: '' });
+        continue;
+      }
+      let total = 0;
+      for (const row of relevant) {
+        const d = calcEffDaily(row, thresh.unit, amtMax, freqMax);
+        if (d !== null) total += d;
+      }
+      total = +total.toFixed(4);
+      const ok = total >= thresh.value;
+      items.push({ label: vitName, texts: effTexts, ok,
+        reason: ok ? '' : `1일 ${total} ${thresh.unit} < 기재조건 ${thresh.value} ${thresh.unit}` });
+    }
+
+    /* 추가효능 (미네랄, 자양강장) */
+    for (const eff of 추가) {
+      if (eff.startsWith('자양강장')) {
+        const t4I = table4.find(r => r['항목'] === 'Ⅰ');
+        const rel = t4I ? activeRows.filter(r => nameMatches(t4I['성분명'], r.ingr)) : [];
+        if (!rel.length) {
+          items.push({ label: '자양강장', texts: ['자양강장'], ok: false, reason: '표4 Ⅰ항 생약(인삼·홍삼·미삼) 미포함' });
+        } else {
+          let g = 0;
+          for (const row of rel) { const v = toGram(parseFloat(row.dose), row.unit); if (v !== null) g += v * amtMax * freqMax; }
+          g = +g.toFixed(4);
+          const ok = g >= 0.6;
+          items.push({ label: '자양강장', texts: ['자양강장'], ok,
+            reason: ok ? '' : `1일 ${g}g < 기재조건 0.6g (원생약 기준)` });
+        }
+        continue;
+      }
+      const m = eff.replace(/,/g,'').match(/^([^(（]+)[（(]([가-힣]+)으로서\s*([\d.]+)\s*(mg|IU|μg|g|mcg)\s*이상/);
+      if (!m) continue;
+      const [, effText, minName, threshStr, unit] = m;
+      const thresh = parseFloat(threshStr);
+      const rel = activeRows.filter(r => { const mr = findMineralRow(table2, r.ingr); return mr && mr['성분'] === minName; });
+      if (!rel.length) {
+        items.push({ label: effText.trim(), texts: [effText.trim()], ok: false, reason: `${minName} 성분 미포함` });
+        continue;
+      }
+      let total = 0;
+      for (const row of rel) { const d = calcEffDaily(row, unit, amtMax, freqMax); if (d !== null) total += d; }
+      total = +total.toFixed(4);
+      const ok = total >= thresh;
+      items.push({ label: effText.trim(), texts: [effText.trim()], ok,
+        reason: ok ? '' : `1일 ${total} ${unit} < 기재조건 ${thresh} ${unit}` });
+    }
+
+    const finalTexts = items.filter(it => it.ok).flatMap(it => it.texts);
+    return { finalTexts, items, basicText, basicItems };
+  }
+
+  return null;
+}
+
+const EXCIPIENT_PREC_DB = {
+  '벤질알코올': {
+    경고: ['벤질알코올은 조숙아에게서 치명적인 가쁜 호흡증상과 연관이 있는 것으로 보고되었다.'],
+    복용하지_말_것: ['신생아, 미숙아 (벤질알코올을 함유하고 있다.)'],
+  },
+  '삭카린나트륨': {
+    복용시_주의: ['동물실험에서 발암성이 있는 것으로 나타난 삭카린을 함유하고 있어 건강에 해로울 수 있다. (감미제로서 삭카린이 함유되어 있다.)'],
+  },
+  '아스파탐': {
+    경고: ['이 약에 함유되어 있는 인공감미제 아스파탐은 체내에서 분해되어 페닐알라닌으로 대사되므로, 페닐알라닌의 섭취를 규제할 필요가 있는 유전성 질환인 페닐케톤뇨증환자에는 투여하지 말 것.'],
+  },
+  '아황산수소나트륨': {
+    복용전_상의: ['이 약은 아황산수소나트륨이 함유되어 있으므로 아황산 아나필락시와 같은 알레르기를 일으킬 수 있으며, 일부 감수성 환자에서는 생명을 위협할 정도 또는 이보다 약한 천식발작을 일으킬 수 있다. 일반 사람에서의 아황산감수성에 대한 총괄적인 빈도는 알려지지 않았으나 낮은 것으로 보이며 아황산감수성은 비천식환자보다 천식환자에서 빈번한 것으로 나타났다.'],
+  },
+  '아황산나트륨': {
+    복용전_상의: ['이 약은 아황산나트륨이 함유되어 있어 아나필락시와 같은 알레르기를 일으킬 수 있으며 일부 감수성 환자에서는 생명을 위협할 정도 또는 이보다 약한 천식발작을 일으킬 수 있다. 일반 사람에서의 아황산감수성에 대한 총괄적인 빈도는 알려지지 않았으나 낮은 것으로 보이며 아황산감수성은 비천식환자보다 천식환자에서 빈번한 것으로 나타났다.'],
+  },
+  '피로아황산나트륨': {
+    복용전_상의: ['이 약은 피로아황산나트륨이 함유되어 있어 아나필락시와 같은 알레르기를 일으킬 수 있으며 일부 감수성 환자에서는 생명을 위협할 정도 또는 이보다 약한 천식발작을 일으킬 수 있다. 일반 사람에서의 아황산감수성에 대한 총괄적인 빈도는 알려지지 않았으나 낮은 것으로 보이며 아황산감수성은 비천식환자보다 천식환자에서 빈번한 것으로 나타났다.'],
+  },
+  '피로아황산칼륨': {
+    복용전_상의: ['이 약은 피로아황산칼륨이 함유되어 있어 아나필락시와 같은 알레르기를 일으킬 수 있으며 일부 감수성 환자에서는 생명을 위협할 정도 또는 이보다 약한 천식발작을 일으킬 수 있다. 일반 사람에서의 아황산감수성에 대한 총괄적인 빈도는 알려지지 않았으나 낮은 것으로 보이며 아황산감수성은 비천식환자보다 천식환자에서 빈번한 것으로 나타났다.'],
+  },
+  '벤조산나트륨': {
+    복용시_주의: [
+      '(외용제) 이 약은 안식향산(나트륨)을 포함하고 있어 피부, 눈, 점막에 경미한 자극이 될 수 있다.',
+      '(주사제) 이 약은 안식향산(나트륨)을 포함하고 있어 신생아에게 황달의 위험을 증가시킬 수 있다.',
+    ],
+  },
+  '알코올': {
+    복용하지_말_것: [
+      '간염, 알코올중독, 간질 또는 두뇌손상 환자',
+      '임부, 수유부 및 소아',
+    ],
+    복용시_주의: [
+      '다른 약물의 효과를 감소시키거나 증가시킬 수 있으며, 반응속도가 감소될 수 있다.',
+      '운전자와 기계조작자는 특히 주의할 것.',
+    ],
+  },
+  '월견초종자유': {
+    복용시_주의: ['이 약은 월견초종자유를 함유하고 있으므로 발진 등의 알레르기 반응과 복통이 나타날 수 있다.'],
+  },
+  '치메로살': {
+    복용하지_말_것: ['치메로살에 과민증 환자'],
+    복용시_주의: ['이 약은 치메로살(유기수은제제)을 함유하고 있어 과민반응이 일어날 수 있다.'],
+  },
+  '카라멜': {
+    복용전_상의: ['이 약은 카라멜을 함유하고 있으므로 이 성분에 과민하거나 알레르기 병력이 있는 환자에는 신중히 투여한다.'],
+  },
+  '카제인': {
+    복용하지_말_것: ['우유에 과민하거나 알레르기 병력이 있는 환자(이 약은 우유단백질을 함유한다)'],
+  },
+  '캄파': {
+    복용하지_말_것: ['30개월 이하의 유아'],
+    복용전_상의: ['소아 (경련을 유발할 수 있다.)'],
+  },
+  '프로필렌글리콜': {
+    복용전_상의: ['이 약은 프로필렌글리콜을 함유하고 있으므로 이 성분에 과민하거나 알레르기 병력이 있는 환자에는 신중히 투여한다.'],
+  },
+  '황색4호(타르트라진)': {
+    복용전_상의: ['이 약은 황색4호(타르트라진)를 함유하고 있으므로 이 성분에 과민하거나 알레르기 병력이 있는 환자에는 신중히 투여한다.'],
+  },
+  '황색5호(선셋옐로우 FCF)': {
+    복용전_상의: ['이 약은 황색5호(선셋옐로우 FCF, Sunset Yellow FCF)를 함유하고 있으므로 이 성분에 과민하거나 알레르기 병력이 있는 환자에는 신중히 투여한다.'],
+  },
+  '엘-아르기닌': {
+    복용하지_말_것: ['심근경색 및 그 병력이 있는 환자'],
+  },
+  '대두유': {
+    복용하지_말_것: [
+      '대두유에 과민하거나 알레르기 병력이 있는 환자',
+      '콩 또는 땅콩에 과민증이 있는 환자',
+    ],
+    복용전_상의: ['고지단백혈증, 당뇨병성고지질혈증 및 췌장염 등 지방대사 이상 환자 또는 지질성유제를 신중히 투여해야 하는 환자(경구제, 주사제 및 질연질캡슐제에 한함)'],
+    복용시_주의: [
+      '지방과부하로 특별한 위험이 예상되는 환자에게 이 약을 투여할 때 혈장지질치를 점검할 것을 권장한다. 이 점검을 통해 지방의 체외배설이 불충분하다고 판단될 경우에는 이 약의 투여를 적절히 조절한다. 환자가 다른 정주용 지질제를 동시에 투여 받고 있다면 이 약 중의 부형제로 혼재되어 있는 지질의 양을 고려하여 그 지질제의 투여량을 감소해야 한다.',
+    ],
+  },
+  '유당': {
+    복용하지_말_것: ['이 약은 유당을 함유하고 있으므로, 갈락토오스 불내성(galactose intolerance), Lapp유당분해효소 결핍증(Lapp lactase deficiency) 또는 포도당-갈락토오스 흡수장애(glucose-galactose malabsorption) 등의 유전적인 문제가 있는 환자에게는 투여하면 안 된다.'],
+  },
+  '벤잘코늄염화물': {
+    복용시_주의: [
+      '이 약은 벤잘코늄염화물을 함유하고 있어 기관지 경련을 일으킬 수 있으며, 특히 장기간 사용시 비강 내 자극이나 종창(부기), 비강 점막의 부종을 유발할 수 있다.(비강 분무제에 한함)',
+      '이 약은 벤잘코늄염화물을 함유하고 있어 기관지 경련을 일으킬 수 있으며, 특히 천식 환자에서 이러한 이상사례의 위험이 높다.(폐 흡입제에 한함)',
+    ],
+  },
+};
+
+const CHANGE_DIRECTIVE_DB = [
+  {
+    trigger: ['이부프로펜', '덱시부프로펜'],
+    citation: "이부프로펜, 덱시부프로펜 성분제제 : 의약품안전평가과-2738호('15.11.26), 허가사항 변경 반영일자: 2016.01.14",
+    sections: [
+      {
+        catKey: '경고',
+        items: [
+          '심혈관계 위험: 조절되지 않는 고혈압, 울혈심부전증(NYHA II-III), 확립된 허혈성 심장질환, 말초동맥질환, 뇌혈관질환을 가진 환자들은 신중히 고려하여 이부프로펜을 사용하여야하며 고용량 이부프로펜(1일 2400mg) 사용을 피해야 한다. 또한 심혈관계 위험 요소(예. 고혈압, 고지혈증, 당뇨병, 흡연)를 가지고 있는 환자가 고용량 이부프로펜(1일 2400mg)이 필요한 경우 장기간 치료를 시작하기 전에 신중히 고려해야한다. 임상연구 결과 고용량(1일 2400mg) 이부프로펜 사용이 동맥 혈전 증상(심근경색증 또는 뇌졸중)에 대한 위험성을 다소 증가시킬 수 있다고 나타났다. 종합적으로 역학연구 결과 저용량 이부프로펜(예. 1일 1200mg 이하)과 동맥 혈전 증상의 위험성 증가간의 연관성은 증명되지 않았다.',
+        ],
+      },
+      {
+        catKey: '복용전_상의',
+        items: [
+          '심근경색이나 뇌졸중 예방목적으로 저용량 아스피린을 복용하는 사람 (이 약은 아스피린의 효과를 감소시키고, 중증의 위장관계 이상반응의 발생 위험을 증가시킬 수 있다.) 실험실적 자료에서 이부프로펜과 아스피린(아세틸살리실산) 병용투여시 이부프로펜이 저용량 아스피린의 혈소판 응집 효과를 억제할 수 있다고 나타났다. 이 데이터 외삽법에 대해 임상적으로 불확실성이 존재하지만 일반적 또는 장기간 이부프로펜 사용시, 저용량 아스피린의 심장 보호 효과가 감소될 수 있다.',
+        ],
+      },
+    ],
+  },
+  {
+    trigger: ['이부프로펜'],
+    citation: "이부프로펜 함유제제(전신적용 제제) : 의약품안전평가과-3777(2024.5.28.), 허가사항 변경 반영일자: 2024.7.15.",
+    sections: [
+      {
+        catKey: '이상반응_및_즉각중지',
+        items: [
+          '매우 드물게 다형성 홍반, 탈락 피부염이 나타날 수 있으며, 빈도불명의 전신증상과 호산구증가증을 동반한 약물 반응(DRESS 증후군) 및 급성 전신 피진성 농포증(AGEP)이 나타날 수 있다.',
+        ],
+      },
+      {
+        catKey: '복용시_주의',
+        items: [
+          '이부프로펜 함유 제품과 관련하여 위중하거나 치명적일 수 있는 중증 피부 이상 반응(탈락 피부염, 다형성 홍반, 스티븐스-존슨 증후군, 독성 표피 괴사 용해, DRESS 증후군, 급성 전신 피진성 농포증(AGEP) 포함)이 보고되었다. 대부분의 경우 이러한 이상반응은 투여 초기 1개월 이내에 발생한다. 이러한 반응의 증상 및 징후가 발현할 경우 이부프로펜 투여를 즉시 중단하고 적절한 치료대안을 고려해야 한다.',
+        ],
+      },
+    ],
+  },
+  {
+    trigger: ['이부프로펜'],
+    citation: "이부프로펜 함유제제(전신적용 제제) : 의약품안전평가과-4423호('25.6.20.), 허가사항 변경 반영일자: 2025.10.10.",
+    sections: [
+      {
+        catKey: '이상반응_및_즉각중지',
+        items: [
+          '빈도 불명의 코니스 증후군이 나타날 수 있다.',
+        ],
+      },
+      {
+        catKey: '복용시_주의',
+        items: [
+          '이 약 투여 환자에게서 코니스 증후군 사례가 보고되었다. 코니스 증후군은 관상동맥 수축과 관련이 있는 알레르기 또는 과민반응 후 발생하는 심혈관계 증상으로 심근경색을 초래할 수 있다.',
+        ],
+      },
+    ],
+  },
+  {
+    trigger: ['이부프로펜'],
+    citation: "이부프로펜 함유제제(전신적용 제제) : - 의약품안전평가과-2229(2019.4.5.), 허가사항 변경 반영일자: 2019.5.22.",
+    sections: [
+      {
+        catKey: '이상반응_및_즉각중지',
+        items: [
+          '이 약의 과량 복용 시 대사산증이 나타날 수 있다.',
+        ],
+      },
+    ],
+  },
+  {
+    trigger: ['이부프로펜'],
+    citation: "이부프로펜 함유제제 - 전신작용 비스테로이드성 항염증제(NSAIDs) : 의약품안전평가과-887(2024.2.1.), 허가사항 변경 반영일자: 2024.5.22.",
+    sections: [
+      {
+        catKey: '임부수유부투여',
+        items: [
+          '임신 30주 이후 이 약을 포함한 비스테로이드성 소염제(NSAIDs)의 사용은 태아 동맥관 조기 폐쇄 위험을 높이므로, 이 약의 사용을 피해야 한다.',
+          '임신 약 20주 이후 이 약을 포함한 비스테로이드성 소염제(NSAIDs)의 사용은 태아 신기능 이상을 일으켜 양수 과소증을 유발할 수 있으며 경우에 따라서는 신생아 신장애를 일으킬 수 있다. 비스테로이드성 소염제(NSAIDs) 개시 후 48시간 이내에 양수 과소증이 흔하지 않게 보고되었지만 이러한 부작용은 평균적으로 투여 후 수일에서 수주 사이에 나타난다. 양수 과소증은 보통 투여 중단 시 회복이 가능하나, 항상 그렇지는 않다. 양수 과소증이 지속되면 합병증(예, 사지 구축과 폐 성숙 지연)이 발생할 수 있다. 신생아 신기능이 손상된 일부 시판 후 사례에서는 교환 수혈이나 투석 같은 침습적 시술이 필요했다. 임신 20~30주 동안 이 약의 투여가 필요한 경우 최소 유효 용량을 최단 기간 동안 사용하고 투여 시간이 48시간을 경과하는 경우에는 양수의 초음파 모니터링을 고려해야 한다. 양수 과소증이 발생하면 이 약을 중단하고 진료 지침에 따라 추적 관찰한다.',
+        ],
+      },
+    ],
+  },
+];
+
+function buildPrecautionCtx(chapterKey, form, activeRows, doseRows) {
+  const ingrRaw = activeRows.map(r => (r.ingr || '').replace(/\s+/g, '').toLowerCase());
+  const classes = new Set();
+  for (const [cls, kws] of Object.entries(_PREC_CLASS_KW)) {
+    if (kws.some(kw => ingrRaw.some(n => n.includes(kw.replace(/\s+/g,'').toLowerCase()))))
+      classes.add(cls);
+  }
+  const hasChildDosage = (doseRows || []).some(r => r.age && r.age !== '만12세이상(성인)');
+  return { ingrRaw, classes, form: form || '', hasChildDosage };
+}
+
+function _checkPrecItem(text, ctx, isAlert) {
+  const conds = _extractPrecConds(text);
+  if (!conds.length) return { show: true, tags: [] };
+
+  // "어린이에 대한 용법이 있는 경우" 조건은 AND 필수 게이트로 처리
+  // (성분 조건이 충족되더라도 어린이 용법이 없으면 표시 안 함)
+  const childCondIdx = conds.findIndex(c => /어린이에\s*대한\s*용법이\s*있는\s*경우/.test(c));
+  if (childCondIdx >= 0 && !ctx.hasChildDosage) return { show: false, tags: [] };
+
+  // 나머지 조건은 OR(anyMet) 처리
+  const otherConds = conds.filter((_, i) => i !== childCondIdx);
+  if (!otherConds.length) return { show: true, tags: childCondIdx >= 0 ? [conds[childCondIdx]] : [] };
+
+  const tags = []; let anyMet = false;
+  for (const c of otherConds) {
+    if (_condMet(c, ctx, isAlert)) { tags.push(c); anyMet = true; }
+  }
+  if (anyMet && childCondIdx >= 0) tags.push(conds[childCondIdx]);
+  return { show: anyMet, tags };
+}
+
+function _resolveInlineMarkers(text, ctx) {
+  return text.replace(/\[\[([^\|]*)\|([^\]]+)\]\]/g, (_, t, clsStr) => {
+    return clsStr.split(',').map(c => c.trim()).some(c => ctx.classes.has(c)) ? t : '';
+  });
+}
+
+function _stripIngredientParens(text) {
+  return text.replace(/\s*\((?:[^)(]|\([^)]*\))*(?:함유\s?제제|복합제|미함유[^)]*|에\s*한함|어린이의?\s*용법[·・]?용량이?\s*있는\s*경우|어린이에\s*대한\s*용법이\s*있는\s*경우)(?:[^)(]|\([^)]*\))*\)\)?/g, '');
+}
+
+function _flattenPrecItems(cat, val) {
+  const CIRC_RE    = /^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳㉮㉯]/;
+  const SUB_NUM_RE = /^\d+[)）]/;
+  if (typeof val === 'string') return [{ sub: null, text: val }];
+  if (Array.isArray(val)) return val.map(v => {
+    const text = String(v);
+    return { sub: null, text, indent: SUB_NUM_RE.test(text), circled: CIRC_RE.test(text) };
+  });
+  if (typeof val === 'object' && val !== null) {
+    const out = [];
+    for (const [k, v] of Object.entries(val)) {
+      if (k === '기타') { out.push({ sub: '기타', text: typeof v === 'string' ? v : v.join(' / ') }); continue; }
+      const SUB_LABEL = { '일반증상': '일반증상', '중증증상': '중증증상' };
+      const sub = SUB_LABEL[k] || k;
+      if (Array.isArray(v)) v.forEach(s => out.push({ sub, text: String(s) }));
+      else if (typeof v === 'string') out.push({ sub, text: v });
+    }
+    return out;
+  }
+  return [];
+}
+
+function generatePrecautions(chapterKey, form, activeRows, excipients, doseRows) {
+  const chData = DB[chapterKey];
+  if (!chData || !chData['사용상의_주의사항']) return null;
+  const prec = chData['사용상의_주의사항'];
+  const ctx  = buildPrecautionCtx(chapterKey, form, activeRows, doseRows);
+  window.__lastPrecParams = { chapterKey, form, activeRows, selectedExcipients, doseRows };
+
+  const CAT_LABELS = [
+    ['경고',                   '경고'],
+    ['복용하지_말_것',         '다음과 같은 사람은 이 약을 복용하지 말 것'],
+    ['병용금기',               '이 약을 복용하는 동안 다음의 약을 복용하지 말 것'],
+    ['복용전_상의',            '다음과 같은 사람(경우)은 이 약을 복용하기 전에 의사, 치과의사, 약사와 상의할 것.'],
+    ['이상반응_및_즉각중지',   '다음과 같은 경우 이 약의 복용을 즉각 중지하고 의사, 치과의사, 약사와 상의할 것. 상담 시 가능한 한 이 첨부문서를 소지할 것.'],
+    ['기타주의사항',           '기타 주의사항'],
+    ['소아투여',               '소아에 대한 투여'],
+    ['임부수유부투여',         '임부 및 수유부에 대한 투여'],
+    ['복용시_주의',            '기타 이 약의 복용 시 주의할 사항'],
+    ['저장상의_주의',          '저장상의 주의사항'],
+  ];
+
+  const sections = [];
+  for (const [cat, label] of CAT_LABELS) {
+    if (!(cat in prec)) continue;
+    const filtered = [];
+
+    if (cat === '이상반응_및_즉각중지' && prec['이상반응_성분매핑']) {
+      const mapping  = prec['이상반응_성분매핑'];
+      const advArr   = prec[cat];
+      const headerText = advArr[0].split('\n')[0].trim();
+      const matched  = mapping.filter(e => ctx.classes.has(e.class));
+      if (matched.length) {
+        filtered.push({ sub: null, text: headerText, origIdx: 0 });
+        const seenTokens = new Set();
+        const allSymptoms = [];
+        matched.forEach(e => {
+          const cleanLine = e.line
+            .replace(/^[①-⑳㉮㉯]\s*/, '')
+            .replace(/^[^\s:：]+\s*[:：]\s*/, '');
+          cleanLine.split(',').map(s => s.trim()).filter(Boolean).forEach(item => {
+            const subTokens = item.split('·').map(s => s.trim());
+            if (!subTokens.every(t => seenTokens.has(t))) {
+              allSymptoms.push(item);
+              subTokens.forEach(t => seenTokens.add(t));
+            }
+          });
+        });
+        if (allSymptoms.length)
+          filtered.push({ sub: null, text: allSymptoms.join(', '), origIdx: 0, isMapping: true });
+      }
+      for (let i = 1; i < advArr.length; i++) {
+        const { show, tags } = _checkPrecItem(advArr[i], ctx);
+        if (show) filtered.push({ sub: null, text: advArr[i], tags, origIdx: i });
+      }
+    } else {
+      const flatItems = _flattenPrecItems(cat, prec[cat]);
+      for (let i = 0; i < flatItems.length; i++) {
+        const { sub, text, indent, circled } = flatItems[i];
+        const resolved = _resolveInlineMarkers(text, ctx);
+        if (!resolved.replace(/[\s,]/g, '')) continue;
+        const { show, tags } = _checkPrecItem(resolved, ctx, cat === '경고');
+        if (show) filtered.push({ sub, text: _stripIngredientParens(resolved), tags, origIdx: i, indent: !!indent, circled: !!circled });
+      }
+    }
+
+    // circled 항목(④-⑨) 재번호: 앞 항목에 포함된 ①②③ 개수부터 이어서 번호 부여
+    if (cat === '이상반응_및_즉각중지') {
+      const CIRC = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮','⑯','⑰','⑱','⑲','⑳'];
+      const hdrText = filtered.find(it => !it.circled && !it.indent)?.text || '';
+      const baseCount = (hdrText.match(/[①-⑳㉮㉯]/g) || []).length;
+      let nextIdx = baseCount;
+      for (const it of filtered) {
+        if (it.circled && nextIdx < CIRC.length) {
+          it.text = it.text.replace(/^[①-⑳㉮㉯]/, CIRC[nextIdx++]);
+        }
+      }
+    }
+
+    let dispNum = 0;
+    filtered.forEach(it => { if (!it.isMapping && !it.indent && !it.circled) it.displayNum = ++dispNum; });
+    if (filtered.length) sections.push({ cat, label, items: filtered });
+  }
+
+  const catOrder = CAT_LABELS.map(([c]) => c);
+
+  // 품목허가사항 변경지시 통합 (첨가제보다 먼저)
+  const ingrNamesAll = activeRows.map(r => r.ingr);
+  for (const entry of CHANGE_DIRECTIVE_DB) {
+    if (!entry.trigger.some(t => ingrNamesAll.some(n => n.includes(t)))) continue;
+    for (const dsec of entry.sections) {
+      let sec = sections.find(s => s.cat === dsec.catKey);
+      if (!sec) {
+        const catLabelEntry = CAT_LABELS.find(([c]) => c === dsec.catKey);
+        if (!catLabelEntry) continue;
+        const catIdx = catOrder.indexOf(dsec.catKey);
+        const insertAfterIdx = sections.reduce((best, s, i) =>
+          catOrder.indexOf(s.cat) < catIdx ? i : best, -1);
+        sec = { cat: dsec.catKey, label: catLabelEntry[1], items: [] };
+        sections.splice(insertAfterIdx + 1, 0, sec);
+      }
+      for (const text of dsec.items) {
+        sec.items.push({ sub: null, text, origIdx: -1, indent: false, isDirective: true, citation: entry.citation });
+      }
+      let dn = 0;
+      sec.items.forEach(it => { if (!it.isMapping && !it.indent && !it.circled) it.displayNum = ++dn; });
+    }
+  }
+
+  // 첨가제 사용상 주의사항 통합
+  const excList = excipients && excipients.length ? excipients : (selectedExcipients || []);
+  if (excList.length) {
+    for (const excName of excList) {
+      const excData = EXCIPIENT_PREC_DB[excName];
+      if (!excData) continue;
+      for (const cat of catOrder) {
+        const items = excData[cat];
+        if (!items || !items.length) continue;
+        let sec = sections.find(s => s.cat === cat);
+        if (!sec) {
+          const lbl = CAT_LABELS.find(([c]) => c === cat)[1];
+          const insertAfterIdx = sections.reduce((best, s, i) =>
+            catOrder.indexOf(s.cat) < catOrder.indexOf(cat) ? i : best, -1);
+          sec = { cat, label: lbl, items: [] };
+          sections.splice(insertAfterIdx + 1, 0, sec);
+        }
+        for (const text of items) {
+          sec.items.push({ sub: null, text, origIdx: -1, indent: false, isExcipient: true, excipientName: excName });
+        }
+        let dn = 0;
+        sec.items.forEach(it => { if (!it.isMapping && !it.indent && !it.circled) it.displayNum = ++dn; });
+      }
+    }
+  }
+
+  return sections.length ? sections : null;
+}
+
+function applyEasyTerms(text) {
+  if (!text) return text;
+  const PH = '\x00';
+  let s = text;
+  for (const [med, easy, rawReplace] of _EASY_TERMS) {
+    const er = med.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // lookbehind: skip if preceded by Korean syllable (term is inside a compound, e.g. 두부신경에서 신)
+    // lookahead: only match at a true word boundary — non-Korean char, end-of-string,
+    //   or a known Korean particle/suffix syllable (이/가/을/를/에/의/은/는/도/만/로/과/와/등/들/임/인/으)
+    //   Also allows 후 (e.g. 발치후) and 통 (e.g. 인후통) as common medical suffixes
+    //   This blocks 신장염(→신장+염), 발적되어(→발적+되) while allowing 부종이(particle 이)
+    s = s.replace(
+      new RegExp(
+        '(?<![\\uAC00-\\uD7A3\\x00])' + er +
+        '(?=[^\\uAC00-\\uD7A3\\x00(]|$|[이가을를에의은는도만로과와등들임인으후통])',
+        'g'
+      ),
+      PH + (rawReplace || (med + '(' + easy + ')')) + PH
+    );
+  }
+  return s.replace(/\x00/g, '');
+}
+
+
+/* ══════════ 6) 생성기 보조 ══════════ */
+
+const _PREC_CLASS_KW = {
+  '아스피린류':       ['아스피린','아스피린알루미늄','아세트아미노펜','에텐자미드','살리실산나트륨'],
+  '이부프로펜류':     ['이부프로펜'],
+  '항히스타민제':     ['디펜히드라민','클로르페니라민','프로메타진','메퀴타진','알리메마진','트리프롤리딘','카르비녹사민','세티리진','로라타딘','아크리바스틴','멕타진','이프로헵타딘'],
+  '디펜히드라민':     ['디펜히드라민'],
+  '크산틴류':         ['아미노필린','테오필린','카페인','디프로필린','크산틴'],
+  '기관지확장제':     ['에페드린','메틸에페드린','슈도에페드린','아미노필린','테오필린','이소프로테레놀','살부타몰','클렌부테롤'],
+  '교감신경자극제':   ['에페드린','메틸에페드린','슈도에페드린'],
+  '부교감신경차단제': ['스코폴리아','벨라돈나','아트로핀','히오신','부틸스코폴라민','염화리소짐'],
+  '마황':             ['마황'],
+  '감초':             ['감초','글리시리진'],
+  '소시호탕':         ['소시호탕'],
+  '시호계지탕':       ['시호계지탕'],
+  '소시호탕류':       ['소시호탕','시호계지탕'],
+  '에페드린마황류':   ['에페드린','메틸에페드린','슈도에페드린','마황'],
+  '갈근탕':           ['갈근탕'],
+  '맥문동탕':         ['맥문동탕'],
+  '미네랄':           ['칼슘으로서','마그네슘으로서','철으로서','아연으로서','망간으로서','크롬으로서','구리으로서','요오드으로서','셀레늄으로서','몰리브덴으로서','염소으로서','인으로서','칼륨으로서','나트륨으로서','황으로서'],
+  '비타민A':                ['레티놀','베타카로틴','간유','레티닐팔미테이트','레티닐아세테이트'],
+  '비타민D':                ['에르고칼시페롤','콜레칼시페롤'],
+  '비타민E':                ['토코페롤','알파토코페롤'],
+  '비타민C':                ['아스코르브산','아스코르빈산'],
+  '비타민B1':               ['티아민','옥토티아민','비스벤티아민','푸르설티아민','프로설티아민','벤포티아민'],
+  '비타민B1_티아민염류제외': ['옥토티아민','비스벤티아민','푸르설티아민','프로설티아민','벤포티아민'],
+  '비타민B1_푸르설티아민':  ['푸르설티아민'],
+  '비타민B2':               ['리보플라빈','플라빈아데닌디뉴클레오티드'],
+  '비타민B2_리보플라빈부티레이트': ['리보플라빈부티레이트'],
+  '비타민B6':               ['피리독신','피리독살'],
+  '칼슘':                   ['칼슘','탄산칼슘','인산칼슘','글루콘산칼슘','유산칼슘'],
+  '철':                     ['철','황산제일철','푸마르산제이철','구연산철암모늄'],
+  '구리':                   ['구리','황산구리','글루콘산구리'],
+  '요오드':                 ['요오드','요오드화칼륨','요오드화나트륨'],
+  '몰리브덴':               ['몰리브덴','몰리브덴산나트륨'],
+  '칼륨':                   ['칼륨','염화칼륨','글루콘산칼륨'],
+  '셀레늄':                 ['셀레늄','셀레나이트나트륨','셀렌산나트륨'],
+  '아연':                   ['아연','산화아연','황산아연','글루콘산아연'],
+  '나트륨':                 ['탄산수소나트륨','탄산나트륨','염화나트륨'],
+  '콘드로이틴설페이트나트륨': ['콘드로이틴'],
+  '타우린':                 ['타우린'],
+};
+
+function _extractPrecConds(text) {
+  const re = /\(((?:[^)(]|\([^)]*\))*(?:함유\s*제제|복합제|미함유[^)]*|에\s*한함|어린이에\s*대한\s*용법이\s*있는\s*경우|소아의?\s*용법[·・]?용량이?\s*있는\s*경우)(?:[^)(]|\([^)]*\))*)\)/g;
+  const out = []; let m;
+  while ((m = re.exec(text)) !== null) out.push(m[1]);
+  return out;
+}
+
+function _condMet(condStr, ctx, isAlert) {
+  const s = condStr.trim();
+  if (/어린이에\s*대한\s*용법이\s*있는\s*경우|소아의?\s*용법[·・]?용량이?\s*있는\s*경우/.test(s)) {
+    return !!ctx.hasChildDosage;
+  }
+  if (s.includes('에 한함')) {
+    const fp = s.replace(/에\s*한함/, '').trim();
+    return fp.split(/[,·및\s]+/).filter(Boolean).some(kw => ctx.form.includes(kw));
+  }
+  if (s.includes('미함유') || /함유\s*제제\s*제외/.test(s)) {
+    // "미함유" 또는 "함유제제 제외" → 해당 성분이 없을 때 표시
+    const sub = s.replace(/함유\s*제제\s*제외/, '').replace(/미함유[^$]*/,'').replace(/함유\s*제제/g,'').trim();
+    const parts = sub.split(/[,·]|또는|및/).map(p => p.trim().replace(/\s+/g,'').toLowerCase()).filter(Boolean);
+    return !parts.some(p =>
+      ctx.ingrRaw.some(n => n.includes(p)) ||
+      ctx.classes.has(p) ||
+      [...ctx.classes].some(cls => cls.replace(/\s+/g,'').toLowerCase() === p)
+    );
+  }
+  if (/\d+\s*(mg|g|IU|μg|mcg|mL)/.test(s)) return false;
+  const text = s.replace(/함유\s*제제/g,'').replace(/\([^)]*\)/g,'').trim();
+  const parts = text.split(/[,·，]|또는|및/).map(p => p.trim().replace(/\s+/g,'').toLowerCase()).filter(p => p.length > 1);
+  for (const p of parts) {
+    if (ctx.classes.has(p)) return true;
+    for (const cls of ctx.classes) if (cls.replace(/\s+/g,'').toLowerCase() === p) return true;
+    if (!isAlert && ctx.ingrRaw.some(n => n.includes(p))) return true;
+    if (isAlert && ctx.ingrRaw.some(n => n.startsWith(p))) return true;
+  }
+  return false;
+}
+
+const _EASY_TERMS = (() => {
+  const r = [
+    ['노동성 호흡곤란','운동호흡곤란'],['노작성 호흡곤란','운동호흡곤란'],['광유성 사하제','기름성 설사약'],
+    ['진구성 심근 경색','오래된 심근경색증'],['골화 지연','뼈발달지연'],['방사선 조사','방사선 쬐임'],
+    ['임신 초삼분기','임신 첫3개월'],['산후 출혈','분만 후 출혈'],['급성 호흡 부전','급성 호흡 기능상실'],
+    ['호기성 호흡곤란','내쉬기 곤란'],['흡기성 호흡곤란','들이쉬기 곤란'],['신성 빈혈','신장성 빈혈'],
+    ['속발성 고혈압','이차 고혈압'],['아두 골반 불균형','머리 골반 불균형'],
+    ['유행성이하선염','볼거리'],['횡문근융해증','횡문근용해'],['유즙울체','젖고임'],
+    ['안와주위부종','눈주변 부기'],['다형성홍반','여러모양의 붉은 반점'],['개방동맥관','동맥관 개방증'],
+    ['이중맹검','환자,의사 모두 모르게 임상시험하는 방법'],['간헐성파행증','이따금 절뚝거림'],
+    ['간헐파행증','이따금 절뚝거림'],['경상이성체','거울상 이성질체'],['척주후만증','척주뒤굽음증'],
+    ['척주측만증','척주옆굽음증'],['척주전만증','척주앞굽음증'],['척주전만','척주앞굽음증'],
+    ['전격성간염','급격히 발병하는 간염'],['안구건조증','눈마름증'],['안구진탕증','눈떨림'],
+    ['안구진탕','눈떨림,안진'],['안구작열감','눈의 화끈거림'],['안구자통','눈의(찌르는듯한) 통증'],
+    ['담도폐쇄증','쓸개길폐쇄증'],['담낭절제술','쓸개절제술'],['유양동절제술','꼭지돌기절제술'],
+    ['위아전절제술','대부분위절제술'],['충수절제술','막창자꼬리절제술,맹장꼬리절제술'],
+    ['유산산증','젓산 산증'],['요추간원판','허리척추원반'],['고뇨산혈증','요산과다증'],
+    ['다발성신경염','여러신경염,다발신경염'],['신경근병증','신경뿌리병증'],['고초열','꽃가루 알레르기비염'],
+    ['견수증후군','어깨손증후군'],['경견완증후군','목어깨팔증후군'],['공기연하증','공기삼킴증'],
+    ['시아노시스','청색증'],['쇽(아나필락시)','','쇽(아나필락시)(과민성 쇼크)'],['아나필락시쇽','과민성 쇼크'],['디스키네시아','운동이상증'],
+    ['아키네시아','운동불능증'],['아시도시스','산증'],['산성증','산증'],['헤마토크리트','적혈구용적률'],
+    ['헤르니아','탈장'],['임플란트','인공치아이식'],['맥관부종','혈관부기,혈관부종'],
+    ['맥관석회화','혈관석회화'],['맥관염','혈관염'],['이긴장증','근육긴장이상'],
+    ['근긴장이상','근육긴장이상'],['디스토니아','근육긴장이상'],['안와주위','눈주변'],
+    ['난원공개존','열린타원구멍'],['심장압전','심장눌림증'],['부전수축','심장박동정지'],
+    ['심계항진','두근거림'],['심와부','명치부위'],['심흉비증대','심흉비 증가'],
+    ['심상성여드름','(보통)여드름'],['심폐독성','폐동맥 고혈압'],['심재성','드러나지 않는'],
+    ['이형성증','형성이상'],['형성장애','형성이상'],['형성부전','형성장애'],
+    ['전신조홍','온몸이 붉어짐'],['전신홍조','온몸이 붉어짐'],['전염단핵구증','전염성 단핵구'],
+    ['전정장애','평형기능장애'],['시조절장애','시각조절장애'],['안검하수','눈꺼풀처짐'],
+    ['안검내반','속말림,눈꺼풀속말림'],['안검염','눈꺼풀염'],['검결막염','눈꺼풀결막염'],
+    ['유착결여','안붙음'],['조갑주위염','손발톱주위염'],['조갑진균증','손발톱진균증'],
+    ['조갑장애','손발톱병'],['조혈모세포','줄기세포'],['한센병균','한센병균'],['나균','한센병균'],
+    ['비갑개절제술','코선반절제술'],['누낭비강','눈물주머니코안'],['누낭염','눈물주머니염'],
+    ['비강진','잔비늘증'],['비문증','날파리증'],['비종대','지라비대/비장비대'],
+    ['비충혈','코막힘'],['비폐','코막힘'],['빈삭호흡','빠른호흡'],['급속호흡','빠른호흡'],
+    ['비출혈','코피'],['비색법','색측정법'],['관류저하','혈류감소'],['관상동맥','심장동맥'],
+    ['담즙울체','쓸개즙정체'],['담녹색','엷은녹색,연두빛'],['담낭축농','고름쓸개,고름담낭'],
+    ['상완외측','위팔 바깥쪽'],['두중감','머리무거움'],['두경부','머리목부위'],
+    ['두개골','머리뼈'],['대퇴골','넙적다리뼈'],['족근골','발목뼈'],['경추','목뼈'],
+    ['요추골','허리뼈'],['하악골','아래턱뼈'],['상악골','위턱뼈'],['미골','꼬리뼈'],
+    ['견갑골','어깨뼈'],['상완골','위팔뼈'],['늑골','갈비뼈'],['슬개골','무릎뼈'],
+    ['경골','정강뼈'],['비골','종아리뼈'],['천골','엉치뼈'],['쇄골','빗장뼈'],
+    ['추골','망치뼈'],['접형골','나비뼈'],
+    ['고관절','엉덩관절'],['견관절','어깨관절'],['슬관절','무릎관절'],['주관절','팔꿉 관절'],
+    ['골다공증','뼈엉성증'],['골조송증','뼈엉성증'],['골이영양증','뼈형성장애'],
+    ['골연령','뼈나이'],['골막','뼈막'],['골수','뼈속질'],['골단','뼈끝'],
+    ['골연화','뼈연화'],['골질환','뼈 질환'],
+    ['검구유착','결막붙음증'],['공막','흰자위막'],['괄약근','조임근'],
+    ['교원섬유','콜라겐섬유'],['교원성 질환','콜라겐 질환'],['교질','콜로이드'],
+    ['경면','졸음'],['기면','졸음'],['면기','졸음'],['내약성','약에 대한 내성'],
+    ['내이','속귀'],['냉암소','시원하고 어두운 곳'],['냉소','시원한 곳'],
+    ['건냉암소','건조,시원,어두운 곳'],['건냉소','건조하고 시원한 곳'],['건소보관','건조한 곳에 보관'],
+    ['뇌수종','물뇌증,수두증'],['뇌일혈','뇌출혈'],['뇨저류','소변이 고임'],
+    ['농가진','고름딱지증'],['농뇨','고름뇨,농뇨'],['농양','고름집'],
+    ['농포','고름물집'],['농피증','고름피부증'],['농흉','가슴고름집'],
+    ['다모증','털과다증'],['다한증','땀과다증'],['다행증','이상행복감'],
+    ['다뇨','소변량과다'],['다갈증','목마름증'],['다발성','여러 부위에서 동시에 나타나는'],
+    ['단회투여','1회 투여'],['담관','쓸개관'],['담낭','쓸개'],['담마진','두드러기'],
+    ['담즙','쓸개즙'],['당내성','포도당 내성'],['대구치','큰어금니'],
+    ['대동맥류','대동맥자루'],['대증요법','증상별로 치료하는 방법'],['대증적','증상에 대응하여'],
+    ['대퇴','넙적다리'],['도찰하다','바르고 문지르다'],['도포하다','바르다'],
+    ['동계','두근거림'],['동통','통증'],['동창','언 상처'],['동요','안절부절'],
+    ['두경감','현기증,어지러움'],['두부경증감','현기증,어지러움'],
+    ['만곡족','휜발,곤봉발'],['말단지절','끝관절 마디'],['맥립종','다래끼'],
+    ['면역부전','면역반응약화'],['모창','털종기증'],['미각도착','맛을 제대로 못느낌'],
+    ['미란','짓무름'],['미로염','내이염/속귀염'],['미소혈관','미세혈관계'],['미황색','연노랑'],
+    ['박리','벗겨내기/벗겨짐'],['반흔','흉터'],['발백선증','무좀'],
+    ['발적','충혈되어 붉어짐'],['발치','이를 뽑음'],['발한','땀이 남'],
+    ['배통','등 통증'],['번갈','심한갈증'],['범혈구','전체 혈구'],
+    ['변색백선','어루러기'],['변의','변을 보고 싶은 느낌'],['병용','함께 복용(사용)'],
+    ['봉소염','벌집염'],['부유감','들뜨는 느낌'],['부정교합','맞물림장애,교합장애,부정 교합'],
+    ['부종','부기'],['불현성화','겉으로 드러나지않게'],['불현성','증상이 나타나지 않는'],
+    ['불용성','녹지 않는'],['비강내','코안'],['비강','코안'],['비루','콧물'],
+    ['알레르기성비염','코염'],['비염','코염'],['비측','코쪽'],['빈맥','빠른맥/빈맥'],['빈호흡','빠른 호흡'],
+    ['사경','기운목'],['사지냉감','팔다리 찬느낌'],['산동','동공확대'],
+    ['산립종','콩다래끼'],['산욕기','출산후기'],['산욕','출산후기'],
+    ['소양감','가려움/가려움증'],['소양증','가려움/가려움증'],
+    ['서맥','느린맥'],['선조','튼살'],['설변색','혀의 변색'],['설유착증','혀유착증'],
+    ['설하','혀밑'],['설염','혀염'],['세균총','세균집단'],['세뇨관','콩팥뇨세관'],
+    ['세동','잔떨림'],['수족냉증','손발이 차가움'],['수족지','손발가락'],
+    ['수족구','손발입병'],['수지','손가락'],['수태능','임신능력'],['수포음','거품소리'],
+    ['수명감','눈부심'],['수명','눈부심'],['식피술','피부이식술'],['신장병증','콩팥병증'],
+    ['신세뇨관','신장세뇨관'],['신독성','신장독성'],['신장애','신장장애'],
+    ['신장질환','','신장(콩팥)질환'],['신장','콩팥'],['신증','콩팥증'],['신염','신장염'],['신손상','신장손상'],
+    ['실독증','읽기곤란증'],['실보증','보행불능(증)'],['실행증','행위상실증'],
+    ['심박율','심장박동율'],['심인성','정신탓,마음탓'],
+    ['쌍태임신','쌍둥이임신'],['쌍태','쌍둥이'],
+    ['약진','약물발진'],['양진','가려움발진'],['역연동','거꿀꿈틀운동'],['역위증','좌우바뀜증'],
+    ['연동','꿈틀운동'],['연변','묽은변'],['연용','계속 복용(사용)'],
+    ['연하곤란','삼킴곤란'],['연하장애','삼킴곤란'],['연하운동','삼킴운동'],
+    ['연하','삼키기/삼킴'],['연축','수축과 이완'],
+    ['열개창','열린상처,개방창'],['열공','구멍,틈새'],['열상','화상'],
+    ['염기성','알칼리성'],['염좌통','삔 통증'],['염좌','삠'],
+    ['영아','젖먹이,갓난아기'],['오심','구역'],['오용','잘못 사용'],['옹종','큰종기'],
+    ['와우기관','와우관,달팽이관'],['와우각','와우,달팽이관'],
+    ['완선','사타구니백선(증)'],['외골증','뼈돌출증'],['외상','상처'],
+    ['외이도','바깥귀길'],['외이','바깥귀'],
+    ['요당양성','소변에 포도당이 배출됨'],['요배통증','허리,등 통증'],
+    ['요부','허리'],['요잠혈','피섞인 소변,피섞인 오줌'],['요천통','허리통증'],
+    ['요통','허리 통증','요(허리)통'],
+    ['요추','허리뼈'],['요폐색','요로폐색'],['요폐','소변축적'],
+    ['용량의존적인','용량에 비례하는'],['용량의존적','용량에 비례하는'],
+    ['용이하도록','쉽도록'],['용이하게','쉽게'],['용이하며','쉬우며'],
+    ['용해하여','녹여서'],['우종','사마귀'],['위부포만감','상복부 팽창감'],
+    ['위약','속임약,모양약,헛약'],['위양성','거짓양성'],['위음성','거짓음성'],
+    ['위중감','위가 답답한 느낌'],['위하수','위처짐'],['유당','젖당'],
+    ['유루증','눈물흘림'],['유상물질','기름상태물질'],['유즙루','젖흐름증,유즙분비과다'],
+    ['유루','젖흐름증'],['유착','부착,붙음'],['유치','젖니,탈락치아'],
+    ['유타증','침과다증'],['유합술','융합,융해,고정술'],
+    ['육안으로','눈으로'],['육안','맨눈'],['음위','발기불능/발기부전'],
+    ['이구전색','귀지떡,귀지전색'],['이루','귓물'],['이명','귀울림'],
+    ['이완되다','풀어지다,느즈러지다,늘어지다'],['이유','젖떼기'],
+    ['이인증','자아상실감,자아분리감'],['이절','귀 부스럼증'],
+    ['이출혈','귀출혈'],['이통','귀통증'],['이폐색감','귀가 막힌 느낌'],
+    ['이폐감','귀가 먹먹한 느낌'],['이하선','귀밑샘'],['이개','귓바퀴'],
+    ['이염','귀염'],['인설','비늘,껍질'],['인습성','흡습성'],['인후','목구멍'],
+    ['일과성','한번 나타나고 없어지는'],['일광화상','햇볕화상'],
+    ['자반','자주색반점'],['자색반','자주색반점'],
+    ['자상','찔린상처'],['자창','찔린상처'],['자통','찌르는 것 같은 아픔'],
+    ['작열감','화끈감'],['장간막','창자간막'],['장관','창자'],
+    ['장중첩','창자겹침증,장겹침증'],['장중적증','장겹침증'],
+    ['장폐색증','창자막힘증'],['장염전','창자꼬임'],['장염','창자염'],
+    ['저류','고임,쌓임'],['저작운동','씹는운동'],['저작','씹기'],['저해제','억제제'],
+    ['전간','뇌전증'],['전기소작','전기지짐'],['전립선','전립샘'],
+    ['전박','아래팔'],['전색','혈관막힘'],['전풍','어루러기'],
+    ['절상','베인 상처'],['절종증','종기증'],['절창증','종기(증)'],
+    ['절증','종기/부스럼'],['점상출혈','출혈점'],
+    ['점안','눈에 넣음'],['점이','귀에 넣음'],['점조','끈끈하고 뻑뻑함'],
+    ['조갑','손발톱'],['조균증','털곰팡이증'],['조발형','조기발생형'],
+    ['조산','조기분만'],['조홍','홍조'],['족배','발등'],
+    ['족부백선','발백선증,무좀'],['족장','발바닥'],['족저','발바닥'],
+    ['족구','발과 입'],['종격','세로칸'],['종골','발꿈치뼈'],
+    ['종창','부기'],['좌골신경염','궁둥이뼈신경염'],['좌상','타박상/멍'],
+    ['좌창','여드름'],['면포','여드름'],['주산기','출산전후기'],['중격','사이막'],
+    ['중이','가운데귀'],['증량','양을 늘림'],['지둔','매우 우둔'],
+    ['지방패드','지방덩이'],['지주막','거미막'],['진경작용','경련멈춤작용'],
+    ['진경','경련완화'],['진균','곰팡이'],['진전','떨림'],
+    ['착감각','감각이상'],['찰과상','긁힌 상처'],['찰상','긁힌 상처'],
+    ['창상봉합','상처꿰맴,상처봉합'],['창상','상처'],
+    ['천공','뚫림'],['천명','숨을 쌕쌕거림'],['천문','숫구멍'],
+    ['천자통','찌름통증'],['천자','뚫기'],['천포창','물집증'],
+    ['체액저류','체액 고임'],['체순환','온몸순환,체순환'],
+    ['초발성','처음 발생'],['초발','처음발생'],
+    ['초회용량','처음 투여량'],['초회량','처음 복용(사용)량'],['초회통','처음통증'],
+    ['최기형성','기형유발성'],['최기형','기형발생'],
+    ['치근관','치아뿌리관,치근관'],['치근','치아뿌리'],['치경','잇몸'],
+    ['항문누공','항문샛길'],['치루','항문샛길'],['치수','치아속질'],
+    ['치아맹출','이돋이,치아맹출'],['치육 비대','잇몸이 붓는 증상'],
+    ['치은비후','잇몸이 붓는 증상'],['치은염','잇몸염'],['치육염','잇몸염'],
+    ['치조','이틀'],['치주질환','치아주위조직질환'],['치주','치아주위조직'],
+    ['침강','가라앉음'],['침흔','주사침 자국'],['카피약','후발약,제네릭의약품'],
+    ['타액','침'],['탈감작','과민성 제거,약화'],['토출','구토'],['토혈','혈액구토'],
+    ['파탄출혈','파열성 출혈'],['파열','터짐'],['파행증','절뚝거림'],['파행','절뚝거림'],
+    ['편평족','평발'],['폐농양','폐고름집'],['폐부전','폐기능 저하'],
+    ['포도상구균','포도알균'],['포진','물집'],['표재성','표면에 있는'],
+    ['피진','피부 발진'],['피하','피부밑'],
+    ['핍뇨증','소변감소증'],['핍정액증','정액저하증'],
+    ['하리','설사'],['하수','처짐'],['하악','아래턱'],['하제','설사약'],
+    ['하지','다리'],['하퇴궤양','다리종아리궤양'],['한진','땀띠'],
+    ['합지증','손발가락붙음증'],['항삼출작용','진물억제작용'],
+    ['항성','쉰목소리'],['하성','쉰목소리'],['해소','기침'],
+    ['현기증','어지러움'],['현기','어지러움'],['현훈','어지러움'],
+    ['현운','현기증,어지러움'],['현성화','겉으로 드러나게'],
+    ['혈괴','피덩이'],['혈병퇴축','혈병뒤당김,응혈뒤당김'],
+    ['혈전','혈관 막힘'],['혈행역학','혈액동력학,혈류역학'],
+    ['호기','날숨'],['호발','자주 발생'],['호전','나아짐'],
+    ['호흡완만','느린호흡'],['혼몽','정신이 흐릿하고 가물가물함'],
+    ['혼용','섞어씀'],['홍피증','홍색피부증'],['화농','곪음'],
+    ['확진','확정 진단'],['환부','질환 부위'],['활액막','윤활막'],['활액','윤활'],
+    ['황색시증','노랗게 보이는 병'],['황시','노랗게 보임'],
+    ['횡격막','가로막'],['휴약','복용(사용) 중지'],
+    ['흉내고민','가슴쓰림'],['흉선','가슴샘'],['흉통','가슴통증'],
+    ['흑모설','검은털모양혀'],['흑변','검게 변함'],['흑토증','혈액구토'],
+    ['흡기','들숨'],['흡인','빨기'],['희석','묽게 함'],['희치증','치아부족증'],
+    ['S상결장','구불결장'],['가역성','회복가능한'],['각막연화증','각막무름증'],
+    ['각화','각질화'],['간헐성','시간 간격을 두고 되풀이하여'],['간부전','간기능상실'],
+    ['간찰진','피부스침증'],['견비부','어깨와 팔'],['결절','튀어나온 부위'],
+    ['경축','경련과 수축이 일어나 수축 상태가 지속되는 현상'],
+    ['고투여량','투여량이 많음'],['고함량','많은 함량'],
+    ['과호흡','과다호흡'],['국한성','특정 부분에 나타나는'],
+    ['굴곡','구부러진'],['근좌상','근육타박상'],
+    ['기명력','새롭게 경험한 것을 기억하는 능력'],['기저치','기본값'],
+    ['기형발현','기형발생'],['난백','달걀흰자'],
+    ['늑간신경통','갈비뼈 사이 신경통'],['단백뇨','단백질이 섞인 오줌'],
+    ['반상출혈','피부에 검보랏빛 얼룩점이 생기는 내부출혈'],
+    ['반점상','얼룩덜룩한 모양의'],['발포정','물에 녹여 복용하는 알약'],
+    ['배농','고름 빼기'],['배뇨곤란','','배뇨(소변을 눔)곤란'],['배뇨','소변을 눔'],['백대하','흰색 질분비물'],
+    ['번열','열이 나고 가슴 속이 답답한 증상'],['변잠혈','피섞인 변'],
+    ['병변','병에 의한 몸의 변화'],['병중병후','병을 앓는 동안이나 회복 후'],
+    ['복통','배아픔'],['산혈증','혈액이 산성화 되는 증상'],
+    ['서방형','효과가 지속적으로 나타나는'],['안내압','눈내부 압력'],
+    ['암적색','검붉은 색'],['야맹증','밤에 잘 못 보는 증상'],
+    ['연소성','어리거나 젊은나이에 나타나는'],['오한','춥고 떨리는 증상'],
+    ['요단백','소변에 포함된 단백질'],['요변색','소변색이 변함'],
+    ['요침사','소변 침전물 검사'],['용혈성','적혈구 파괴성'],
+    ['잔뇨감','소변을 누고난 후에도 다 눈 것 같지 않은 느낌'],
+    ['점증투여','점차적으로 늘려 투여하는'],['제증상','여러 증상'],
+    ['제질환','여러 질환'],['진해거담제','','진해(기침을 그치게 함)거담제(가래약)'],['진해','기침을 그치게 함'],
+    ['특발성','원인 불명의'],['폐색','닫혀서 막힘'],['풍질','신경계 질환'],
+    ['항응혈제','혈액응고저지제'],['협착','좁아짐'],
+    ['홍반','붉은 반점'],['화상양','불에 덴 듯한 모양'],
+    ['황반','피부나 눈 흰자위가 노래짐'],
+    ['감작','과민상태로 만듦'],['감정둔마','감정무딤'],
+    ['강축증','강직증'],['개존','개방,열린'],['객담','가래'],
+    ['거담제','가래약'],['게실','곁주머니'],['격통','심한 고통'],
+    ['경결','단단해짐'],['경동맥','목동맥'],
+    ['경미한','가벼운,대수롭지 않은'],['경부통','목통증'],
+    ['경지증','손발가락경화증'],['경직','굳음'],
+    ['경피적','피부경유'],['경피증','피부경화증'],
+    ['고령자','노인'],['고미','쓴 맛'],['고식적','임기응변적'],
+    ['고정약진','약에 의한 피부발진'],['공수병','물공포증'],
+    ['공장','빈창자'],['과산증','위산과다증'],['과이완','심하게 이완됨'],
+    ['관침','주사침'],['교상','물린상처'],
+    ['구각염','입꼬리염'],['구갈증','목마름증'],['구강','입안'],
+    ['구개수','목젖'],['구개','입천장'],['구기','메스꺼움'],
+    ['구내염','입안염'],['구내이상감','입안이상감'],['구순건조감','입술건조감'],
+    ['구순열','입술갈림증'],['구순염','입술염'],['구순유착증','입술붙음증'],
+    ['구취','입냄새'],['굴근','굽힘근육'],['굴염','부비동염'],
+    ['균열','갈라짐'],['근경련','근육경련'],['근무력증','근육무력증'],
+    ['근병증','근육병증'],['근위부','몸쪽'],['급성동통','급성통증'],
+    ['기분변조','기분저하증'],['기왕력','병력'],['기왕증','과거 질병'],
+    ['기외수축','조기수축'],['기흉','공기가슴증'],
+    ['길항작용','억제작용,대항작용'],['길항제','억제제,대항제'],
+    ['나태','게으름'],['난청','귀먹음'],
+    ['녹농','푸른 고름'],['누공','샛길'],
+    ['누도','눈물길'],['누선염','눈물샘염'],['누안','눈물흘림'],['누액','눈물'],
+    ['다맥색','진한 갈색'],['단락술','지름길,지름술,션트,사잇 길'],
+    ['단신증','단일신장증'],['단안증','외눈증'],['담객출','가래뱉음'],
+    ['담마진','두드러기'],
+    ['만곡족','휜발,곤봉발'],['망상적혈구','그물적혈구'],
+    ['면정','안면종기'],['무언증','벙어리증'],['무유증','젖마름증'],
+    ['무지외반증','엄지발가락가쪽휨증,무지 외반증'],
+    ['밀전하여','뚜껑을 꼭 닫아,단단히 마개로 막아'],
+    ['반수치사량','반수치사용량'],['반추','되새김'],
+    ['배굴','발등굽힘,손등굽힘'],['배담작용','쓸개즙분비작용'],
+    ['배부','등'],['변력제','심장근육수축 조절약'],
+    ['보장구','장애인 보조기'],['보체고정법','도움체고정법'],
+    ['보행','걸음'],['복명','창자 가스소리'],['복부','배부분'],
+    ['복수','뱃물'],['복시','겹보임'],['복청','겹듣기'],
+    ['본제','이 약'],['봉합','꿰맴'],['부신','콩팥위샘'],
+    ['부안검','덧눈꺼풀'],['분무하다','뿌리다'],['분비선','분비샘'],
+    ['분시박출량','분당박출량'],['불온','불안감'],
+    ['산부','산모'],['살세포','살해세포'],['색륜','시각 달무리'],
+    ['선통','쏘는 통증'],['세그먼트','조각,분절,부분,구역'],
+    ['세극등','틈새등'],['소구증','작은입증'],
+    ['소상','긁어서 생긴 상처'],['소실','없어짐'],['소염제','항염증제,염증약'],
+    ['소염','항염'],['소이증','작은귀증'],['소파술','긁어냄(술)'],
+    ['속발성','이차,제이'],['속행','계속함'],
+    ['수활액낭종','물낭,물주머니'],['수회','여러 차례'],['숙지','자세히 앎'],
+    ['순목','눈 깜박거림'],['습윤','습기 참'],['시겔라증','이질'],
+    ['시몽감','흐린시력'],['식간에','식사때와 식사때 사이에'],
+    ['식체','체함'],['식피창','피부 이식후 생긴 상처'],
+    ['알칼로시스','알칼리증'],['암점','시야불능부위'],
+    ['압통','누르는 통증'],['애역','딸꾹질'],['양안','두 눈'],
+    ['연령','나이'],['연성하감균','무른궤양균'],
+    ['위체','체함'],['육안으로','눈으로'],['율속단계','속도결정단계'],
+    ['의거하여','따라서,좇아서,근거삼아'],['의주감','스멀거림/개미기는 느낌'],
+    ['입상','알갱이모양'],['임신 초삼분기','임신 첫3개월'],
+    ['장문합술','장연결(술)'],['장쇄','긴 사슬'],
+    ['적자색','붉은 자주색'],['전풍','어루러기'],
+    ['제대','탯줄'],['제동맥','탯줄동맥'],
+    ['제세동기','잔떨림제거기,제세동기'],['제염','배꼽염'],
+    ['조동','된떨림,조동'],['중증','심한 증상'],
+    ['증량','양을 늘림'],['척주전만','척주앞굽음증'],
+    ['청열','열을 내려줌'],['추벽','주름'],
+    ['취한증','땀악취증'],['타제','다른 약'],
+    ['보체','도움체,보체'],
+    ['가성','거짓'],['가임여성','임신가능성 있는 여성'],
+    ['감독','독성을 줄임'],['감량','줄임'],['감미','단맛'],
+    ['감신미','달고신맛'],['감약','감소하여 복용(사용)'],
+    ['개시투여량','첫 투여량'],['개방동맥관','동맥관 개방증'],
+    ['건염','힘줄염'],['건초염','힘줄윤활막염'],['건성안','눈마름'],
+    ['건피증','피부건조증'],['결막낭','결막주머니'],['결막하','결막밑'],
+    ['결찰술','묶기,묶음술'],['겸자','집게'],
+    ['경피적','피부경유'],['공복','빈 속'],
+    ['공여부','주는 부위,공여부'],['공여자','주는이,제공자'],
+    ['공여','기증,주기,헌혈'],['고부백선','대퇴부백선'],
+    ['곤충자상','벌레물린 상처'],
+    ['상경적으로','경쟁적으로'],['상순','윗입술'],
+    ['상안검','윗눈꺼풀'],['상용','일상적으로 사용'],
+    ['상회','웃돎,웃돌다'],
+    ['악안면','턱얼굴'],['안각','눈구석'],['안검','눈꺼풀'],
+    ['안근','안구근육'],['안면','얼굴'],['안염','눈염증'],
+    ['안와','눈주변'],['안저','눈바닥'],['안내','안구내/눈속'],
+    ['위양성','거짓양성'],['위음성','거짓음성'],
+    ['유즙루','젖흐름증,유즕분비과다'],
+    ['전위성','전위,변위'],
+    ['조갑주위염','손발톱주위염'],
+    ['중이','가운데귀'],
+    ['전립선','전립샘'],['췌장','이자'],['치조','이틀'],
+    ['직장','곧창자,직장','직장'],['진보','나아짐'],
+    ['쌍태','쌍둥이'],
+    ['색륜','시각 달무리'],
+    ['수의근','맘대로근'],['산미','신 맛'],
+    ['역위증','좌우바뀜증'],
+    ['이두근','두갈래근'],['이욕','귀를 씻음'],
+    ['견통','어깨결림,어깨통증'],
+    ['가온','온도를 올림'],['가감','더하거나 줄임'],
+    ['비경구','먹는 약이 아닌'],
+    ['서방형','효과가 지속적으로 나타나는'],
+    ['배뇨','소변을 눔'],['배농','고름 빼기'],
+    ['발포정','물에 녹여 복용하는 알약'],
+    ['병소','아픈 부위'],['병인','병의 원인'],['병태','병의 상태'],
+    ['병합','합침'],
+    ['두부단독','머리나 얼굴이 세균 감염 등으로 열이 나고 붉어지며 붓고 아픈 증상'],
+    ['맥관석회화','혈관석회화'],['무시','앞이 보이지 않음'],
+  ];
+  r.sort((a, b) => b[0].length - a[0].length);
+  return r;
+})();
+
+
+function renderPrecautions(sections) {
+  if (!sections || !sections.length) return '';
+  const ts       = 'padding:4px 8px 4px 0;border-bottom:1px solid #f5f5f5;font-size:11px;vertical-align:top;color:#333;';
+  const tsIndent = 'padding:4px 8px 4px 18px;border-bottom:1px solid #f5f5f5;font-size:11px;vertical-align:top;color:#333;';
+  const STRIP_COND = /\s*\((?:[^)(]|\([^)]*\))*(?:함유\s?제제|미함유[^)]*|에\s*한함|어린이의?\s*용법[·・]?용량이?\s*있는\s*경우|어린이에\s*대한\s*용법이\s*있는\s*경우)(?:[^)(]|\([^)]*\))*\)\??/g;
+  const copyLines = [];
+  sections.forEach((sec, si) => {
+    copyLines.push(`\n${si + 1}. ${sec.label}`);
+    sec.items.forEach((it) => {
+      if (it.text && it.text.includes('<삭제>')) return;
+      if (it.sub) copyLines.push(`[${it.sub}]`);
+      const clean = applyEasyTerms(removeEditorial(it.text).replace(STRIP_COND, '').trim());
+      if (it.isMapping || it.indent) {
+        copyLines.push(`   ${clean}`);
+      } else if (it.circled) {
+        copyLines.push(clean);
+      } else {
+        copyLines.push(`${it.displayNum}) ${clean}`);
+      }
+    });
+  });
+  window.__precCopyText = copyLines.join('\n').trim();
+  const sectHtml = sections.map((sec, secIdx) => {
+    let prevSub = null;
+    const rows = sec.items.filter(it => !(it.text && it.text.includes('<삭제>'))).map((it) => {
+      const subHdr = (it.sub && it.sub !== prevSub)
+        ? `<tr><td style="padding:4px 0 2px;font-size:10px;font-weight:700;color:#666;letter-spacing:0.04em;">${esc(it.sub)}</td></tr>`
+        : '';
+      prevSub = it.sub;
+      const cleanText = applyEasyTerms(removeEditorial(it.text).replace(STRIP_COND, '').trim());
+      const extraStyle = it.isDirective ? 'background:#FFF3E0;' : '';
+      const badge = it.isDirective
+        ? `<span style="font-size:9px;color:#E65100;margin-left:5px;font-style:italic;white-space:nowrap;">[변경지시]</span>`
+        : '';
+      if (it.isMapping || it.indent) {
+        return `${subHdr}<tr><td style="${tsIndent}${extraStyle}">${esc(cleanText).replace(/\n/g,'<br>')}${badge}</td></tr>`;
+      }
+      if (it.circled) {
+        return `${subHdr}<tr><td style="${ts}${extraStyle}">${esc(cleanText).replace(/\n/g,'<br>')}${badge}</td></tr>`;
+      }
+      return `${subHdr}<tr><td style="${ts}${extraStyle}">${it.displayNum}) ${esc(cleanText).replace(/\n/g,'<br>')}${badge}</td></tr>`;
+    }).join('');
+    return `<div style="margin-bottom:10px;">
+      <div style="font-size:11px;font-weight:700;color:#1e40af;padding:3px 0 4px;border-bottom:1px solid #e2e8f0;margin-bottom:2px;">${secIdx + 1}. ${esc(sec.label)}</div>
+      <table style="width:100%;border-collapse:collapse;"><tbody>${rows}</tbody></table>
+    </div>`;
+  }).join('');
+  return `<div class="res-doc">
+    <div class="res-doc-head">
+      <span class="res-sec-title">사용상의 주의사항 (성분 기반 자동 생성)</span>
+      ${resCopyBtn('__precCopyText')}
+    </div>
+    ${sectHtml}
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid #f1f5f9;">
+      <button onclick="generateFullWordDoc()"
+        style="padding:8px 20px;background:#1e40af;color:#fff;border:none;border-radius:5px;font-size:13px;cursor:pointer;font-weight:700;letter-spacing:0.02em;font-family:inherit;">
+        ⬇ 최종 검토 워드 파일 다운로드
+      </button>
+    </div>
+  </div>`;
+}
+
+function generateWordDoc() {
+  const params = window.__lastPrecParams;
+  if (!params) { alert('먼저 검증을 실행하세요.'); return; }
+  const { chapterKey, form, activeRows, selectedExcipients: excList, doseRows } = params;
+
+  const chData = DB[chapterKey];
+  if (!chData || !chData['사용상의_주의사항']) return;
+  const prec    = chData['사용상의_주의사항'];
+  const ctx     = buildPrecautionCtx(chapterKey, form, activeRows, doseRows);
+  const fnMaps  = prec?.['각주_맵'] || {};   // 섹션별 인라인 각주 성분명 맵
+
+  // Build displayedMap: cat -> Set<origIdx>
+  const sections = generatePrecautions(chapterKey, form, activeRows, excList, doseRows);
+  const displayedMap = new Map();
+  if (sections) {
+    sections.forEach(sec => {
+      if (!displayedMap.has(sec.cat)) displayedMap.set(sec.cat, new Set());
+      sec.items.forEach(it => displayedMap.get(sec.cat).add(it.origIdx));
+    });
+  }
+
+  const CAT_LABELS = [
+    ['경고',                 '경고'],
+    ['복용하지_말_것',       '다음과 같은 사람은 이 약을 복용하지 말 것'],
+    ['병용금기',             '이 약을 복용하는 동안 다음의 약을 복용하지 말 것'],
+    ['복용전_상의',          '다음과 같은 사람(경우)은 이 약을 복용하기 전에 의사, 치과의사, 약사와 상의할 것.'],
+    ['이상반응_및_즉각중지', '다음과 같은 경우 이 약의 복용을 즉각 중지하고 의사, 치과의사, 약사와 상의할 것. 상담 시 가능한 한 이 첨부문서를 소지할 것.'],
+    ['기타주의사항',         '기타 주의사항'],
+    ['소아투여',             '소아에 대한 투여'],
+    ['임부수유부투여',       '임부 및 수유부에 대한 투여'],
+    ['복용시_주의',          '기타 이 약의 복용 시 주의할 사항'],
+    ['저장상의_주의',        '저장상의 주의사항'],
+  ];
+
+  const HL  = 'background:#FFFF00;';
+  const DIM = 'color:#aaa;';
+  const BASE = 'font-size:11pt;margin:0;padding:2pt 0;line-height:1.6;';
+  const INDENT = 'padding-left:20pt;';
+
+  let body = '';
+  const ingrNames = activeRows.map(r => r.ingr).join(', ');
+  body += `<p style="font-size:11pt;margin-bottom:6pt;"><b>선택 성분:</b> ${ingrNames} &nbsp;|&nbsp; <b>제형:</b> ${form}</p>`;
+  body += `<p style="font-size:10pt;color:#666;margin-bottom:14pt;">※ 노란색 하이라이트: 해당 성분에 적용되는 항목 &nbsp;/&nbsp; 회색: 미적용 항목</p>`;
+
+  let secNum = 1;
+  let commentDefs = '';
+  let commentSeq = 0;
+  for (const [cat, label] of CAT_LABELS) {
+    const hasDbCat = cat in prec;
+    const excItemsInCat = (excList || []).some(n => (EXCIPIENT_PREC_DB[n] || {})[cat]);
+    const dirItemsInCat = (sections || []).find(s => s.cat === cat)?.items.filter(it => it.isDirective) || [];
+    if (!hasDbCat && !excItemsInCat && !dirItemsInCat.length) continue;
+    const dispSet = displayedMap.get(cat) || new Set();
+    const fnMap   = fnMaps[cat] || null;   // 이 섹션의 각주 성분명 맵
+    body += `<p style="font-size:12pt;font-weight:bold;color:#b71c1c;margin-top:14pt;margin-bottom:4pt;">${secNum++}. ${label}</p>`;
+
+    let dispNum = 0;
+    if (hasDbCat && cat === '이상반응_및_즉각중지' && prec['이상반응_성분매핑']) {
+      const advArr = prec[cat];
+      const mapping = prec['이상반응_성분매핑'];
+
+      // Split advArr[0] into header + individual entry lines
+      const rawLines = advArr[0].split('\n').filter(l => l.trim());
+      const headerLine = rawLines[0];
+      const contentLines = rawLines.slice(1);
+
+      body += `<p style="${BASE}">${esc(_stripInlineMarkers(headerLine))}</p>`;
+
+      // Each content line matched sequentially to its mapping entry for per-line highlight
+      contentLines.forEach((line, idx) => {
+        const entry = mapping[idx];
+        const isActive = entry ? ctx.classes.has(entry.class) : false;
+        if (isActive) {
+          // 활성: 문단 전체 HL + 비활성 조건 단어만 white로 덮어씌움
+          body += `<p style="${BASE + INDENT + HL}">${_renderPrecWithInlineHL(line, ctx, HL, fnMap, true)}</p>`;
+        } else {
+          body += `<p style="${BASE + INDENT + DIM}">${esc(_stripInlineMarkers(line))}</p>`;
+        }
+      });
+
+      // Regular advArr items (index 1+)
+      for (let i = 1; i < advArr.length; i++) {
+        const disp = dispSet.has(i);
+        body += `<p style="${BASE + (disp ? '' : DIM)}">${i}) ${esc(_stripInlineMarkers(advArr[i]))}</p>`;
+      }
+    } else if (hasDbCat) {
+      const flatItems = _flattenPrecItems(cat, prec[cat]);
+      flatItems.forEach((item, i) => {
+        const isIndent = !!item.indent;
+        const isCircled = !!item.circled;
+        if (!isIndent && !isCircled) dispNum++;
+        const displayed = dispSet.has(i);
+        const baseS = BASE + (isIndent ? INDENT : '');
+        const prefix = (isIndent || isCircled) ? '' : `${dispNum}) `;
+        if (displayed) {
+          // 활성: 문단 전체 HL + [[...]] 마커 있으면 비활성 단어만 white로 덮어씌움
+          // 각주 정의 라인(\n1)함유제제...)은 화면에 표시하지 않음 — 워드 좌측(기준)열에만 표시
+          body += `<p style="${baseS + HL}">${prefix}${_renderPrecWithInlineHL(_stripFootnoteLines(item.text), ctx, HL, fnMap, true)}</p>`;
+        } else {
+          body += `<p style="${baseS + DIM}">${prefix}${esc(_stripInlineMarkers(_stripFootnoteLines(item.text))).replace(/\n/g,'<br>')}</p>`;
+        }
+      });
+    }
+    // 변경지시 추가 항목
+    if (dirItemsInCat.length) {
+      body += `<p style="font-size:9pt;color:#E65100;margin:6pt 0 2pt;font-style:italic;">[품목허가사항 변경지시 추가 문구]</p>`;
+      dirItemsInCat.forEach((it) => {
+        const cmtId = `cmt${++commentSeq}`;
+        const cmtRef = `<span style="mso-comment-reference:${cmtId};mso-comment-date:20240101T000000"><span style="mso-special-character:comment"> </span></span>`;
+        body += `<p style="${BASE}background:#FFF3E0;">${it.displayNum}) ${it.text}${cmtRef}</p>`;
+        commentDefs += `<div style="mso-element:comment" id="${cmtId}"><p class="MsoNormal" style="font-size:9pt;font-family:&apos;맑은 고딕&apos;,sans-serif;"><b>기재 사유:</b> ${it.citation}</p></div>`;
+      });
+    }
+
+    // 첨가제 추가 항목 (항상 하이라이팅)
+    if (excList && excList.length) {
+      for (const excName of excList) {
+        const excItems = (EXCIPIENT_PREC_DB[excName] || {})[cat];
+        if (!excItems) continue;
+        body += `<p style="font-size:9pt;color:#1565c0;margin:3pt 0 1pt;font-style:italic;">[첨가제: ${excName}]</p>`;
+        excItems.forEach(text => {
+          body += `<p style="${BASE + HL}">${++dispNum}) ${text}</p>`;
+        });
+      }
+    }
+  }
+
+  const commentListHtml = commentDefs
+    ? `<div style="mso-element:comment-list">${commentDefs}</div>`
+    : '';
+  const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset="UTF-8"><title>사용상의 주의사항 원본</title>
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:TrackChanges/></w:WordDocument></xml><![endif]-->
+<style>body{font-family:'맑은 고딕',Arial,sans-serif;margin:2cm;}p{margin:0;padding:2pt 0;}.MsoCommentText{font-size:9pt;font-family:'맑은 고딕',sans-serif;}</style>
+</head><body>
+<h2 style="font-size:14pt;color:#b71c1c;margin-bottom:10pt;">사용상의 주의사항 (원본 전체)</h2>
+${body}
+${commentListHtml}</body></html>`;
+
+  const blob = new Blob(['﻿' + html], { type: 'application/msword;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `사용상주의사항_원본_${chapterKey}_${new Date().toISOString().slice(0,10)}.doc`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 2. 기준 적합여부 섹션 (배합량 표 전체 이후 1회 표시)
+// ════════════════════════════════════════════════════════════════════
+function renderCriteriaSection(chapterKey, validations, allDosageRows) {
+  if (!validations.length) return '';
+
+  if (chapterKey === '제2장_해열진통제') {
+    const allVpairs = allDosageRows.map((dr, i) => ({ dr, v: validations[i] })).filter(x => x.v);
+    const { kindsSt, amtsSt } = computeCh2KindsAmtsStatus(allVpairs);
+    const kindsDb = DB['제2장_해열진통제']?.['기준']?.['유효성분의_종류'] ?? [];
+    const amtsDb  = DB['제2장_해열진통제']?.['기준']?.['유효성분의_분량'] ?? [];
+
+    const { ruleErrors } = validations[0];
+    const maxFreqAll = Math.max(...allDosageRows.map(dr => dr.freqMax));
+    const aspirinFail = allVpairs.some(({ v }) => v.ruleErrors.some(r => r.key === '아스피린계 연령' && r.ok === false));
+    const aspirinReason = allVpairs.flatMap(({ v }) => v.ruleErrors.filter(r => r.key === '아스피린계 연령' && r.ok === false).map(r => r.reason)).join('; ');
+
+    const td = 'padding:4px 8px;border:1px solid #dde3ef;font-size:11px;';
+    const thd = td + 'font-weight:700;background:#f7f9fc;';
+
+    const mkRow = (num, label, st) => {
+      const mark  = st.na ? '—' : (st.ok ? 'O' : 'X');
+      const color = st.na ? '#aaa' : (st.ok ? '#2e7d32' : '#c62828');
+      const bg    = resRowBg(st.na ? null : st.ok);
+      const reasonHtml = (!st.na && !st.ok && st.reason) ? `<br><span style="color:#c62828;font-size:10px;">↳ ${esc(st.reason)}</span>` : '';
+      return `<tr style="background:${bg};">
+        <td style="${td}text-align:center;white-space:nowrap;color:#666;">${esc(num)}</td>
+        <td style="${td}">${esc(label)}${reasonHtml}</td>
+        <td style="${td}text-align:center;font-weight:700;font-size:14px;color:${color};">${mark}</td>
+      </tr>`;
+    };
+
+    // 유효성분의_종류 rows
+    const kindsRows = kindsDb.map((item, i) => {
+      const st = kindsSt[i] ?? { ok: null, na: true, reason: '' };
+      return mkRow(`${i+1}`, item, st);
+    }).join('');
+
+    // 유효성분의_분량 rows
+    const amtsRows = amtsDb.map((item, i) => {
+      const st = amtsSt[i] ?? { ok: null, na: true, reason: '' };
+      return mkRow(`${i+1}`, item, st);
+    }).join('');
+
+    // 기타 기준 rows
+    const extraRows = [
+      mkRow('용법용량', '용법용량은 1일 1~3회까지로 한다.',
+            { ok: maxFreqAll <= 3, na: false,
+              reason: maxFreqAll <= 3 ? '' : `입력된 1일 최대 ${maxFreqAll}회 — 허용 범위(1~3회) 초과` }),
+      ...(aspirinFail || allVpairs.some(({ v }) => v.ruleErrors.some(r => r.key === '아스피린계 연령'))
+        ? [mkRow('아스피린 연령', '아스피린/아스피린알루미늄/살리실산나트륨/히드로탈시트는 만 15세 미만 사용 불가',
+                 { ok: !aspirinFail, na: false, reason: aspirinFail ? aspirinReason : '' })]
+        : []),
+    ].join('');
+
+    const tableHtml = (rows) => `
+      <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
+        <thead><tr>
+          <th style="${thd}width:5%;text-align:center;">번호</th>
+          <th style="${thd}">기준 내용</th>
+          <th style="${thd}width:7%;text-align:center;white-space:nowrap;">적합<br>여부</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+
+    return `<div style="margin-bottom:14px;padding:10px 14px;background:#fff;border:1px solid #dde3ef;border-radius:6px;">
+      <div style="font-size:11px;font-weight:700;color:#555;letter-spacing:0.06em;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #eee;">📋 2. 기준 적합여부</div>
+      <div style="font-size:11px;font-weight:700;color:#1a4b8c;margin-bottom:3px;">▸ 유효성분의 종류</div>
+      ${kindsDb.length ? tableHtml(kindsRows) : '<p style="color:#aaa;font-size:11px;">DB 데이터 없음</p>'}
+      <div style="font-size:11px;font-weight:700;color:#1a4b8c;margin:6px 0 3px;">▸ 유효성분의 분량</div>
+      ${amtsDb.length ? tableHtml(amtsRows) : '<p style="color:#aaa;font-size:11px;">DB 데이터 없음</p>'}
+      <div style="font-size:11px;font-weight:700;color:#1a4b8c;margin:6px 0 3px;">▸ 기타 기준</div>
+      ${tableHtml(extraRows)}
+    </div>`;
+  }
+
+  return '';
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 검토 실행
+// ════════════════════════════════════════════════════════════════════
+function renderAgeHeader(dr) {
+  const unitDisplay = dosageUnit || '정';
+  const freqStr = dr.freqMin === dr.freqMax ? `${dr.freqMax}회` : `${dr.freqMin}~${dr.freqMax}회`;
+  const amtStr  = dr.amtMin  === dr.amtMax  ? `${dr.amtMax}${unitDisplay}` : `${dr.amtMin}~${dr.amtMax}${unitDisplay}`;
+  return `<div style="margin-top:14px;margin-bottom:4px;padding:5px 10px;background:#1a4b8c;color:#fff;
+    border-radius:4px;font-size:11px;font-weight:700;letter-spacing:0.04em;">
+    ▸ ${esc(displayAgeLabel(dr.age, currentKey, currentForm) || '연령 미선택')} &nbsp;|&nbsp; 1일 ${esc(freqStr)}, 1회 ${esc(amtStr)}
+  </div>`;
+}
+
+function runValidation() {
+  const ch   = chaptersMap[currentKey];
+  const form = $('sel-dosage-form').value;
+  const body = $('results-body');
+
+  if (!ch)   { setStatus('장을 선택하세요', 'error'); return; }
+  if (!form) { setStatus('제형을 선택하세요', 'error'); return; }
+
+  const validDosageRows = dosageRows.filter(dr => dr.age);
+  if (!validDosageRows.length) { setStatus('연령을 1개 이상 선택하세요', 'error'); return; }
+
+  const activeRows = currentKey === '제1장_비타민미네랄' ? getCh1ActiveRows()
+                   : isMatrixMode() ? getMatrixActiveRows()
+                   : ingredientRows.filter(r => r.ingr && r.dose);
+  if (!activeRows.length) { setStatus('성분과 배합량을 입력하세요', 'error'); return; }
+
+  // 입력 검증을 통과한 시점에 결과 패널을 펼친다
+  setResultsCollapsed(false);
+
+  let html = '';
+  let anyFail = false;
+  const validations = []; // 연령별 검증 결과 수집 (기준 섹션·전체판정용)
+
+  // ── 연령별 배합량 판정 표 (전 장 공통) ──
+  // 좌측 입력 패널의 표는 편집용 실시간 화면이고, 우측 결과 패널의 표는
+  // 검토 결과 기록(캡처·공유용)이므로 두 곳 모두에 표시한다.
+  for (const dr of validDosageRows) {
+    const dosage = { freqMin: dr.freqMin, freqMax: dr.freqMax,
+                     amtMin: dr.amtMin,   amtMax: dr.amtMax, unit: dosageUnit };
+
+    if (currentKey === '제1장_비타민미네랄') {
+      html += renderAgeHeader(dr);
+      const v = validateChapter1(DB['제1장_비타민미네랄']['표'], form, dr.age, activeRows, dosage);
+      if (!v.itemResults.every(r => r.ok !== false) || !v.sumResults.every(r => r.ok !== false))
+        anyFail = true;
+      html += renderChapter1Results(v, form, dr.age);
+      validations.push(v);
+    } else if (currentKey === '제2장_해열진통제') {
+      html += renderAgeHeader(dr);
+      const v = validateChapter2(DB['제2장_해열진통제']['표'], form, dr.age, activeRows, dosage);
+      if (!v.itemResults.every(r => r.ok !== false) || !v.ruleErrors.every(r => r.ok !== false))
+        anyFail = true;
+      html += renderChapter2Results(v, form, dr.age);
+      validations.push(v);
+    } else if (currentKey === '제3장_감기약') {
+      html += renderAgeHeader(dr);
+      const v = validateChapter3(DB['제3장_감기약']['표'], form, dr.age, activeRows, dosage);
+      if (!v.itemResults.every(r => r.ok !== false) || !v.ruleErrors.every(r => r.ok !== false))
+        anyFail = true;
+      html += renderChapter3Results(v, form, dr.age);
+      validations.push(v);
+    } else if (currentKey === '제7장_진해거담제') {
+      html += renderAgeHeader(dr);
+      const v = validateChapter7(DB['제7장_진해거담제']['표'], form, dr.age, activeRows, dosage);
+      if (!v.itemResults.every(r => r.ok !== false) || !v.ruleErrors.every(r => r.ok !== false))
+        anyFail = true;
+      html += renderChapter7Results(v, form, dr.age);
+      validations.push(v);
+    } else if (currentKey === '제9장_비염용경구제') {
+      html += renderAgeHeader(dr);
+      const v = validateChapter9(DB['제9장_비염용경구제']['표'], form, dr.age, activeRows, dosage);
+      if (!v.itemResults.every(r => r.ok !== false) || !v.ruleErrors.every(r => r.ok !== false))
+        anyFail = true;
+      html += renderChapter9Results(v, form, dr.age);
+      validations.push(v);
+    }
+  }
+
+  // ── 2. 기준 적합여부 (배합량 표 전체 이후 1회) ──
+  html += renderCriteriaSection(currentKey, validations, validDosageRows);
+
+  // ── 효능효과·사용상주의사항 (연령과 무관하므로 1회만 표시) ──
+  const refDr = validDosageRows[0];
+  const refDosage = { freqMin: refDr.freqMin, freqMax: refDr.freqMax,
+                      amtMin: refDr.amtMin,   amtMax: refDr.amtMax };
+  const effResult  = generateEfficacy(currentKey, form, activeRows, refDosage);
+  const precResult = generatePrecautions(currentKey, form, activeRows, selectedExcipients, dosageRows);
+  if (effResult)  html += renderEfficacy(effResult);
+  if (precResult) html += renderPrecautions(precResult);
+
+  body.innerHTML = html || '<div class="empty-state"><span>결과 없음</span></div>';
+  setStatus(anyFail ? '❌ 부적합 항목 있음' : '✅ 검토 완료 — 적합', anyFail ? 'error' : 'ok');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 최종 Word 파일 다운로드 (표준제조기준 비교표)
+// ════════════════════════════════════════════════════════════════════
+function buildCriteriaRows(chapterKey, allValidations) {
+  if (!allValidations.length) return [];
+  const v0 = allValidations[0].v;
+  if (chapterKey === '제2장_해열진통제') {
+    const { ruleErrors, propResult } = v0;
+    const maxFreqAll = Math.max(...allValidations.map(({ dr }) => dr.freqMax));
+    const isOk = key => !ruleErrors.some(r => r.key === key && r.ok === false);
+    const getReason = key => (ruleErrors.find(r => r.key === key) || {}).reason || '';
+    return [
+      { num: '(1)②', ok: isOk('필수 성분 누락'), na: false, reason: getReason('필수 성분 누락'),
+        label: '배합하지 않으면 안되는 유효성분은 Ⅰ항과 Ⅱ항 성분 중 1종 이상으로 한다.' },
+      { num: '(1)④', ok: isOk('Ⅲ항 초과'), na: false, reason: getReason('Ⅲ항 초과'),
+        label: 'Ⅲ항의 유효성분을 배합하는 경우는 Ⅲ항의 유효성분 중 1종만 배합한다.' },
+      { num: '(1)⑤', ok: isOk('Ⅱ항+Ⅰ항 배합 금지'), na: false, reason: getReason('Ⅱ항+Ⅰ항 배합 금지'),
+        label: 'Ⅱ항의 성분인 이부프로펜은 Ⅰ항의 성분과 배합하지 않는다.' },
+      { num: '(2)⑤', ok: propResult ? propResult.ok : null, na: propResult == null,
+        reason: propResult ? propResult.reason : '',
+        label: 'Ⅰ항 2종이상 배합 시 각 성분을 각각 1회 최대분량으로 나누어 얻은 수치의 합이 1/2이상, 3/2이하' },
+      { num: '④', ok: maxFreqAll <= 3, na: false,
+        reason: maxFreqAll <= 3 ? '' : `입력된 1일 최대 ${maxFreqAll}회 — 허용 범위(1~3회) 초과`,
+        label: '용법용량은 1일 1~3회까지로 한다.' },
+    ];
+  }
+  const ruleErrors = v0.ruleErrors || [];
+  return ruleErrors.map((e, i) => ({
+    num: `(${i + 1})`, ok: e.ok !== false, na: e.ok === null,
+    reason: e.ok === false ? e.reason : '', label: e.key,
+  }));
+}
+
+// ── ch2 유효성분의 종류/분량 기준 O/X 계산 ──────────────────────────────
+// allVpairs: [{dr, v}, ...] (validateChapter2 결과 + 해당 dosageRow)
+function computeCh2KindsAmtsStatus(allVpairs) {
+  if (!allVpairs.length) return { kindsSt: [], amtsSt: [] };
+  const v0   = allVpairs[0].v;
+  const { ruleErrors, propResult } = v0;
+  const ir0  = v0.itemResults;
+  const isOk = key => !ruleErrors.some(r => r.key === key && r.ok === false);
+  const getReason = key => (ruleErrors.find(r => r.key === key) || {}).reason || '';
+
+  // 유효성분의 종류 (5 items) — 규칙은 연령 무관, allVpairs[0] 기준
+  const unknownIngr = ir0.filter(r => r.ok === null);
+  const kindsSt = [
+    { ok: unknownIngr.length === 0, na: false,
+      reason: unknownIngr.length ? unknownIngr.map(r => `${r.ingr}: 표1·표2 미등재`).join('; ') : '' },
+    { ok: isOk('필수 성분 누락'),      na: false, reason: getReason('필수 성분 누락') },
+    { ok: isOk('Ⅰ항 초과'),           na: false, reason: getReason('Ⅰ항 초과') },
+    { ok: isOk('Ⅲ항 초과'),           na: false, reason: getReason('Ⅲ항 초과') },
+    { ok: isOk('Ⅱ항+Ⅰ항 배합 금지'), na: false, reason: getReason('Ⅱ항+Ⅰ항 배합 금지') },
+  ];
+
+  // 유효성분의 분량 (6 items) — 전체 연령 중 가장 엄격한 결과(worst-case)
+  const anyFail = pred => allVpairs.some(({ v }) => v.itemResults.some(pred));
+  const grup1n  = ir0.filter(r => r.gubun === 'Ⅰ항').length;
+  const grup3n  = ir0.filter(r => r.gubun === 'Ⅲ항').length;
+  const grup5n  = ir0.filter(r => r.gubun === 'Ⅴ항').length;
+  const grp2n   = ir0.filter(r => r.gubun === '표2 Ⅰ항').length;
+  const allProp = allVpairs.map(({ v }) => v.propResult).filter(Boolean);
+
+  // item1: 1회/1일 최대분량 이하
+  const ok1 = !anyFail(r => r.ok === false && r.reason?.includes('최대 초과'));
+  const fail1 = [];
+  allVpairs.forEach(({ dr, v }) => {
+    const al = displayAgeLabel(dr.age, '제2장_해열진통제', currentForm) || dr.age;
+    v.itemResults.filter(r => r.ok === false && r.reason?.includes('최대 초과'))
+                 .forEach(r => fail1.push(`${r.ingr}(${al}): ${r.reason}`));
+  });
+
+  // item2: Ⅰ항 1종 배합 시 1/2 하한 (NA if Ⅰ항이 없거나 2종이상, 또는 Ⅲ항 있음)
+  const it2na = grup1n === 0 || grup1n >= 2 || grup3n >= 1;
+  const ok2   = it2na ? null : !anyFail(r => r.gubun === 'Ⅰ항' && r.ok === false && r.reason?.includes('1/2'));
+
+  // item3: Ⅰ항 2종이상/Ⅲ항 시 1/5 하한 (NA if 해당 구성 없음)
+  const it3na = grup1n < 2 && grup3n === 0;
+  const ok3   = it3na ? null : !anyFail(r => (r.gubun === 'Ⅰ항' || r.gubun === 'Ⅲ항') && r.ok === false && r.reason?.includes('1/5'));
+
+  // item4: Ⅴ항 1/15 하한 (NA if Ⅴ항 없음)
+  const it4na = grup5n === 0;
+  const ok4   = it4na ? null : !anyFail(r => r.gubun === 'Ⅴ항' && r.ok === false && r.reason?.includes('1/15'));
+
+  // item5: Ⅰ항 2종이상 비례배합 (NA if 적용 안됨)
+  const it5na = allProp.length === 0;
+  const ok5   = it5na ? null : allProp.every(p => p.ok);
+  const fail5 = allProp.find(p => !p.ok)?.reason || '';
+
+  // item6: 표2 성분 1/10 하한 (NA if 표2 성분 없음)
+  const it6na = grp2n === 0;
+  const ok6   = it6na ? null : !anyFail(r => r.gubun === '표2 Ⅰ항' && r.ok === false);
+
+  const amtsSt = [
+    { ok: ok1, na: false,  reason: ok1   ? '' : fail1.join('; ') || '최대분량 초과' },
+    { ok: ok2, na: it2na,  reason: ok2 === false ? 'Ⅰ항 1종 배합: 1/2 하한 미달' : '' },
+    { ok: ok3, na: it3na,  reason: ok3 === false ? 'Ⅰ항 2종이상/Ⅲ항: 1/5 하한 미달' : '' },
+    { ok: ok4, na: it4na,  reason: ok4 === false ? 'Ⅴ항: 1/15 하한 미달' : '' },
+    { ok: ok5, na: it5na,  reason: ok5 === false ? fail5 : '' },
+    { ok: ok6, na: it6na,  reason: ok6 === false ? '표2 성분 1일 하한(1/10) 미달' : '' },
+  ];
+  return { kindsSt, amtsSt };
+}
+
+function generateFullWordDoc() {
+  const productName = ($('product-name')?.value || '').trim() || '(제품명)';
+  const ch = chaptersMap[currentKey];
+  const form = $('sel-dosage-form').value;
+  const validDosageRows = dosageRows.filter(dr => dr.age);
+  const activeRows = currentKey === '제1장_비타민미네랄' ? getCh1ActiveRows()
+                   : isMatrixMode() ? getMatrixActiveRows()
+                   : ingredientRows.filter(r => r.ingr && r.dose);
+  if (!ch || !form || !validDosageRows.length || !activeRows.length) {
+    alert('장·제형·연령·성분을 모두 입력한 후 실행해 주세요.');
+    return;
+  }
+
+  const unit = dosageUnit || '정';
+  const refDr = validDosageRows[0];
+  const refDosage = { freqMin: refDr.freqMin, freqMax: refDr.freqMax,
+                      amtMin: refDr.amtMin,   amtMax: refDr.amtMax };
+
+  const allValidations = [];
+  for (const dr of validDosageRows) {
+    const dosage = { freqMin: dr.freqMin, freqMax: dr.freqMax,
+                     amtMin: dr.amtMin,   amtMax: dr.amtMax, unit };
+    let v = null;
+    if (currentKey === '제1장_비타민미네랄')
+      v = validateChapter1(DB['제1장_비타민미네랄']['표'], form, dr.age, activeRows, dosage);
+    else if (currentKey === '제2장_해열진통제')
+      v = validateChapter2(DB['제2장_해열진통제']['표'], form, dr.age, activeRows, dosage);
+    else if (currentKey === '제3장_감기약')
+      v = validateChapter3(DB['제3장_감기약']['표'], form, dr.age, activeRows, dosage);
+    else if (currentKey === '제7장_진해거담제')
+      v = validateChapter7(DB['제7장_진해거담제']['표'], form, dr.age, activeRows, dosage);
+    else if (currentKey === '제9장_비염용경구제')
+      v = validateChapter9(DB['제9장_비염용경구제']['표'], form, dr.age, activeRows, dosage);
+    if (v) allValidations.push({ dr, v });
+  }
+
+  const effResult    = generateEfficacy(currentKey, form, activeRows, refDosage);
+  const precSections = generatePrecautions(currentKey, form, activeRows, selectedExcipients, dosageRows);
+
+  // Shared styles
+  const FN   = "font-family:'맑은 고딕',Arial,sans-serif;";
+  const HL   = 'background:#FFFF00;';
+  const DIM  = 'color:#bbb;';
+  const BORD = 'border:1px solid #a0a0a0;';
+  const TD   = `${FN}font-size:10pt;padding:4pt 6pt;${BORD}vertical-align:top;`;
+  const TH   = `${FN}font-size:10pt;padding:4pt 6pt;${BORD}font-weight:bold;text-align:center;background:#E8EEF7;`;
+  const TH2  = `${FN}font-size:10pt;padding:4pt 6pt;${BORD}font-weight:bold;text-align:center;background:#d6e4f5;`;
+  const TH3  = `${FN}font-size:10pt;padding:4pt 6pt;${BORD}font-weight:bold;text-align:center;background:#d9f0e0;`;
+  const SEC  = `${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;`;
+  const fmt  = v => v != null ? (+v).toLocaleString('ko-KR', { maximumFractionDigits: 4 }) : '—';
+  const chLabel = ch.label || currentKey;
+
+  let body = '';
+
+  // ── ch2 전용 서식 (해열진통제) ──
+  if (currentKey === '제2장_해열진통제') {
+    // (1) 제목 — 좌측 정렬, 제품명 + 연질캡슐 고정
+    body += `<p style="${FN}font-size:16pt;font-weight:bold;color:#1a4b8c;text-align:left;margin:0 0 16pt;">${esc(productName)}연질캡슐</p>`;
+
+    // (1-a) [원료약품 및 그 분량]
+    // 7열 표를 Word 페이지 너비에 맞게: table-layout:fixed + colgroup + 소형 폰트/패딩
+    const THRAW  = `${FN}font-size:8pt;padding:2pt 3pt;${BORD}font-weight:bold;text-align:center;word-break:break-all;word-wrap:break-word;vertical-align:middle;`;
+    const TH2R   = THRAW + 'background:#d6e4f5;';
+    const TH3R   = THRAW + 'background:#d9f0e0;';
+    const TDRAW  = `${FN}font-size:8.5pt;padding:2pt 3pt;${BORD}vertical-align:middle;word-break:break-word;word-wrap:break-word;`;
+    body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[원료약품 및 그 분량]</p>`;
+    {
+      // 연령별로 각각 표 출력 — 연령계수로 인해 표제기 기준값(1회최대/최소, 1일최대)이
+      // 연령마다 다르므로 동일 용법이더라도 병합하지 않음
+      const ingrGroups2 = allValidations.map(({ dr, v }) => ({
+        key: String(dr.id),
+        dr,
+        v,
+        labels: [displayAgeLabel(dr.age, currentKey, currentForm) || dr.age],
+      }));
+      const multiGrp2 = ingrGroups2.length > 1;
+      // 그룹이 없는 경우(검토 전) fallback: activeRows로 빈 표 1개 출력
+      if (!ingrGroups2.length) {
+        body += `<table style="width:100%;border-collapse:collapse;margin-bottom:12pt;table-layout:fixed;mso-table-layout-alt:fixed;">`;
+        body += `<colgroup><col style="width:8%;mso-width-source:userset;"><col style="width:22%;mso-width-source:userset;"><col style="width:12%;mso-width-source:userset;"><col style="width:13%;mso-width-source:userset;"><col style="width:12%;mso-width-source:userset;"><col style="width:16%;mso-width-source:userset;"><col style="width:17%;mso-width-source:userset;"></colgroup>`;
+        body += `<thead><tr><th colspan="5" style="${TH2R}">의약품 표준제조기준</th><th colspan="2" style="${TH3R}">${esc(productName)}</th></tr>`;
+        body += `<tr><th style="${TH2R}">구분</th><th style="${TH2R}">유효성분명</th><th style="${TH2R}">1회최대<br>분량(mg)</th><th style="${TH2R}">1일최대<br>분량(mg)</th><th style="${TH2R}">1회최소<br>분량(mg)</th><th style="${TH3R}">1회<br>용량(mg)</th><th style="${TH3R}">1일용량(mg)</th></tr></thead><tbody>`;
+        for (const r of activeRows) {
+          body += `<tr><td style="${TDRAW}text-align:center;">${esc(r.gubun||'—')}</td><td style="${TDRAW}">${esc(r.ingr)}</td><td style="${TDRAW}text-align:center;">—</td><td style="${TDRAW}text-align:center;">—</td><td style="${TDRAW}text-align:center;">—</td><td style="${TDRAW}text-align:right;">${esc(r.dose)}</td><td style="${TDRAW}text-align:center;">—</td></tr>`;
+        }
+        body += `</tbody></table>`;
+      }
+      for (const grp of ingrGroups2) {
+        const { dr, v, labels } = grp;
+        // 병합 연령 레이블 생성
+        let ageLbl2;
+        if (labels.length === 1) {
+          ageLbl2 = labels[0];
+        } else {
+          const firstLbl = labels[0];
+          const lastLbl  = labels[labels.length - 1];
+          const lowerM   = lastLbl.match(/^(.+?이상)/);
+          const lower    = lowerM ? lowerM[1] : lastLbl;
+          const upperM   = firstLbl.match(/(만\s*\d+세\s*미만)$/);
+          ageLbl2 = upperM ? `${lower} ~ ${upperM[1]}` : lower;
+        }
+        // 연령 소제목 (복수 그룹일 때만)
+        if (multiGrp2) {
+          body += `<p style="${FN}font-size:9.5pt;font-weight:bold;color:#1a4b8c;margin:5pt 0 2pt;">▶ ${esc(ageLbl2)}</p>`;
+        }
+        body += `<table style="width:100%;border-collapse:collapse;margin-bottom:${multiGrp2?'8':'12'}pt;table-layout:fixed;mso-table-layout-alt:fixed;">`;
+        body += `<colgroup>`;
+        body += `<col style="width:8%;mso-width-source:userset;">`;
+        body += `<col style="width:22%;mso-width-source:userset;">`;
+        body += `<col style="width:12%;mso-width-source:userset;">`;
+        body += `<col style="width:13%;mso-width-source:userset;">`;
+        body += `<col style="width:12%;mso-width-source:userset;">`;
+        body += `<col style="width:16%;mso-width-source:userset;">`;
+        body += `<col style="width:17%;mso-width-source:userset;">`;
+        body += `</colgroup>`;
+        body += `<thead><tr>`;
+        body += `<th colspan="5" style="${TH2R}">의약품 표준제조기준</th>`;
+        body += `<th colspan="2" style="${TH3R}">${esc(productName)}</th>`;
+        body += `</tr><tr>`;
+        body += `<th style="${TH2R}">구분</th>`;
+        body += `<th style="${TH2R}">유효성분명</th>`;
+        body += `<th style="${TH2R}">1회최대<br>분량(mg)</th>`;
+        body += `<th style="${TH2R}">1일최대<br>분량(mg)</th>`;
+        body += `<th style="${TH2R}">1회최소<br>분량(mg)</th>`;
+        body += `<th style="${TH3R}">1회<br>용량(mg)</th>`;
+        {
+          const freqDispW = dr.freqMin === dr.freqMax ? `1일 ${dr.freqMax}회` : `1일 ${dr.freqMin}~${dr.freqMax}회`;
+          const amtDispW  = dr.amtMin  === dr.amtMax  ? `1회 ${dr.amtMax}${unit}` : `1회 ${dr.amtMin}~${dr.amtMax}${unit}`;
+          body += `<th style="${TH3R}">1일용량(mg)<br>(${esc(freqDispW)},<br>${esc(amtDispW)})</th>`;
+        }
+        body += `</tr></thead><tbody>`;
+        if (v && v.itemResults && v.itemResults.length) {
+          for (const r of v.itemResults) {
+            const fail2   = r.ok === false;
+            const rowBg2  = fail2 ? 'background:#fff5f5;' : '';
+            const ingrRow2 = activeRows.find(ar => ar.ingr === r.ingr);
+            const std1max2  = r.allowed?.max1dose ?? null;
+            const std1dmax2 = r.allowed?.max1d    ?? r.critMax ?? null;
+            const std1min2  = r.allowed?.min1dose ?? null;
+            const act12     = r.actual?.max1dose  ?? (ingrRow2 ? +(parseFloat(ingrRow2.dose) * dr.amtMax).toFixed(4) : null);
+            const act1d2    = r.actual?.max1d     ?? r.dailyMax ?? null;
+            body += `<tr style="${rowBg2}">`;
+            body += `<td style="${TDRAW}text-align:center;">${esc(r.gubun || '—')}</td>`;
+            body += `<td style="${TDRAW}">${esc(r.ingr)}</td>`;
+            body += `<td style="${TDRAW}text-align:right;background:#edf3fb;">${fmt(std1max2)}</td>`;
+            body += `<td style="${TDRAW}text-align:right;background:#edf3fb;">${fmt(std1dmax2)}</td>`;
+            body += `<td style="${TDRAW}text-align:right;background:#edf3fb;">${fmt(std1min2)}</td>`;
+            body += `<td style="${TDRAW}text-align:right;background:#edfaf1;">${fmt(act12)}</td>`;
+            body += `<td style="${TDRAW}text-align:right;background:#edfaf1;">${fmt(act1d2)}</td>`;
+            body += `</tr>`;
+            if (fail2 && r.reason && r.reason !== '부적합') {
+              body += `<tr style="background:#fff5f5;"><td colspan="7" style="${TDRAW}font-size:8pt;color:#c62828;padding:1pt 6pt;">↳ ${esc(r.reason)}</td></tr>`;
+            }
+          }
+        } else {
+          for (const r of activeRows) {
+            body += `<tr>`;
+            body += `<td style="${TDRAW}text-align:center;">${esc(r.gubun || '—')}</td>`;
+            body += `<td style="${TDRAW}">${esc(r.ingr)}</td>`;
+            body += `<td style="${TDRAW}text-align:center;">—</td>`;
+            body += `<td style="${TDRAW}text-align:center;">—</td>`;
+            body += `<td style="${TDRAW}text-align:center;">—</td>`;
+            body += `<td style="${TDRAW}text-align:right;">${esc(r.dose)}</td>`;
+            body += `<td style="${TDRAW}text-align:center;">—</td>`;
+            body += `</tr>`;
+          }
+        }
+        body += `</tbody></table>`;
+      }
+    }
+
+    // (1-b) [유효성분의 종류] & [유효성분의 분량] — O/X 자동 검증
+    {
+      const kinds2 = DB['제2장_해열진통제']?.['기준']?.['유효성분의_종류'] ?? [];
+      const amts2  = DB['제2장_해열진통제']?.['기준']?.['유효성분의_분량'] ?? [];
+      const { kindsSt: kSt2, amtsSt: aSt2 } = computeCh2KindsAmtsStatus(allValidations);
+
+      // O/X 셀 스타일
+      const OKST  = `${FN}font-size:13pt;font-weight:bold;color:#2e7d32;text-align:center;padding:2pt 3pt;${BORD}`;
+      const NGST  = `${FN}font-size:13pt;font-weight:bold;color:#c62828;text-align:center;padding:2pt 3pt;${BORD}`;
+      const NAST  = `${FN}font-size:10pt;color:#aaa;text-align:center;padding:2pt 3pt;${BORD}`;
+
+      const renderCheckTable2 = (items, statusArr) => {
+        if (!items.length) return '';
+        let s = `<table style="width:100%;border-collapse:collapse;margin-bottom:10pt;table-layout:fixed;">`;
+        s += `<colgroup><col style="width:87%;mso-width-source:userset;"><col style="width:13%;mso-width-source:userset;"></colgroup>`;
+        s += `<thead><tr>`;
+        s += `<th style="${TH}">세부내용</th>`;
+        s += `<th style="${TH}text-align:center;">확인<br>(적합&amp;부적합)</th>`;
+        s += `</tr></thead><tbody>`;
+        items.forEach((item, i) => {
+          const st = statusArr?.[i];
+          let mark = '', cellStyle = NAST;
+          if (st && !st.na) {
+            if (st.ok)  { mark = 'O'; cellStyle = OKST; }
+            else        { mark = 'X'; cellStyle = NGST; }
+          } else { mark = '—'; }
+          const reasonTxt = (st && !st.ok && !st.na && st.reason)
+            ? `<br><span style="${FN}font-size:8pt;color:#c62828;">↳ ${esc(st.reason)}</span>` : '';
+          const rowBg = (st && !st.ok && !st.na) ? 'background:#fff5f5;' : '';
+          s += `<tr style="${rowBg}">`;
+          s += `<td style="${TD}">${i+1}) ${esc(item)}${reasonTxt}</td>`;
+          s += `<td style="${cellStyle}">${mark}</td>`;
+          s += `</tr>`;
+        });
+        s += `</tbody></table>`;
+        return s;
+      };
+      if (kinds2.length) {
+        body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 종류]</p>`;
+        body += renderCheckTable2(kinds2, kSt2);
+      }
+      if (amts2.length) {
+        body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 분량]</p>`;
+        body += renderCheckTable2(amts2, aSt2);
+      }
+    }
+
+    // (2) [효능효과] — plain text, no table
+    body += `<p>&nbsp;</p><p>&nbsp;</p>`;
+    body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[효능효과]</p>`;
+    const effDbItems2 = DB['제2장_해열진통제']?.['기준']?.['효능효과'] ?? [];
+    body += `<p style="${FN}font-size:10pt;margin:0 0 4pt;">효능 및 효과의 범위는 다음 범위로 한다.</p>`;
+    effDbItems2.forEach((t, i) => {
+      body += `<p style="${FN}font-size:10pt;margin:0 0 3pt;padding-left:12pt;">${i+1}) ${esc(applyEasyTerms(t))}</p>`;
+    });
+    body += `<p>&nbsp;</p><p>&nbsp;</p>`;
+
+    // (3) [용법용량] — 2-col table
+    body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[용법용량]</p>`;
+    body += `<table style="width:100%;border-collapse:collapse;margin-bottom:14pt;"><thead><tr>`;
+    body += `<th style="${TH}width:50%;">의약품 표준제조기준</th>`;
+    body += `<th style="${TH}width:50%;">${esc(productName)}연질캡슐</th>`;
+    body += `</tr></thead><tbody><tr>`;
+    let dos2L = '', dos2R = '';
+    {
+      const tbl3 = DB[currentKey]?.['표']?.['표3_연령구분계수'] ?? [];
+      dos2L += `<p style="margin:0 0 4pt;font-weight:bold;">(4) 용법&#xB7;용량</p>`;
+      dos2L += `<p style="margin:0 0 2pt;font-weight:bold;">1) 용법은 다음과 같이 한다.</p>`;
+      dos2L += `<p style="margin:0 0 1pt;padding-left:10pt;">① 1일 1회 복용하는 경우</p>`;
+      dos2L += `<p style="margin:0 0 5pt;padding-left:20pt;">1일 1회까지로 하고 공복시를 피하여 복용한다.</p>`;
+      dos2L += `<p style="margin:0 0 1pt;padding-left:10pt;">② 1일 2회 복용하는 경우</p>`;
+      dos2L += `<p style="margin:0 0 1pt;padding-left:20pt;">1일 2회까지로 하고 공복시를 피하여 복용한다.</p>`;
+      dos2L += `<p style="margin:0 0 5pt;padding-left:20pt;">복용 간격은 6시간 이상으로 한다.</p>`;
+      dos2L += `<p style="margin:0 0 1pt;padding-left:10pt;">③ 1일 3회 복용하는 경우</p>`;
+      dos2L += `<p style="margin:0 0 1pt;padding-left:20pt;">1일 3회까지로 하고 공복시를 피하여 복용한다.</p>`;
+      dos2L += `<p style="margin:0 0 8pt;padding-left:20pt;">복용간격은 4시간 이상으로 한다.</p>`;
+      dos2L += `<p style="margin:0 0 4pt;"><b>3)</b> 캡슐제, 정제(추어블정 및 발포정 제외)는 만 7세 이하의 영&#xB7;유아의 복용은 인정하지 아니한다. 또한, 추어블정에 대해서는 원칙적으로 만 3세 미만을 대상으로 하는 용법은 인정하지 않는다.</p>`;
+      if (tbl3.length) {
+        dos2L += `<p style="margin:6pt 0 3pt;font-weight:bold;">&lt;표3&gt; 연령 구분별 용량의 환산 계수표</p>`;
+        dos2L += `<table style="width:100%;border-collapse:collapse;font-size:9pt;font-family:'맑은 고딕',Arial,sans-serif;margin-bottom:4pt;">`;
+        dos2L += `<tr><th style="border:1px solid #888;padding:3pt 6pt;background:#e8eef7;text-align:center;width:75%;">연령구분</th>`;
+        dos2L += `<th style="border:1px solid #888;padding:3pt 6pt;background:#e8eef7;text-align:center;width:25%;">계수</th></tr>`;
+        tbl3.forEach(row => {
+          dos2L += `<tr><td style="border:1px solid #888;padding:3pt 6pt;">${esc(row['연령구분'])}</td>`;
+          dos2L += `<td style="border:1px solid #888;padding:3pt 6pt;text-align:center;">${esc(row['계수'])}</td></tr>`;
+        });
+        dos2L += `</table>`;
+      }
+      // DB 용법용량에서 공복/복용간격 부가 설명 추출 (freq → {hasFasting, interval})
+      const freqSupp = {};
+      for (const entry of (DB[currentKey]?.['기준']?.['용법용량'] ?? [])) {
+        const fm = entry.match(/^1일\s*(\d+)회/);
+        if (!fm) continue;
+        const freq = parseInt(fm[1]);
+        const hasFasting = entry.includes('공복');
+        const intM = entry.match(/(복용\s*간격은\s*\d+시간\s*이상으로 한다)/);
+        freqSupp[freq] = { hasFasting, interval: intM ? intM[1] : null };
+      }
+
+      // 연속된 동일 용량 연령군 합치기
+      const dKey = dr => `${dr.freqMin}|${dr.freqMax}|${dr.amtMin}|${dr.amtMax}`;
+      const groups2 = [];
+      for (const dr of validDosageRows) {
+        const lbl = displayAgeLabel(dr.age, currentKey, currentForm) || dr.age;
+        if (groups2.length && groups2[groups2.length-1].key === dKey(dr)) {
+          groups2[groups2.length-1].labels.push(lbl);
+        } else {
+          groups2.push({ key: dKey(dr), dr, labels: [lbl] });
+        }
+      }
+      for (const g of groups2) {
+        const { dr, labels } = g;
+        const freqStr = dr.freqMin === dr.freqMax ? `1일 ${dr.freqMax}회` : `1일 ${dr.freqMin}~${dr.freqMax}회`;
+        const amtStr  = dr.amtMin  === dr.amtMax  ? `1회 ${dr.amtMax}${unit}` : `1회 ${dr.amtMin}~${dr.amtMax}${unit}`;
+        let ageLbl;
+        if (labels.length === 1) {
+          ageLbl = labels[0];
+        } else {
+          const firstLbl = labels[0];
+          const lastLbl  = labels[labels.length - 1];
+          const lowerM = lastLbl.match(/^(.+?이상)/);
+          const lower  = lowerM ? lowerM[1] : lastLbl;
+          const upperM = firstLbl.match(/(만\s*\d+세\s*미만)$/);
+          ageLbl = upperM ? `${lower} - ${upperM[1]}` : lower;
+        }
+        dos2R += `<p style="margin:0 0 2pt;"><b>${esc(ageLbl)}</b>: ${esc(freqStr)}, ${esc(amtStr)}</p>`;
+      }
+      // 부가 문구(공복/복용간격)는 중복 제거 후 연령군 전체 아래에 한 번만 출력
+      let needFasting = false;
+      const intervals = new Set();
+      for (const g of groups2) {
+        const supp = freqSupp[g.dr.freqMax];
+        if (supp?.hasFasting) needFasting = true;
+        if (supp?.interval) intervals.add(supp.interval);
+      }
+      if (needFasting || intervals.size) {
+        dos2R += `<p style="margin:4pt 0 1pt;">`;
+        dos2R += `</p>`;
+        if (needFasting)
+          dos2R += `<p style="margin:0 0 1pt;">공복(빈 속)시를 피하여 복용한다.</p>`;
+        for (const iv of intervals)
+          dos2R += `<p style="margin:0 0 1pt;">${esc(iv)}.</p>`;
+      }
+    }
+    body += `<td style="${TD}">${dos2L}</td>`;
+    body += `<td style="${TD}">${dos2R || `<span style="color:#aaa;">(입력 없음)</span>`}</td>`;
+    body += `</tr></tbody></table>`;
+
+    // (4) [사용상의 주의사항] — 2-col table, numbered labels
+    body += `<p>&nbsp;</p><p>&nbsp;</p>`;
+    body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[사용상의 주의사항] <span style="${FN}font-size:9pt;font-weight:normal;color:#555;">(해당 부분 하이라이트)</span></p>`;
+    body += `<table style="width:100%;border-collapse:collapse;margin-bottom:12pt;"><thead><tr>`;
+    body += `<th style="${TH}width:50%;">의약품 표준제조기준</th>`;
+    body += `<th style="${TH}width:50%;">${esc(productName)}연질캡슐</th>`;
+    body += `</tr></thead><tbody>`;
+
+    const CAT_LABELS_2 = [
+      ['경고',                 '1.  경고'],
+      ['복용하지_말_것',       '2.  다음과 같은 사람은 이 약을 복용하지 말 것.'],
+      ['병용금기',             '3.  이 약을 복용하는 동안 다음의 약을 복용하지 말 것.'],
+      ['복용전_상의',          '5.  다음과 같은 사람은 이 약을 복용하기 전에 의사, 치과의사, 약사와 상의 할 것.'],
+      ['이상반응_및_즉각중지', '6.  다음과 같은 경우 이 약의 복용을 즉각 중지하고 의사, 치과의사, 약사와 상의할 것. 상담 시 가능한 한 이 첨부문서를 소지할 것.'],
+      ['소아투여',             '7.  소아에 대한 투여'],
+      ['임부수유부투여',       '임부 및 수유부에 대한 투여'],
+      ['복용시_주의',          '8.  기타 이 약의 복용 시 주의할 사항'],
+      ['저장상의_주의',        '9.  저장상의 주의사항'],
+    ];
+    const prec2    = DB[currentKey]?.['사용상의_주의사항'];
+    const ctx2     = prec2 ? buildPrecautionCtx(currentKey, form, activeRows, dosageRows) : null;
+    const fnMaps2  = prec2?.['각주_맵'] || {};   // 섹션별 인라인 각주 성분명 맵
+    const dispMap2 = new Map();
+    if (precSections) {
+      precSections.forEach(sec => {
+        if (!dispMap2.has(sec.cat)) dispMap2.set(sec.cat, new Set());
+        sec.items.forEach(it => dispMap2.get(sec.cat).add(it.origIdx));
+      });
+    }
+
+    let rSecNum = 0;
+    for (const [cat, label] of CAT_LABELS_2) {
+      const hasDbCat = prec2 && cat in prec2;
+      const excInCat = (selectedExcipients || []).some(n => (EXCIPIENT_PREC_DB[n] || {})[cat]);
+      const dirInCat = (precSections || []).find(s => s.cat === cat)?.items.filter(it => it.isDirective) || [];
+      if (!hasDbCat && !excInCat && !dirInCat.length) continue;
+      const dispSet = dispMap2.get(cat) || new Set();
+      const fnMap2  = fnMaps2[cat] || null;   // 이 섹션의 각주 성분명 맵
+
+      let lH = `<p style="margin:0 0 4pt;font-weight:bold;font-size:10pt;">${esc(label)}</p>`;
+      const rItems = [];
+
+      let dNum = 0;
+      if (hasDbCat && cat === '이상반응_및_즉각중지' && prec2['이상반응_성분매핑']) {
+        const advArr = prec2[cat];
+        const mapping = prec2['이상반응_성분매핑'];
+        const rawLines = advArr[0].split('\n').filter(l => l.trim());
+        lH += `<p style="margin:0 0 2pt;">${esc(_stripInlineMarkers(rawLines[0]))}</p>`;
+        rawLines.slice(1).forEach((line, idx) => {
+          const entry = mapping[idx];
+          const isActive = entry ? ctx2.classes.has(entry.class) : false;
+          if (isActive) {
+            lH += `<p style="margin:0;padding-left:10pt;${HL}">${_renderPrecWithInlineHL(line, ctx2, HL, fnMap2, true)}</p>`;
+          } else {
+            lH += `<p style="margin:0;padding-left:10pt;${DIM}">${esc(_stripInlineMarkers(line))}</p>`;
+          }
+        });
+        for (let i = 1; i < advArr.length; i++) {
+          const disp = dispSet.has(i);
+          lH += `<p style="margin:0 0 2pt;${disp ? '' : DIM}">${i}) ${esc(_stripInlineMarkers(advArr[i]))}</p>`;
+        }
+      } else if (hasDbCat) {
+        const flatItems = _flattenPrecItems(cat, prec2[cat]);
+        flatItems.forEach((item, i) => {
+          const isIndent = !!item.indent;
+          const isCircled2 = !!item.circled;
+          if (!isIndent && !isCircled2) dNum++;
+          const disp = dispSet.has(i);
+          const indent = isIndent ? 'padding-left:10pt;' : '';
+          const lPrefix = (isIndent || isCircled2) ? '' : `${dNum}) `;
+          if (disp) {
+            lH += `<p style="margin:0 0 2pt;${indent + HL}">${lPrefix}${_renderPrecWithInlineHL(item.text, ctx2, HL, fnMap2, true)}</p>`;
+          } else {
+            lH += `<p style="margin:0 0 2pt;${indent}${DIM}">${lPrefix}${esc(_stripInlineMarkers(item.text)).replace(/\n/g,'<br>')}</p>`;
+          }
+        });
+      }
+      if (dirInCat.length) {
+        lH += `<p style="font-size:9pt;color:#E65100;margin:4pt 0 2pt;font-style:italic;">[품목허가사항 변경지시]</p>`;
+        dirInCat.forEach(it => {
+          lH += `<p style="margin:0 0 1pt;background:#FFF3E0;">${it.displayNum}) ${esc(it.text)}</p>`;
+          if (it.citation) lH += `<p style="margin:0 0 4pt;padding-left:8pt;font-size:8pt;font-style:italic;color:#888;font-family:'맑은 고딕',sans-serif;">○ ${esc(it.citation)}</p>`;
+        });
+      }
+      for (const excName of (selectedExcipients || [])) {
+        const excItems = (EXCIPIENT_PREC_DB[excName] || {})[cat];
+        if (!excItems) continue;
+        lH += `<p style="font-size:9pt;color:#1565c0;margin:4pt 0 2pt;font-style:italic;">[첨가제: ${esc(excName)}]</p>`;
+        excItems.forEach(text => {
+          lH += `<p style="margin:0 0 2pt;${HL}">${++dNum}) ${esc(text)}</p>`;
+        });
+      }
+      // 우측 열: precSections에서 직접 구성 (화면과 동일한 번호·텍스트)
+      const precSec2 = precSections?.find(s => s.cat === cat);
+      if (precSec2) {
+        precSec2.items.forEach(it => {
+          if (it.text && it.text.includes('<삭제>')) return;
+          const clean = applyEasyTerms(removeEditorial(_stripIngredientParens(it.text)));
+          if (it.indent || it.isMapping) {
+            rItems.push(`   ${clean}`);
+          } else if (it.circled) {
+            rItems.push(clean);
+          } else {
+            rItems.push(`${it.displayNum}) ${clean}`);
+          }
+        });
+      }
+      const rLabelText = label.replace(/^\d+\.\s*/, '');
+      const rH = rItems.length
+        ? `<p style="margin:0 0 4pt;font-weight:bold;font-size:10pt;">${++rSecNum}. ${esc(rLabelText)}</p>`
+          + rItems.map(t => `<p style="margin:0 0 2pt;">${esc(t).replace(/\n/g,'<br>')}</p>`).join('')
+        : `<span style="color:#aaa;">(해당 없음)</span>`;
+      body += `<tr><td style="${TD}">${lH}</td><td style="${TD}">${rH}</td></tr>`;
+    }
+    body += `</tbody></table>`;
+
+    const html2 = `<html xmlns:o='urn:schemas-microsoft-com:office:office'`
+      + ` xmlns:w='urn:schemas-microsoft-com:office:word'`
+      + ` xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset="UTF-8"><title>${esc(productName)} 표준제조기준 검토</title>
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>90</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->
+<style>
+  @page { margin: 1.5cm 1cm; mso-page-orientation: portrait; }
+  body { font-family:'맑은 고딕',Arial,sans-serif; margin:0; font-size:9pt; }
+  p { margin:0; padding:1pt 0; line-height:1.4; }
+  table { border-collapse:collapse; width:100%; table-layout:fixed; }
+  td, th { padding:3pt 5pt; border:1px solid #aaa; word-wrap:break-word; overflow-wrap:break-word; }
+</style>
+</head><body>
+${body}
+</body></html>`;
+    const blob2 = new Blob(['﻿' + html2], { type: 'application/msword;charset=utf-8' });
+    const url2  = URL.createObjectURL(blob2);
+    const a2    = document.createElement('a');
+    a2.href = url2;
+    a2.download = `${productName}_표준제조기준검토_${new Date().toISOString().slice(0,10)}.doc`;
+    document.body.appendChild(a2);
+    a2.click();
+    document.body.removeChild(a2);
+    setTimeout(() => URL.revokeObjectURL(url2), 1000);
+    return;
+  }
+
+  // ── ch3/ch7/ch9 감기약·진해거담제·비염 전용 서식 (ch2와 동일 레이아웃) ──
+  if (isMatrixMode() && currentKey !== '제1장_비타민미네랄') {
+    const THRAW  = `${FN}font-size:8pt;padding:2pt 3pt;${BORD}font-weight:bold;text-align:center;word-break:break-all;word-wrap:break-word;vertical-align:middle;`;
+    const TH2R   = THRAW + 'background:#d6e4f5;';
+    const TH3R   = THRAW + 'background:#d9f0e0;';
+    const TDRAW  = `${FN}font-size:8.5pt;padding:2pt 3pt;${BORD}vertical-align:middle;word-break:break-word;word-wrap:break-word;`;
+
+    // (1) 제목 — 제품명만
+    body += `<p style="${FN}font-size:16pt;font-weight:bold;color:#1a4b8c;text-align:left;margin:0 0 16pt;">${esc(productName)}</p>`;
+
+    // (2) [원료약품 및 그 분량]
+    body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 4pt;">[원료약품 및 그 분량]</p>`;
+    {
+      const ingrGrpsMx = allValidations.map(({ dr, v }) => ({
+        dr, v, labels: [displayAgeLabel(dr.age, currentKey, currentForm) || dr.age],
+      }));
+      const multiGrpMx = ingrGrpsMx.length > 1;
+      // 연령 그룹이 없으면 activeRows로 빈 표 출력
+      if (!ingrGrpsMx.length) {
+        body += `<table style="width:100%;border-collapse:collapse;margin-bottom:12pt;table-layout:fixed;mso-table-layout-alt:fixed;">`;
+        body += `<colgroup><col style="width:8%;mso-width-source:userset;"><col style="width:25%;mso-width-source:userset;"><col style="width:15%;mso-width-source:userset;"><col style="width:14%;mso-width-source:userset;"><col style="width:16%;mso-width-source:userset;"><col style="width:16%;mso-width-source:userset;"><col style="width:6%;mso-width-source:userset;"></colgroup>`;
+        body += `<thead><tr><th colspan="4" style="${TH2R}">의약품 표준제조기준</th><th colspan="2" style="${TH3R}">${esc(productName)}</th><th style="${TH2R}">적합<br>여부</th></tr>`;
+        body += `<tr><th style="${TH2R}">구분</th><th style="${TH2R}">유효성분명</th><th style="${TH2R}">1일최대<br>(mg)</th><th style="${TH2R}">1일최소<br>(mg)</th><th style="${TH3R}">1회<br>용량(mg)</th><th style="${TH3R}">1일<br>용량(mg)</th><th style="${TH2R}"></th></tr></thead><tbody>`;
+        for (const r of activeRows) {
+          body += `<tr><td style="${TDRAW}text-align:center;">${esc(r.gubun||'—')}</td><td style="${TDRAW}">${esc(r.ingr)}</td><td style="${TDRAW}text-align:center;">—</td><td style="${TDRAW}text-align:center;">—</td><td style="${TDRAW}text-align:right;">${esc(r.dose)}</td><td style="${TDRAW}text-align:center;">—</td><td style="${TDRAW}text-align:center;">—</td></tr>`;
+        }
+        body += `</tbody></table>`;
+      }
+      for (const grp of ingrGrpsMx) {
+        const { dr, v, labels } = grp;
+        const ageLblMx = labels[0];
+        if (multiGrpMx) {
+          body += `<p style="${FN}font-size:9.5pt;font-weight:bold;color:#1a4b8c;margin:5pt 0 2pt;">▶ ${esc(ageLblMx)}</p>`;
+        }
+        const freqDispW = dr.freqMin === dr.freqMax ? `1일 ${dr.freqMax}회` : `1일 ${dr.freqMin}~${dr.freqMax}회`;
+        const amtDispW  = dr.amtMin  === dr.amtMax  ? `1회 ${dr.amtMax}${unit}` : `1회 ${dr.amtMin}~${dr.amtMax}${unit}`;
+        body += `<table style="width:100%;border-collapse:collapse;margin-bottom:${multiGrpMx?'8':'12'}pt;table-layout:fixed;mso-table-layout-alt:fixed;">`;
+        body += `<colgroup><col style="width:8%;mso-width-source:userset;"><col style="width:25%;mso-width-source:userset;"><col style="width:14%;mso-width-source:userset;"><col style="width:13%;mso-width-source:userset;"><col style="width:16%;mso-width-source:userset;"><col style="width:18%;mso-width-source:userset;"><col style="width:6%;mso-width-source:userset;"></colgroup>`;
+        body += `<thead><tr>`;
+        body += `<th colspan="4" style="${TH2R}">의약품 표준제조기준</th>`;
+        body += `<th colspan="2" style="${TH3R}">${esc(productName)}</th>`;
+        body += `<th style="${TH2R}">적합<br>여부</th>`;
+        body += `</tr><tr>`;
+        body += `<th style="${TH2R}">구분</th>`;
+        body += `<th style="${TH2R}">유효성분명</th>`;
+        body += `<th style="${TH2R}">1일최대<br>(mg)</th>`;
+        body += `<th style="${TH2R}">1일최소<br>(mg)</th>`;
+        body += `<th style="${TH3R}">1회용량(mg)<br>(${esc(amtDispW)})</th>`;
+        body += `<th style="${TH3R}">1일용량(mg)<br>(${esc(freqDispW)},${esc(amtDispW)})</th>`;
+        body += `<th style="${TH2R}"></th>`;
+        body += `</tr></thead><tbody>`;
+        if (v && v.itemResults && v.itemResults.length) {
+          let lastGubun = null;
+          for (const r of v.itemResults) {
+            if (r.gubun && r.gubun !== lastGubun) {
+              lastGubun = r.gubun;
+              body += `<tr style="background:#edf2fa;"><td colspan="7" style="${TDRAW}font-weight:bold;color:#1a4b8c;padding:2pt 4pt;">${esc(r.gubun)}</td></tr>`;
+            }
+            const fail = r.ok === false;
+            const rowBg = fail ? 'background:#fff5f5;' : '';
+            const ingrRow = activeRows.find(ar => ar.ingr === r.ingr);
+            const act1 = r.dose1 != null ? +(r.dose1 * dr.amtMax).toFixed(4) : (ingrRow ? +(parseFloat(ingrRow.dose) * dr.amtMax).toFixed(4) : null);
+            const act1d = r.dailyMax ?? null;
+            const okMark = r.ok === true ? 'O' : r.ok === false ? 'X' : '—';
+            const okSt = r.ok === true ? `${FN}font-size:12pt;font-weight:bold;color:#2e7d32;text-align:center;padding:2pt;${BORD}` : r.ok === false ? `${FN}font-size:12pt;font-weight:bold;color:#c62828;text-align:center;padding:2pt;${BORD}` : `${FN}font-size:10pt;color:#aaa;text-align:center;padding:2pt;${BORD}`;
+            body += `<tr style="${rowBg}">`;
+            body += `<td style="${TDRAW}text-align:center;">${esc(r.gubun||'—')}</td>`;
+            body += `<td style="${TDRAW}">${esc(r.ingr)}</td>`;
+            body += `<td style="${TDRAW}text-align:right;background:#edf3fb;">${fmt(r.critMax)}</td>`;
+            body += `<td style="${TDRAW}text-align:right;background:#edf3fb;">${fmt(r.critMin)}</td>`;
+            body += `<td style="${TDRAW}text-align:right;background:#edfaf1;">${fmt(act1)}</td>`;
+            body += `<td style="${TDRAW}text-align:right;background:#edfaf1;">${fmt(act1d)}</td>`;
+            body += `<td style="${okSt}">${okMark}</td>`;
+            body += `</tr>`;
+            if (fail && r.reason) {
+              body += `<tr style="background:#fff5f5;"><td colspan="7" style="${TDRAW}font-size:8pt;color:#c62828;padding:1pt 6pt;">↳ ${esc(r.reason)}</td></tr>`;
+            }
+          }
+          // 배합 규칙 위반 별도 표시
+          if (v.ruleErrors && v.ruleErrors.some(e => !e.ok)) {
+            body += `<tr style="background:#fff5f5;"><td colspan="7" style="${TDRAW}font-size:8pt;color:#c62828;font-weight:bold;padding:2pt 6pt;">⚠ 배합 규칙 위반</td></tr>`;
+            for (const re of v.ruleErrors.filter(e => !e.ok)) {
+              body += `<tr style="background:#fff5f5;"><td colspan="7" style="${TDRAW}font-size:8pt;color:#c62828;padding:1pt 6pt;">↳ ${esc(re.reason || re.key)}</td></tr>`;
+            }
+          }
+        } else {
+          for (const r of activeRows) {
+            body += `<tr><td style="${TDRAW}text-align:center;">${esc(r.gubun||'—')}</td><td style="${TDRAW}">${esc(r.ingr)}</td><td style="${TDRAW}text-align:center;">—</td><td style="${TDRAW}text-align:center;">—</td><td style="${TDRAW}text-align:right;">${esc(r.dose)}</td><td style="${TDRAW}text-align:center;">—</td><td style="${TDRAW}text-align:center;">—</td></tr>`;
+          }
+        }
+        body += `</tbody></table>`;
+      }
+
+      // 배합 규칙 체크 표 (유효성분의 종류/분량)
+      const kinds3 = DB[currentKey]?.['기준']?.['유효성분의_종류'] ?? [];
+      const amts3  = DB[currentKey]?.['기준']?.['유효성분의_분량'] ?? [];
+      const renderCheckMx = items => {
+        if (!items.length) return '';
+        let s = `<table style="width:100%;border-collapse:collapse;margin-bottom:10pt;table-layout:fixed;">`;
+        s += `<colgroup><col style="width:87%;mso-width-source:userset;"><col style="width:13%;mso-width-source:userset;"></colgroup>`;
+        s += `<thead><tr><th style="${TH}">세부내용</th><th style="${TH}text-align:center;">확인<br>(적합&amp;부적합)</th></tr></thead><tbody>`;
+        items.forEach((item, i) => {
+          s += `<tr><td style="${TD}">${i+1}) ${esc(item)}</td><td style="${`${FN}font-size:10pt;color:#aaa;text-align:center;padding:2pt 3pt;${BORD}`}">—</td></tr>`;
+        });
+        s += `</tbody></table>`;
+        return s;
+      };
+      if (kinds3.length) {
+        body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 종류]</p>`;
+        body += renderCheckMx(kinds3);
+      }
+      if (amts3.length) {
+        body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 분량]</p>`;
+        body += renderCheckMx(amts3);
+      }
+    }
+
+    // (3) [효능효과]
+    body += `<p>&nbsp;</p><p>&nbsp;</p>`;
+    body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[효능효과]</p>`;
+    if (effResult?.finalTexts?.length) {
+      effResult.finalTexts.forEach(t => {
+        body += `<p style="${FN}font-size:10pt;margin:0 0 4pt;">${esc(applyEasyTerms(t))}</p>`;
+      });
+    }
+    body += `<p>&nbsp;</p><p>&nbsp;</p>`;
+
+    // (4) [용법용량] — 2-col
+    body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[용법용량]</p>`;
+    body += `<table style="width:100%;border-collapse:collapse;margin-bottom:14pt;"><thead><tr>`;
+    body += `<th style="${TH}width:50%;">의약품 표준제조기준</th>`;
+    body += `<th style="${TH}width:50%;">${esc(productName)}</th>`;
+    body += `</tr></thead><tbody><tr>`;
+    {
+      let dosL = '', dosR = '';
+      const dosDB = DB[currentKey]?.['기준']?.['용법용량'] ?? [];
+      dosDB.forEach(t => { dosL += `<p style="margin:0 0 2pt;">${esc(t)}</p>`; });
+      const tbl3mx = DB[currentKey]?.['표']?.['표3_연령구분계수'] ?? [];
+      if (tbl3mx.length) {
+        dosL += `<p style="margin:6pt 0 3pt;font-weight:bold;">&lt;표3&gt; 연령 구분별 용량의 환산 계수표</p>`;
+        dosL += `<table style="width:100%;border-collapse:collapse;font-size:9pt;font-family:'맑은 고딕',Arial,sans-serif;margin-bottom:4pt;">`;
+        dosL += `<tr><th style="border:1px solid #888;padding:3pt 6pt;background:#e8eef7;text-align:center;width:75%;">연령구분</th><th style="border:1px solid #888;padding:3pt 6pt;background:#e8eef7;text-align:center;width:25%;">계수</th></tr>`;
+        tbl3mx.forEach(row => { dosL += `<tr><td style="border:1px solid #888;padding:3pt 6pt;">${esc(row['연령구분'])}</td><td style="border:1px solid #888;padding:3pt 6pt;text-align:center;">${esc(row['계수'])}</td></tr>`; });
+        dosL += `</table>`;
+      }
+      const dGroups = [];
+      const dKey = dr => `${dr.freqMin}|${dr.freqMax}|${dr.amtMin}|${dr.amtMax}`;
+      for (const dr of validDosageRows) {
+        const lbl = displayAgeLabel(dr.age, currentKey, currentForm) || dr.age;
+        if (dGroups.length && dGroups[dGroups.length-1].key === dKey(dr)) {
+          dGroups[dGroups.length-1].labels.push(lbl);
+        } else { dGroups.push({ key: dKey(dr), dr, labels: [lbl] }); }
+      }
+      for (const g of dGroups) {
+        const { dr, labels } = g;
+        const freqStr = dr.freqMin === dr.freqMax ? `1일 ${dr.freqMax}회` : `1일 ${dr.freqMin}~${dr.freqMax}회`;
+        const amtStr  = dr.amtMin  === dr.amtMax  ? `1회 ${dr.amtMax}${unit}` : `1회 ${dr.amtMin}~${dr.amtMax}${unit}`;
+        dosR += `<p style="margin:0 0 2pt;"><b>${esc(labels.join(', '))}</b>: ${esc(freqStr)}, ${esc(amtStr)}</p>`;
+      }
+      body += `<td style="${TD}">${dosL || '<span style="color:#aaa;">(해당 없음)</span>'}</td>`;
+      body += `<td style="${TD}">${dosR || '<span style="color:#aaa;">(입력 없음)</span>'}</td>`;
+    }
+    body += `</tr></tbody></table>`;
+
+    // (5) [사용상의 주의사항] — ch2와 동일 2-col 비교표
+    body += `<p>&nbsp;</p><p>&nbsp;</p>`;
+    body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[사용상의 주의사항] <span style="${FN}font-size:9pt;font-weight:normal;color:#555;">(해당 부분 하이라이트)</span></p>`;
+    body += `<table style="width:100%;border-collapse:collapse;margin-bottom:12pt;"><thead><tr>`;
+    body += `<th style="${TH}width:50%;">의약품 표준제조기준</th>`;
+    body += `<th style="${TH}width:50%;">${esc(productName)}</th>`;
+    body += `</tr></thead><tbody>`;
+    {
+      const CAT_LABELS_MX = [
+        ['경고',                 '1.  경고'],
+        ['복용하지_말_것',       '2.  다음과 같은 사람은 이 약을 복용하지 말 것.'],
+        ['병용금기',             '3.  이 약을 복용하는 동안 다음의 약을 복용하지 말 것.'],
+        ['복용전_상의',          '5.  다음과 같은 사람은 이 약을 복용하기 전에 의사, 치과의사, 약사와 상의 할 것.'],
+        ['이상반응_및_즉각중지', '6.  다음과 같은 경우 이 약의 복용을 즉각 중지하고 의사, 치과의사, 약사와 상의할 것. 상담 시 가능한 한 이 첨부문서를 소지할 것.'],
+        ['소아투여',             '7.  소아에 대한 투여'],
+        ['임부수유부투여',       '임부 및 수유부에 대한 투여'],
+        ['복용시_주의',          '8.  기타 이 약의 복용 시 주의할 사항'],
+        ['저장상의_주의',        '9.  저장상의 주의사항'],
+      ];
+      const precMx    = DB[currentKey]?.['사용상의_주의사항'];
+      const ctxMx     = precMx ? buildPrecautionCtx(currentKey, form, activeRows, dosageRows) : null;
+      const fnMapsMx  = precMx?.['각주_맵'] || {};
+      const dispMapMx = new Map();
+      if (precSections) {
+        precSections.forEach(sec => {
+          if (!dispMapMx.has(sec.cat)) dispMapMx.set(sec.cat, new Set());
+          sec.items.forEach(it => dispMapMx.get(sec.cat).add(it.origIdx));
+        });
+      }
+      let rSecNumMx = 0;
+      for (const [cat, label] of CAT_LABELS_MX) {
+        const hasDbCat = precMx && cat in precMx;
+        const excInCat = (selectedExcipients || []).some(n => (EXCIPIENT_PREC_DB[n] || {})[cat]);
+        const dirInCat = (precSections || []).find(s => s.cat === cat)?.items.filter(it => it.isDirective) || [];
+        if (!hasDbCat && !excInCat && !dirInCat.length) continue;
+        const dispSet  = dispMapMx.get(cat) || new Set();
+        const fnMapMx  = fnMapsMx[cat] || null;
+        let lHmx = `<p style="margin:0 0 4pt;font-weight:bold;font-size:10pt;">${esc(label)}</p>`;
+        const rItemsMx = [];
+        let dNumMx = 0;
+        if (hasDbCat && cat === '이상반응_및_즉각중지' && precMx['이상반응_성분매핑']) {
+          const advArr  = precMx[cat];
+          const mapping = precMx['이상반응_성분매핑'];
+          const rawLines = advArr[0].split('\n').filter(l => l.trim());
+          lHmx += `<p style="margin:0 0 2pt;">${esc(_stripInlineMarkers(rawLines[0]))}</p>`;
+          rawLines.slice(1).forEach((line, idx) => {
+            const entry    = mapping[idx];
+            const isActive = entry ? ctxMx.classes.has(entry.class) : false;
+            if (isActive) {
+              lHmx += `<p style="margin:0;padding-left:10pt;${HL}">${_renderPrecWithInlineHL(line, ctxMx, HL, fnMapMx, true)}</p>`;
+            } else {
+              lHmx += `<p style="margin:0;padding-left:10pt;${DIM}">${esc(_stripInlineMarkers(line))}</p>`;
+            }
+          });
+          for (let i = 1; i < advArr.length; i++) {
+            const disp = dispSet.has(i);
+            lHmx += `<p style="margin:0 0 2pt;${disp ? '' : DIM}">${i}) ${esc(_stripInlineMarkers(advArr[i]))}</p>`;
+          }
+        } else if (hasDbCat) {
+          const flatItems = _flattenPrecItems(cat, precMx[cat]);
+          flatItems.forEach((item, i) => {
+            const isIndent = !!item.indent;
+            const isCircledMx = !!item.circled;
+            if (!isIndent && !isCircledMx) dNumMx++;
+            const disp   = dispSet.has(i);
+            const indent = isIndent ? 'padding-left:10pt;' : '';
+            const lPfx   = (isIndent || isCircledMx) ? '' : `${dNumMx}) `;
+            if (disp) {
+              lHmx += `<p style="margin:0 0 2pt;${indent + HL}">${lPfx}${_renderPrecWithInlineHL(item.text, ctxMx, HL, fnMapMx, true)}</p>`;
+            } else {
+              lHmx += `<p style="margin:0 0 2pt;${indent}${DIM}">${lPfx}${esc(_stripInlineMarkers(item.text)).replace(/\n/g,'<br>')}</p>`;
+            }
+          });
+        }
+        if (dirInCat.length) {
+          lHmx += `<p style="font-size:9pt;color:#E65100;margin:4pt 0 2pt;font-style:italic;">[품목허가사항 변경지시]</p>`;
+          dirInCat.forEach(it => {
+            lHmx += `<p style="margin:0 0 1pt;background:#FFF3E0;">${it.displayNum}) ${esc(it.text)}</p>`;
+            if (it.citation) lHmx += `<p style="margin:0 0 4pt;padding-left:8pt;font-size:8pt;font-style:italic;color:#888;font-family:'맑은 고딕',sans-serif;">○ ${esc(it.citation)}</p>`;
+          });
+        }
+        for (const excName of (selectedExcipients || [])) {
+          const excItems = (EXCIPIENT_PREC_DB[excName] || {})[cat];
+          if (!excItems) continue;
+          lHmx += `<p style="font-size:9pt;color:#1565c0;margin:4pt 0 2pt;font-style:italic;">[첨가제: ${esc(excName)}]</p>`;
+          excItems.forEach(text => { lHmx += `<p style="margin:0 0 2pt;${HL}">${++dNumMx}) ${esc(text)}</p>`; });
+        }
+        const precSecMx = precSections?.find(s => s.cat === cat);
+        if (precSecMx) {
+          precSecMx.items.forEach(it => {
+            if (it.text && it.text.includes('<삭제>')) return;
+            const clean = applyEasyTerms(removeEditorial(_stripIngredientParens(it.text)));
+            if (it.indent || it.isMapping) rItemsMx.push(`   ${clean}`);
+            else if (it.circled) rItemsMx.push(clean);
+            else rItemsMx.push(`${it.displayNum}) ${clean}`);
+          });
+        }
+        const rLabelMx = label.replace(/^\d+\.\s*/, '');
+        const rHmx = rItemsMx.length
+          ? `<p style="margin:0 0 4pt;font-weight:bold;font-size:10pt;">${++rSecNumMx}. ${esc(rLabelMx)}</p>`
+            + rItemsMx.map(t => `<p style="margin:0 0 2pt;">${esc(t).replace(/\n/g,'<br>')}</p>`).join('')
+          : `<span style="color:#aaa;">(해당 없음)</span>`;
+        body += `<tr><td style="${TD}">${lHmx}</td><td style="${TD}">${rHmx}</td></tr>`;
+      }
+    }
+    body += `</tbody></table>`;
+
+    const htmlMx = `<html xmlns:o='urn:schemas-microsoft-com:office:office'`
+      + ` xmlns:w='urn:schemas-microsoft-com:office:word'`
+      + ` xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset="UTF-8"><title>${esc(productName)} 표준제조기준 검토</title>
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>90</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->
+<style>
+  @page { margin: 1.5cm 1cm; mso-page-orientation: portrait; }
+  body { font-family:'맑은 고딕',Arial,sans-serif; margin:0; font-size:9pt; }
+  p { margin:0; padding:1pt 0; line-height:1.4; }
+  table { border-collapse:collapse; width:100%; table-layout:fixed; }
+  td, th { padding:3pt 5pt; border:1px solid #aaa; word-wrap:break-word; overflow-wrap:break-word; }
+</style>
+</head><body>
+${body}
+</body></html>`;
+    const blobMx = new Blob(['﻿' + htmlMx], { type: 'application/msword;charset=utf-8' });
+    const urlMx  = URL.createObjectURL(blobMx);
+    const aMx    = document.createElement('a');
+    aMx.href = urlMx;
+    aMx.download = `${productName}_표준제조기준검토_${new Date().toISOString().slice(0,10)}.doc`;
+    document.body.appendChild(aMx);
+    aMx.click();
+    document.body.removeChild(aMx);
+    setTimeout(() => URL.revokeObjectURL(urlMx), 1000);
+    return;
+  }
+
+  // ── 문서 제목 ──
+  body += `<p style="${FN}font-size:16pt;font-weight:bold;color:#1a4b8c;text-align:left;margin:0 0 8pt;">${esc(productName)}${esc(form)}</p>`;
+  body += `<p style="${FN}font-size:14pt;font-weight:bold;text-align:center;margin:0 0 5pt;">의약품 표준제조기준 검토</p>`;
+  body += `<p style="${FN}font-size:10pt;text-align:center;color:#555;margin:0 0 14pt;">`
+        + `${esc(chLabel)} &nbsp;|&nbsp; 제형: ${esc(form)} &nbsp;|&nbsp; 제품명: <b>${esc(productName)}</b>`
+        + ` &nbsp;|&nbsp; 생성일: ${new Date().toLocaleDateString('ko-KR')}</p>`;
+
+  // ══════════════════════════════════════════
+  // 1. [원료약품 및 그 분량]
+  // ══════════════════════════════════════════
+  body += `<p style="${SEC}">[원료약품 및 그 분량]</p>`;
+
+  if (currentKey === '제1장_비타민미네랄') {
+    // ch1 전용: 연령별 고정폭 7열 표
+    const THRAW1 = `${FN}font-size:8pt;padding:2pt 3pt;${BORD}font-weight:bold;text-align:center;word-break:break-all;word-wrap:break-word;vertical-align:middle;`;
+    const TH2R1  = THRAW1 + 'background:#d6e4f5;';
+    const TH3R1  = THRAW1 + 'background:#d9f0e0;';
+    const TDRAW1 = `${FN}font-size:8.5pt;padding:2pt 3pt;${BORD}vertical-align:middle;word-break:break-word;word-wrap:break-word;`;
+    const ingrGrps1  = allValidations.map(({dr, v}) => ({ dr, v, lbl: displayAgeLabel(dr.age, currentKey, currentForm) || dr.age }));
+    const multi1 = ingrGrps1.length > 1;
+    const buildCh1IngrTable = (dr, v) => {
+      const freqDispW = dr.freqMin === dr.freqMax ? `1일 ${dr.freqMax}회` : `1일 ${dr.freqMin}~${dr.freqMax}회`;
+      const amtDispW  = dr.amtMin  === dr.amtMax  ? `1회 ${dr.amtMax}${unit}` : `1회 ${dr.amtMin}~${dr.amtMax}${unit}`;
+      let t = `<table style="width:100%;border-collapse:collapse;margin-bottom:${multi1?'8':'12'}pt;table-layout:fixed;mso-table-layout-alt:fixed;">`;
+      t += `<colgroup>`;
+      t += `<col style="width:9%;mso-width-source:userset;">`;
+      t += `<col style="width:23%;mso-width-source:userset;">`;
+      t += `<col style="width:12%;mso-width-source:userset;">`;
+      t += `<col style="width:13%;mso-width-source:userset;">`;
+      t += `<col style="width:8%;mso-width-source:userset;">`;
+      t += `<col style="width:17%;mso-width-source:userset;">`;
+      t += `<col style="width:18%;mso-width-source:userset;">`;
+      t += `</colgroup>`;
+      t += `<thead><tr>`;
+      t += `<th colspan="5" style="${TH2R1}">의약품 표준제조기준</th>`;
+      t += `<th colspan="2" style="${TH3R1}">${esc(productName)}</th>`;
+      t += `</tr><tr>`;
+      t += `<th style="${TH2R1}">구분</th>`;
+      t += `<th style="${TH2R1}">유효성분명</th>`;
+      t += `<th style="${TH2R1}">1일최소분량</th>`;
+      t += `<th style="${TH2R1}">1일최대분량</th>`;
+      t += `<th style="${TH2R1}">단위</th>`;
+      t += `<th style="${TH3R1}">1회용량</th>`;
+      t += `<th style="${TH3R1}">1일용량<br>(${esc(freqDispW)},<br>${esc(amtDispW)})</th>`;
+      t += `</tr></thead><tbody>`;
+      if (v && v.itemResults && v.itemResults.length) {
+        for (const r of v.itemResults) {
+          const fail1 = r.ok === false;
+          const rowBg1 = fail1 ? 'background:#fff5f5;' : '';
+          const ingrRow1 = activeRows.find(ar => ar.ingr === r.ingr);
+          const act1  = ingrRow1 ? +(parseFloat(ingrRow1.dose) * dr.amtMax).toFixed(4) : null;
+          const act1d = r.dailyMax ?? null;
+          const stdMin1 = r.critMin ?? null;
+          const stdMax1 = r.critMax ?? null;
+          const useU = r.useUnit ?? '';
+          t += `<tr style="${rowBg1}">`;
+          t += `<td style="${TDRAW1}text-align:center;">${esc(r.gubun || '—')}</td>`;
+          t += `<td style="${TDRAW1}">${esc(r.ingr)}</td>`;
+          t += `<td style="${TDRAW1}text-align:right;background:#edf3fb;">${fmt(stdMin1)}</td>`;
+          t += `<td style="${TDRAW1}text-align:right;background:#edf3fb;">${fmt(stdMax1)}</td>`;
+          t += `<td style="${TDRAW1}text-align:center;background:#edf3fb;">${esc(useU)}</td>`;
+          t += `<td style="${TDRAW1}text-align:right;background:#edfaf1;">${fmt(act1)}</td>`;
+          t += `<td style="${TDRAW1}text-align:right;background:#edfaf1;">${fmt(act1d)}</td>`;
+          t += `</tr>`;
+          if (fail1 && r.reason && r.reason !== '부적합') {
+            t += `<tr style="background:#fff5f5;"><td colspan="7" style="${TDRAW1}font-size:8pt;color:#c62828;padding:1pt 6pt;">↳ ${esc(r.reason)}</td></tr>`;
+          }
+        }
+      } else {
+        for (const r of activeRows) {
+          t += `<tr><td style="${TDRAW1}text-align:center;">${esc(r.gubun||'—')}</td>`;
+          t += `<td style="${TDRAW1}">${esc(r.ingr)}</td>`;
+          t += `<td style="${TDRAW1}text-align:center;">—</td><td style="${TDRAW1}text-align:center;">—</td>`;
+          t += `<td style="${TDRAW1}text-align:center;">${esc(r.unit||'')}</td>`;
+          t += `<td style="${TDRAW1}text-align:right;">${esc(r.dose)}</td>`;
+          t += `<td style="${TDRAW1}text-align:center;">—</td></tr>`;
+        }
+      }
+      t += `</tbody></table>`;
+      return t;
+    };
+    if (!ingrGrps1.length) {
+      body += buildCh1IngrTable(refDr, null);
+    }
+    for (const { dr, v, lbl } of ingrGrps1) {
+      if (multi1) body += `<p style="${FN}font-size:9.5pt;font-weight:bold;color:#1a4b8c;margin:5pt 0 2pt;">▶ ${esc(lbl)}</p>`;
+      body += buildCh1IngrTable(dr, v);
+    }
+  } else {
+    // 기타 장: 기존 형식
+    body += `<table style="width:100%;border-collapse:collapse;margin-bottom:12pt;table-layout:fixed;">`;
+    body += `<colgroup>`;
+    body += `<col style="width:9%;"><col style="width:22%;"><col style="width:14%;"><col style="width:14%;"><col style="width:14%;"><col style="width:13%;"><col style="width:14%;">`;
+    body += `</colgroup>`;
+    body += `<thead><tr>`;
+    body += `<th colspan="5" style="${TH2}">의약품 표준제조기준</th>`;
+    body += `<th colspan="2" style="${TH3}">${esc(productName)}</th>`;
+    body += `</tr><tr>`;
+    body += `<th style="${TH2}">구분</th>`;
+    body += `<th style="${TH2}">유효성분명</th>`;
+    body += `<th style="${TH2}">1회최대분량(mg)</th>`;
+    body += `<th style="${TH2}">1일최대분량(mg)</th>`;
+    body += `<th style="${TH2}">1회최소분량(mg)</th>`;
+    body += `<th style="${TH3}">1회용량(mg)</th>`;
+    body += `<th style="${TH3}">1일용량(mg)<br>(1일 ${esc(String(refDr.freqMax))}회)</th>`;
+    body += `</tr></thead><tbody>`;
+    const v0 = allValidations[0]?.v;
+    if (v0 && v0.itemResults && v0.itemResults.length) {
+      for (const r of v0.itemResults) {
+        const fail = r.ok === false;
+        const rowBg = fail ? 'background:#fff5f5;' : '';
+        const ingrRow = activeRows.find(ar => ar.ingr === r.ingr);
+        const std1max  = r.allowed?.max1dose ?? null;
+        const std1dmax = r.allowed?.max1d    ?? r.critMax ?? null;
+        const std1min  = r.allowed?.min1dose ?? null;
+        const act1     = r.actual?.max1dose  ?? (ingrRow ? +(parseFloat(ingrRow.dose) * refDr.amtMax).toFixed(4) : null);
+        const act1d    = r.actual?.max1d     ?? r.dailyMax ?? null;
+        body += `<tr style="${rowBg}">`;
+        body += `<td style="${TD}text-align:center;font-size:9pt;">${esc(r.gubun || '—')}</td>`;
+        body += `<td style="${TD}">${esc(r.ingr)}</td>`;
+        body += `<td style="${TD}text-align:right;background:#edf3fb;">${fmt(std1max)}</td>`;
+        body += `<td style="${TD}text-align:right;background:#edf3fb;">${fmt(std1dmax)}</td>`;
+        body += `<td style="${TD}text-align:right;background:#edf3fb;">${fmt(std1min)}</td>`;
+        body += `<td style="${TD}text-align:right;background:#edfaf1;">${fmt(act1)}</td>`;
+        body += `<td style="${TD}text-align:right;background:#edfaf1;">${fmt(act1d)}</td>`;
+        body += `</tr>`;
+        if (fail && r.reason && r.reason !== '부적합') {
+          body += `<tr style="background:#fff5f5;"><td colspan="7" style="${TD}font-size:9pt;color:#c62828;padding:2pt 8pt;">↳ ${esc(r.reason)}</td></tr>`;
+        }
+      }
+      if (allValidations.length > 1) {
+        body += `<tr><td colspan="7" style="${TD}font-size:9pt;color:#666;font-style:italic;">※ 위 배합량은 첫 번째 연령군(${esc(displayAgeLabel(allValidations[0].dr.age, currentKey, currentForm))}) 기준입니다.</td></tr>`;
+      }
+    } else {
+      for (const r of activeRows) {
+        body += `<tr>`;
+        body += `<td style="${TD}text-align:center;">${esc(r.gubun || '—')}</td>`;
+        body += `<td style="${TD}">${esc(r.ingr)}</td>`;
+        body += `<td style="${TD}text-align:center;">—</td>`;
+        body += `<td style="${TD}text-align:center;">—</td>`;
+        body += `<td style="${TD}text-align:center;">—</td>`;
+        body += `<td style="${TD}text-align:right;">${esc(r.dose)}</td>`;
+        body += `<td style="${TD}text-align:center;">—</td>`;
+        body += `</tr>`;
+      }
+    }
+    body += `</tbody></table>`;
+  }
+
+  // ══════════════════════════════════════════
+  // 2. [유효성분의 종류 및 배합한도]
+  // ══════════════════════════════════════════
+  {
+    const chDbObj2 = DB[currentKey];
+    const v0c = allValidations[0]?.v;
+    const failedRules = v0c ? (v0c.ruleErrors || []).filter(e => e.ok === false) : [];
+    const failedItems = v0c ? (v0c.itemResults || []).filter(r => r.ok === false) : [];
+    const SEC2 = `${FN}font-size:10pt;font-weight:bold;color:#1a4b8c;margin:10pt 0 3pt;`;
+
+    const renderCriteriaTable = (items, startNum) => {
+      if (!items.length) return '';
+      let s = `<table style="width:100%;border-collapse:collapse;margin-bottom:8pt;">`;
+      s += `<thead><tr>`;
+      s += `<th style="${TH}width:6%;">번호</th>`;
+      s += `<th style="${TH}width:94%;">의약품 표준제조기준 내용</th>`;
+      s += `</tr></thead><tbody>`;
+      items.forEach((item, i) => {
+        s += `<tr><td style="${TD}text-align:center;font-weight:bold;">${startNum + i}</td>`;
+        s += `<td style="${TD}">${esc(item)}</td></tr>`;
+      });
+      s += `</tbody></table>`;
+      return s;
+    };
+
+    body += `<p style="${SEC}">[유효성분의 종류 및 배합한도]</p>`;
+
+    if (currentKey === '제1장_비타민미네랄') {
+      // ch1 전용: O/X 확인 열이 있는 3항목 표
+      const items1c = chDbObj2?.['기준']?.['배합성분의_종류_및_배합한도'] ?? [];
+      const hasV1   = allValidations.length > 0;
+      // 각 항목별 O/X 판정
+      // 항목1: 모든 성분이 표1~4에 있는지
+      const st1ok = hasV1 ? allValidations.every(({v}) =>
+        (v.itemResults ?? []).every(r => r.reason !== '표1~표4에서 성분을 찾을 수 없음')
+      ) : null;
+      // 항목2: 각 항목 배합 총량이 1일 최대를 넘지 않는지 (개별 + 합산)
+      const st2ok = hasV1 ? allValidations.every(({v}) =>
+        (v.itemResults ?? []).every(r => r.ok !== false) &&
+        (v.sumResults  ?? []).every(r => r.ok !== false)
+      ) : null;
+      // 항목3: 만 8세 미만 금지 미네랄 미포함
+      const st3ok = hasV1 ? allValidations.every(({v}) =>
+        (v.itemResults ?? []).every(r => !r.reason?.includes('만 8세 미만 배합 금지'))
+      ) : null;
+      const ch1Statuses = [st1ok, st2ok, st3ok];
+      const OKST1c = `${FN}font-size:13pt;font-weight:bold;color:#2e7d32;text-align:center;padding:2pt 3pt;${BORD}`;
+      const NGST1c = `${FN}font-size:13pt;font-weight:bold;color:#c62828;text-align:center;padding:2pt 3pt;${BORD}`;
+      const NAST1c = `${FN}font-size:10pt;color:#aaa;text-align:center;padding:2pt 3pt;${BORD}`;
+      if (items1c.length) {
+        let s1c = `<table style="width:100%;border-collapse:collapse;margin-bottom:10pt;table-layout:fixed;">`;
+        s1c += `<colgroup><col style="width:87%;mso-width-source:userset;"><col style="width:13%;mso-width-source:userset;"></colgroup>`;
+        s1c += `<thead><tr>`;
+        s1c += `<th style="${TH}">세부내용</th>`;
+        s1c += `<th style="${TH}text-align:center;">확인<br>(적합&amp;부적합)</th>`;
+        s1c += `</tr></thead><tbody>`;
+        const filteredItems1c = items1c.filter(item => !item.trim().match(/^예\s*\)/));
+        filteredItems1c.forEach((item, i) => {
+          const ok = ch1Statuses[i] ?? null;
+          let mark = '—', cellSt = NAST1c;
+          if (ok === true)  { mark = 'O'; cellSt = OKST1c; }
+          else if (ok === false) { mark = 'X'; cellSt = NGST1c; }
+          const rowBg1c = ok === false ? 'background:#fff5f5;' : '';
+          s1c += `<tr style="${rowBg1c}">`;
+          s1c += `<td style="${TD}">${i+1}) ${esc(item)}</td>`;
+          s1c += `<td style="${cellSt}">${mark}</td>`;
+          s1c += `</tr>`;
+        });
+        s1c += `</tbody></table>`;
+        body += s1c;
+      }
+    } else {
+      const kinds = chDbObj2?.['기준']?.['유효성분의_종류'] ?? [];
+      const amts  = chDbObj2?.['기준']?.['유효성분의_분량'] ?? [];
+      if (kinds.length) {
+        body += `<p style="${SEC2}">유효성분의 종류</p>`;
+        body += renderCriteriaTable(kinds, 1);
+      }
+      if (amts.length) {
+        body += `<p style="${SEC2}">유효성분의 분량</p>`;
+        body += renderCriteriaTable(amts, 1);
+      }
+    }
+    if (failedRules.length || failedItems.length) {
+      const msgs = [
+        ...failedRules.map(e => e.reason || e.key),
+        ...failedItems.map(r => `${r.ingr}: ${r.reason}`),
+      ];
+      body += `<p style="${FN}font-size:9pt;color:#c62828;margin:0 0 8pt;"><b>부적합 항목:</b> ${msgs.map(esc).join(' / ')}</p>`;
+    }
+  }
+
+  // ══════════════════════════════════════════
+  // 3. [효능효과]
+  // ══════════════════════════════════════════
+  body += `<p style="${SEC}">[효능효과]</p>`;
+  body += `<table style="width:100%;border-collapse:collapse;margin-bottom:12pt;">`;
+  body += `<thead><tr>`;
+  body += `<th style="${TH}width:60%;">의약품 표준제조기준</th>`;
+  body += `<th style="${TH}width:40%;">${esc(productName)}</th>`;
+  body += `</tr></thead><tbody><tr>`;
+  let effLeft = '', effRight = '';
+  if (currentKey === '제2장_해열진통제') {
+    const effDbItems = DB['제2장_해열진통제']?.['기준']?.['효능효과'] ?? [];
+    const effHeader = '효능 및 효과의 범위는 다음 범위로 한다.';
+    effLeft  += `<p style="margin:0 0 4pt;">${esc(effHeader)}</p>`;
+    effRight += `<p style="margin:0 0 4pt;">${esc(effHeader)}</p>`;
+    effDbItems.forEach((t, i) => {
+      const easyT = applyEasyTerms(t);
+      effLeft  += `<p style="margin:0 0 3pt;padding-left:8pt;">${i+1}) ${esc(easyT)}</p>`;
+      effRight += `<p style="margin:0 0 3pt;padding-left:8pt;">${i+1}) ${esc(easyT)}</p>`;
+    });
+  } else if (effResult) {
+    const { items = [], basicText, basicItems = [], finalTexts = [] } = effResult;
+    if (basicText) {
+      const anyOk = basicItems.some(bi => bi.ok);
+      effLeft += `<p style="margin:0 0 3pt;${anyOk ? HL : DIM}">${esc(basicText)}</p>`;
+    }
+    for (const bi of basicItems) {
+      effLeft += `<p style="margin:0 0 2pt;padding-left:10pt;${bi.ok ? HL : DIM}">${esc(bi.label)}(${esc(bi.cond)})</p>`;
+    }
+    for (const it of items) {
+      for (const t of (it.texts || [])) {
+        effLeft += `<p style="margin:0 0 2pt;${it.ok ? HL : DIM}">${esc(t)}</p>`;
+      }
+    }
+    if (!basicText && basicItems.length === 0 && items.length === 0) {
+      for (const t of finalTexts) effLeft += `<p style="margin:0 0 2pt;${HL}">${esc(t)}</p>`;
+    }
+    for (const t of finalTexts) {
+      effRight += `<p style="margin:0 0 3pt;">${esc(applyEasyTerms(t))}</p>`;
+    }
+  }
+  body += `<td style="${TD}">${effLeft || `<span style="color:#aaa;">효능효과 데이터 없음</span>`}</td>`;
+  body += `<td style="${TD}">${effRight || `<span style="color:#aaa;">(해당 없음)</span>`}</td>`;
+  body += `</tr></tbody></table>`;
+
+  // ══════════════════════════════════════════
+  // 4. [용법용량]
+  // ══════════════════════════════════════════
+  body += `<p style="${SEC}">[용법용량]</p>`;
+  body += `<table style="width:100%;border-collapse:collapse;margin-bottom:12pt;">`;
+  body += `<thead><tr>`;
+  body += `<th style="${TH}width:60%;">의약품 표준제조기준</th>`;
+  body += `<th style="${TH}width:40%;">${esc(productName)}</th>`;
+  body += `</tr></thead><tbody><tr>`;
+  let dosLeft = '', dosRight = '';
+  {
+    const chDbObj3 = DB[currentKey];
+    if (currentKey === '제2장_해열진통제') {
+      const tbl3 = chDbObj3?.['표']?.['표3_연령구분계수'] ?? [];
+      dosLeft += `<p style="margin:0 0 4pt;font-weight:bold;">(4) 용법&#xB7;용량</p>`;
+      dosLeft += `<p style="margin:0 0 2pt;font-weight:bold;">1) 용법은 다음과 같이 한다.</p>`;
+      dosLeft += `<p style="margin:0 0 1pt;padding-left:10pt;">① 1일 1회 복용하는 경우</p>`;
+      dosLeft += `<p style="margin:0 0 5pt;padding-left:20pt;">1일 1회까지로 하고 공복시를 피하여 복용한다.</p>`;
+      dosLeft += `<p style="margin:0 0 1pt;padding-left:10pt;">② 1일 2회 복용하는 경우</p>`;
+      dosLeft += `<p style="margin:0 0 1pt;padding-left:20pt;">1일 2회까지로 하고 공복시를 피하여 복용한다.</p>`;
+      dosLeft += `<p style="margin:0 0 5pt;padding-left:20pt;">복용 간격은 6시간 이상으로 한다.</p>`;
+      dosLeft += `<p style="margin:0 0 1pt;padding-left:10pt;">③ 1일 3회 복용하는 경우</p>`;
+      dosLeft += `<p style="margin:0 0 1pt;padding-left:20pt;">1일 3회까지로 하고 공복시를 피하여 복용한다.</p>`;
+      dosLeft += `<p style="margin:0 0 8pt;padding-left:20pt;">복용간격은 4시간 이상으로 한다.</p>`;
+      dosLeft += `<p style="margin:0 0 4pt;"><b>3)</b> 캡슐제, 정제(추어블정 및 발포정 제외)는 만 7세 이하의 영&#xB7;유아의 복용은 인정하지 아니한다. 또한, 추어블정에 대해서는 원칙적으로 만 3세 미만을 대상으로 하는 용법은 인정하지 않는다.</p>`;
+      if (tbl3.length) {
+        dosLeft += `<p style="margin:6pt 0 3pt;font-weight:bold;">&lt;표3&gt; 연령 구분별 용량의 환산 계수표</p>`;
+        dosLeft += `<table style="width:100%;border-collapse:collapse;font-size:9pt;font-family:'맑은 고딕',Arial,sans-serif;margin-bottom:4pt;">`;
+        dosLeft += `<tr><th style="border:1px solid #888;padding:3pt 6pt;background:#e8eef7;text-align:center;width:75%;">연령구분</th>`;
+        dosLeft += `<th style="border:1px solid #888;padding:3pt 6pt;background:#e8eef7;text-align:center;width:25%;">계수</th></tr>`;
+        tbl3.forEach(row => {
+          dosLeft += `<tr>`;
+          dosLeft += `<td style="border:1px solid #888;padding:3pt 6pt;">${esc(row['연령구분'])}</td>`;
+          dosLeft += `<td style="border:1px solid #888;padding:3pt 6pt;text-align:center;">${esc(row['계수'])}</td>`;
+          dosLeft += `</tr>`;
+        });
+        dosLeft += `</table>`;
+      }
+    } else {
+      const dosDbItems = chDbObj3?.['기준']?.['용법용량'] ?? [];
+      const formSpecificKws = ['추어블정','발포정','발포과립','구강용해필름','구강붕해정','경구용젤리제','트로키제','건조시럽제','건조시럽'];
+      dosDbItems.forEach((item, i) => {
+        const mentionsSpecific = formSpecificKws.some(kw => item.includes(kw));
+        const mentionsCurrent  = form && item.includes(form);
+        const isRelevant = mentionsCurrent || !mentionsSpecific;
+        dosLeft += `<p style="margin:0 0 4pt;${isRelevant ? HL : DIM}"><b>${i + 1}.</b> ${esc(item)}</p>`;
+      });
+    }
+    for (const dr of validDosageRows) {
+      const ageLbl = displayAgeLabel(dr.age, currentKey, currentForm) || dr.age;
+      const freqStr = dr.freqMin === dr.freqMax ? `1일 ${dr.freqMax}회` : `1일 ${dr.freqMin}~${dr.freqMax}회`;
+      const amtStr  = dr.amtMin  === dr.amtMax  ? `1회 ${dr.amtMax}${unit}` : `1회 ${dr.amtMin}~${dr.amtMax}${unit}`;
+      dosRight += `<p style="margin:0 0 4pt;"><b>${esc(ageLbl)}</b>: ${esc(freqStr)}, ${esc(amtStr)}</p>`;
+    }
+  }
+  body += `<td style="${TD}">${dosLeft || `<span style="color:#aaa;">데이터 없음</span>`}</td>`;
+  body += `<td style="${TD}">${dosRight || `<span style="color:#aaa;">(입력 없음)</span>`}</td>`;
+  body += `</tr></tbody></table>`;
+
+  // ══════════════════════════════════════════
+  // 5. [사용상의 주의사항]
+  // ══════════════════════════════════════════
+  body += `<p style="${SEC}">[사용상의 주의사항]</p>`;
+  body += `<table style="width:100%;border-collapse:collapse;margin-bottom:12pt;">`;
+  body += `<thead><tr>`;
+  body += `<th style="${TH}width:60%;">의약품 표준제조기준</th>`;
+  body += `<th style="${TH}width:40%;">${esc(productName)}</th>`;
+  body += `</tr></thead><tbody>`;
+
+  const CAT_LABELS_FW = [
+    ['경고',                 '경고'],
+    ['복용하지_말_것',       '다음과 같은 사람은 이 약을 복용하지 말 것'],
+    ['병용금기',             '이 약을 복용하는 동안 다음의 약을 복용하지 말 것'],
+    ['복용전_상의',          '다음과 같은 사람(경우)은 이 약을 복용하기 전에 의사, 치과의사, 약사와 상의할 것.'],
+    ['이상반응_및_즉각중지', '다음과 같은 경우 이 약의 복용을 즉각 중지하고 의사, 치과의사, 약사와 상의할 것. 상담 시 가능한 한 이 첨부문서를 소지할 것.'],
+    ['기타주의사항',         '기타 주의사항'],
+    ['소아투여',             '소아에 대한 투여'],
+    ['임부수유부투여',       '임부 및 수유부에 대한 투여'],
+    ['복용시_주의',          '기타 이 약의 복용 시 주의할 사항'],
+    ['저장상의_주의',        '저장상의 주의사항'],
+  ];
+  const chDb   = DB[currentKey];
+  const prec   = chDb?.['사용상의_주의사항'];
+  const ctx    = prec ? buildPrecautionCtx(currentKey, form, activeRows, dosageRows) : null;
+  const fnMaps = prec?.['각주_맵'] || {};   // 섹션별 인라인 각주 성분명 맵
+  const displayedMap = new Map();
+  if (precSections) {
+    precSections.forEach(sec => {
+      if (!displayedMap.has(sec.cat)) displayedMap.set(sec.cat, new Set());
+      sec.items.forEach(it => displayedMap.get(sec.cat).add(it.origIdx));
+    });
+  }
+  let commentDefs2 = '', commentSeq2 = 0;
+
+  for (const [cat, label] of CAT_LABELS_FW) {
+    const hasDbCat = prec && cat in prec;
+    const excItemsInCat = (selectedExcipients || []).some(n => (EXCIPIENT_PREC_DB[n] || {})[cat]);
+    const dirItemsInCat = (precSections || []).find(s => s.cat === cat)?.items.filter(it => it.isDirective) || [];
+    if (!hasDbCat && !excItemsInCat && !dirItemsInCat.length) continue;
+    const dispSet = displayedMap.get(cat) || new Set();
+    const fnMap   = fnMaps[cat] || null;   // 이 섹션의 각주 성분명 맵
+
+    let leftH = `<p style="margin:0 0 4pt;font-weight:bold;font-size:10pt;">${esc(label)}</p>`;
+    const rightItems = [];
+
+    if (hasDbCat && cat === '이상반응_및_즉각중지' && prec['이상반응_성분매핑']) {
+      const advArr = prec[cat];
+      const mapping = prec['이상반응_성분매핑'];
+      const rawLines = advArr[0].split('\n').filter(l => l.trim());
+      leftH += `<p style="margin:0 0 2pt;">${esc(_stripInlineMarkers(rawLines[0]))}</p>`;
+      rawLines.slice(1).forEach((line, idx) => {
+        const entry = mapping[idx];
+        const isActive = entry ? ctx.classes.has(entry.class) : false;
+        if (isActive) {
+          leftH += `<p style="margin:0;padding-left:10pt;${HL}">${_renderPrecWithInlineHL(line, ctx, HL, fnMap, true)}</p>`;
+        } else {
+          leftH += `<p style="margin:0;padding-left:10pt;${DIM}">${esc(_stripInlineMarkers(line))}</p>`;
+        }
+      });
+      for (let i = 1; i < advArr.length; i++) {
+        const disp = dispSet.has(i);
+        leftH += `<p style="margin:0 0 2pt;${disp ? '' : DIM}">${i}) ${esc(_stripInlineMarkers(advArr[i]))}</p>`;
+      }
+    } else if (hasDbCat) {
+      const flatItems = _flattenPrecItems(cat, prec[cat]);
+      let dispNum = 0;
+      flatItems.forEach((item, i) => {
+        const isIndent = !!item.indent;
+        const isCircledW = !!item.circled;
+        if (!isIndent && !isCircledW) dispNum++;
+        const disp = dispSet.has(i);
+        const indent = isIndent ? 'padding-left:10pt;' : '';
+        const prefix = (isIndent || isCircledW) ? '' : `${dispNum}) `;
+        if (disp) {
+          leftH += `<p style="margin:0 0 2pt;${indent + HL}">${prefix}${_renderPrecWithInlineHL(item.text, ctx, HL, fnMap, true)}</p>`;
+        } else {
+          leftH += `<p style="margin:0 0 2pt;${indent}${DIM}">${prefix}${esc(_stripInlineMarkers(item.text)).replace(/\n/g,'<br>')}</p>`;
+        }
+      });
+    }
+    if (dirItemsInCat.length) {
+      leftH += `<p style="font-size:9pt;color:#E65100;margin:4pt 0 2pt;font-style:italic;">[품목허가사항 변경지시]</p>`;
+      dirItemsInCat.forEach(it => {
+        const cmtId = `fw${++commentSeq2}`;
+        const cmtRef = `<span style="mso-comment-reference:${cmtId};mso-comment-date:20240101T000000"><span style="mso-special-character:comment"> </span></span>`;
+        leftH += `<p style="margin:0 0 1pt;background:#FFF3E0;">${it.displayNum}) ${esc(it.text)}${cmtRef}</p>`;
+        if (it.citation) leftH += `<p style="margin:0 0 4pt;padding-left:8pt;font-size:8pt;font-style:italic;color:#888;font-family:'맑은 고딕',sans-serif;">○ ${esc(it.citation)}</p>`;
+        commentDefs2 += `<div style="mso-element:comment" id="${cmtId}"><p class="MsoNormal" style="font-size:9pt;font-family:'맑은 고딕',sans-serif;"><b>기재 사유:</b> ${esc(it.citation)}</p></div>`;
+      });
+    }
+    if (selectedExcipients && selectedExcipients.length) {
+      for (const excName of selectedExcipients) {
+        const excItems = (EXCIPIENT_PREC_DB[excName] || {})[cat];
+        if (!excItems) continue;
+        leftH += `<p style="font-size:9pt;color:#1565c0;margin:4pt 0 2pt;font-style:italic;">[첨가제: ${esc(excName)}]</p>`;
+        excItems.forEach(text => {
+          leftH += `<p style="margin:0 0 2pt;${HL}">${esc(text)}</p>`;
+        });
+      }
+    }
+    // 우측 열: precSections에서 직접 구성 (화면과 동일한 번호·텍스트)
+    const precSec = precSections?.find(s => s.cat === cat);
+    if (precSec) {
+      precSec.items.forEach(it => {
+        if (it.text && it.text.includes('<삭제>')) return;
+        const clean = applyEasyTerms(removeEditorial(_stripIngredientParens(it.text)));
+        if (it.indent || it.isMapping) {
+          rightItems.push(`   ${clean}`);
+        } else if (it.circled) {
+          rightItems.push(clean);
+        } else {
+          rightItems.push(`${it.displayNum}) ${clean}`);
+        }
+      });
+    }
+    const rightH = rightItems.length
+      ? `<p style="margin:0 0 4pt;font-weight:bold;font-size:10pt;">${esc(label)}</p>`
+        + rightItems.map(t => `<p style="margin:0 0 2pt;">${esc(t).replace(/\n/g,'<br>')}</p>`).join('')
+      : `<span style="color:#aaa;">(해당 없음)</span>`;
+    body += `<tr><td style="${TD}">${leftH}</td><td style="${TD}">${rightH}</td></tr>`;
+  }
+  body += `</tbody></table>`;
+
+  const commentListHtml2 = commentDefs2
+    ? `<div style="mso-element:comment-list">${commentDefs2}</div>` : '';
+
+  const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office'`
+    + ` xmlns:w='urn:schemas-microsoft-com:office:word'`
+    + ` xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset="UTF-8"><title>${esc(productName)} 표준제조기준 검토</title>
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>90</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->
+<style>
+  @page { margin: 1.5cm 1cm; mso-page-orientation: portrait; }
+  body { font-family:'맑은 고딕',Arial,sans-serif; margin:0; font-size:9pt; }
+  p { margin:0; padding:1pt 0; line-height:1.4; }
+  table { border-collapse:collapse; width:100%; table-layout:fixed; }
+  td, th { padding:3pt 5pt; border:1px solid #aaa; word-wrap:break-word; overflow-wrap:break-word; }
+  .MsoCommentText { font-size:9pt; font-family:'맑은 고딕',sans-serif; }
+</style>
+</head><body>
+${body}
+${commentListHtml2}
+</body></html>`;
+
+  const blob = new Blob(['﻿' + html], { type: 'application/msword;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `${productName}_표준제조기준검토_${new Date().toISOString().slice(0,10)}.doc`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* =========================================================
+   제품 DB (Firebase Firestore — 실시간 공유)
+   ========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyCPVskzgCYINmVTiVcmpi6xmLhqI7BKNp8",
+  authDomain: "rpbiodb.firebaseapp.com",
+  projectId: "rpbiodb",
+  storageBucket: "rpbiodb.firebasestorage.app",
+  messagingSenderId: "588114091397",
+  appId: "1:588114091397:web:d7d074eca144bbf3e478ec"
+};

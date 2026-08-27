@@ -21,17 +21,22 @@
   --ash:       #c9c9c9;   --smoke:  #a8a8a8;  --graphite: #8f8f8f;
   --slate:     #7d7d7d;   --stone:  #666666;  --charcoal: #4d4d4d;
   --obsidian:  #171717;   --carbon: #000000;
-  --green:     #297a3a;                       /* 적합 */
-  --red:       #c62828;                       /* 부적합 — 의도적 확장 (가이드 참고) */
+  --green:     #1a7f37;   --green-bg: #eaf6ec;  /* 적합 */
+  --red:       #c62828;   --red-bg:   #fdecea;  /* 부적합 — 의도적 확장 (가이드 참고) */
 
-  /* 기준 vs 제품을 색조 대신 명도로 구분 */
-  --std-bg:    #f4f4f4;   --std-head:  #171717;  --std-head-fg: #ffffff;
-  --prod-bg:   #ffffff;   --prod-head: #ebebeb;  --prod-head-fg: #171717;
+  /* 기준 vs 제품을 색조 대신 명도로 구분 — 검정이 무거워 한 단계 옅게 */
+  --std-bg:    #f4f4f4;   --std-head:  #575757;  --std-head-fg: #ffffff;
+  --prod-bg:   #ffffff;   --prod-head: #ebebeb;  --prod-head-fg: #3d3d3d;
+
+  /* 작업자가 값을 넣어야 하는 칸 — 어디를 채워야 하는지 한눈에 */
+  --input-bg:  #fff8db;   --input-line: #e8d071;  --input-focus: #b8912a;
 
   /* 서체 — 라틴은 Geist, 한글은 Pretendard가 이어받는다.
      Geist를 앞에 둬도 한글 글리프가 없어 자동으로 Pretendard로 넘어간다. */
   --sans: 'Geist', 'Pretendard Variable', 'Pretendard', system-ui, sans-serif;
-  --mono: 'Geist Mono', 'Pretendard Variable', ui-monospace, Consolas, monospace;
+  /* 숫자도 본문과 같은 서체를 쓴다. Geist Mono의 0이 눈에 띄어 읽기를 방해했다.
+     자릿수 정렬은 tabular-nums로 유지된다. */
+  --mono: var(--sans);
 
   --r: 6px;                                    /* 모서리 */
   --ring:  0 0 0 1px rgba(0,0,0,.08);          /* 헤어라인 (그림자 대신) */
@@ -74,7 +79,7 @@ select, input[type="text"], input[type="number"] {
 }
 select:focus, input:focus { box-shadow: 0 0 0 1px var(--obsidian); }
 select:disabled { color: var(--ash); background: var(--paper); cursor: not-allowed; }
-input[type="number"] { font-family: var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+input[type="number"] { text-align: right; font-variant-numeric: tabular-nums; }
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
@@ -84,8 +89,8 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   border: none; border-radius: var(--r); padding: 7px 14px; height: 32px;
   white-space: nowrap; transition: background .12s;
 }
-.btn-primary { background: var(--obsidian); color: var(--white); }
-.btn-primary:hover:not(:disabled) { background: #000; }
+.btn-primary { background: #2e2e2e; color: var(--white); }
+.btn-primary:hover:not(:disabled) { background: var(--obsidian); }
 .btn-primary:disabled { background: var(--ash); cursor: not-allowed; }
 .btn-ghost { background: transparent; color: var(--charcoal); box-shadow: var(--ring2); }
 .btn-ghost:hover { background: var(--white); }
@@ -140,7 +145,7 @@ main.result-open #pane-result { flex: 1 1 auto; }
 table.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
 
 .tbl thead th {
-  font-family: var(--mono); font-weight: 400; font-size: 10.5px;
+  font-weight: 500; font-size: 10.5px;
   letter-spacing: .04em; text-transform: uppercase;
   padding: 6px 8px; text-align: center; white-space: nowrap;
   border-bottom: 1px solid var(--hairline);
@@ -150,7 +155,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
 /* 기준 = 어두운 헤더, 제품 = 밝은 헤더 (색조 아닌 명도로 구분) */
 .tbl th.g-std  { background: var(--std-head)  !important; color: var(--std-head-fg)  !important; }
 .tbl th.g-prod { background: var(--prod-head) !important; color: var(--prod-head-fg) !important; }
-.tbl tr.h2 th.g-std  { background: #3d3d3d !important; }
+.tbl tr.h2 th.g-std  { background: #6e6e6e !important; }
 .tbl tr.h2 th.g-prod { background: #f4f4f4 !important; color: var(--stone) !important; }
 
 .tbl tbody td { padding: 2px 8px; border-bottom: 1px solid #f3f3f3; vertical-align: middle; }
@@ -191,15 +196,30 @@ tr.grp .tri { display: inline-block; width: 10px; color: var(--carbon); font-siz
 tr.grp .gcount { color: var(--graphite); margin-left: 8px; }
 
 /* 판정 — 색만이 아니라 기호를 항상 함께 */
-.verdict { text-align: center; white-space: nowrap; font-family: var(--mono); font-size: 11px; }
-.v-ok   { color: var(--green); }
-.v-fail { color: var(--red); font-weight: 500; }
-.v-na   { color: var(--graphite); }
-.v-why  { display: block; font-size: 10px; color: var(--red); white-space: normal; margin-top: 1px; }
-tr.fail td { background: #fdf6f6 !important; }
-tr.fail td:first-child { box-shadow: inset 2px 0 0 var(--red); }
+.verdict { text-align: center; white-space: nowrap; font-size: 11px; }
+.v-ok, .v-fail, .v-na {
+  display: inline-block; border-radius: 4px; padding: 2px 8px;
+  font-size: 11px; font-weight: 500; letter-spacing: -.01em;
+}
+.v-ok   { background: var(--green-bg); color: var(--green); box-shadow: 0 0 0 1px #cfe6d4; }
+.v-fail { background: var(--red); color: #fff; font-weight: 600; }
+.v-na   { background: var(--paper); color: var(--graphite); box-shadow: var(--ring2); }
+.v-why  { display: block; font-size: 10px; color: var(--red); white-space: normal; margin-top: 2px; font-weight: 500; }
+/* 부적합 행은 배경 + 왼쪽 굵은 띠로 확실히 드러낸다 */
+tr.fail td { background: var(--red-bg) !important; }
+tr.fail td:first-child { box-shadow: inset 3px 0 0 var(--red); }
+tr.fail td.name { font-weight: 500; }
 
-.dose-input { width: 68px; height: 24px; padding: 2px 6px; font-size: 11.5px; }
+/* input[type=number] 규칙(0,1,1)이 .dose-input(0,1,0)을 이기므로 태그를 붙여 맞춘다 */
+input.dose-input {
+  width: 74px; height: 26px; padding: 2px 7px; font-size: 12px; font-weight: 500;
+  background: var(--input-bg); box-shadow: 0 0 0 1px var(--input-line);
+}
+input.dose-input:focus { background: #fffdf3; box-shadow: 0 0 0 2px var(--input-focus); }
+.dose-input::placeholder { color: #c8b268; }
+/* 입력 칸이 있는 열 전체를 옅게 표시해 "여기를 채우세요"를 드러낸다 */
+.tbl td.c-input { background: #fffdf0; }
+.tbl th.g-input { background: #fdf3c4 !important; color: #6b5410 !important; }
 .unit-sel   { height: 24px; padding: 1px 4px; font-size: 11px; font-family: var(--mono); width: 56px; }
 .name-sel   { height: 24px; padding: 2px 6px; font-size: 11.5px; max-width: 240px; width: 100%; }
 
@@ -213,12 +233,17 @@ tr.fail td:first-child { box-shadow: inset 2px 0 0 var(--red); }
 /* ── 결과 ── */
 .summary-card { border-radius: var(--r); box-shadow: var(--ring2); overflow: hidden; margin-bottom: 12px; }
 .summary-top { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
-.summary-top.ok   { background: var(--white); }
-.summary-top.fail { background: #fdf6f6; }
-.summary-top .mark { font-family: var(--mono); font-size: 16px; }
-.summary-top.ok   .mark, .summary-top.ok   .txt { color: var(--green); }
-.summary-top.fail .mark, .summary-top.fail .txt { color: var(--red); }
-.summary-top .txt { font-size: 15px; font-weight: 500; letter-spacing: -.01em; }
+.summary-top.ok   { background: var(--green-bg); box-shadow: inset 4px 0 0 var(--green); }
+.summary-top.fail { background: var(--red-bg);   box-shadow: inset 4px 0 0 var(--red); }
+.summary-top .mark {
+  font-size: 13px; font-weight: 600; width: 24px; height: 24px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; color: #fff;
+}
+.summary-top.ok   .mark { background: var(--green); }
+.summary-top.fail .mark { background: var(--red); }
+.summary-top.ok   .txt  { color: var(--green); }
+.summary-top.fail .txt  { color: var(--red); }
+.summary-top .txt { font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
 .meta { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; background: var(--paper); }
 .chip {
   font-family: var(--mono); font-size: 10.5px; color: var(--stone);
@@ -226,6 +251,24 @@ tr.fail td:first-child { box-shadow: inset 2px 0 0 var(--red); }
   padding: 3px 8px; white-space: nowrap;
 }
 .chip b { color: var(--obsidian); font-weight: 500; }
+
+/* 허가사항에 붙여넣을 문구 블록 */
+.doc { margin-top: 12px; border-radius: var(--r); box-shadow: var(--ring2); overflow: hidden; background: var(--white); }
+.doc-head {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  background: var(--paper); box-shadow: 0 1px 0 var(--hairline);
+}
+.doc-head .eyebrow { flex: 1; min-width: 0; }
+.doc-body {
+  padding: 10px 14px; font-size: 12.5px; line-height: 1.85; color: var(--obsidian);
+  max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;
+}
+.doc-body .lv1 { }
+.doc-body .lv2 { padding-left: 12px; color: var(--charcoal); }
+.doc-body .lv3 { padding-left: 24px; color: var(--stone); font-size: 12px; }
+.doc-body .none { color: var(--ash); font-size: 12px; }
+.btn-copy { font-size: 11.5px; padding: 4px 11px; height: 26px; }
+.btn-copy.done { background: var(--green); color: #fff; box-shadow: none; }
 
 .empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -235,9 +278,9 @@ tr.fail td:first-child { box-shadow: inset 2px 0 0 var(--red); }
 .empty .t { font-family: var(--mono); font-size: 11px; letter-spacing: .071em; text-transform: uppercase; }
 
 #live { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--graphite); }
-#live .st { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: var(--r); box-shadow: var(--ring2); background: var(--white); }
-#live .st.ok   { color: var(--green); }
-#live .st.fail { color: var(--red); }
+#live .st { font-size: 11.5px; font-weight: 500; padding: 3px 9px; border-radius: 4px; box-shadow: var(--ring2); background: var(--white); }
+#live .st.ok   { background: var(--green-bg); color: var(--green); box-shadow: 0 0 0 1px #cfe6d4; }
+#live .st.fail { background: var(--red); color: #fff; box-shadow: none; }
 
 .search-box { position: relative; }
 .search-box input { width: 100%; height: 34px; }
@@ -506,7 +549,7 @@ function renderTable() {
       </tr>
       <tr class="h2">
         <th class="g-std">최소</th><th class="g-std">최대</th>
-        <th class="g-prod">1${esc(unitWord(form))}당</th>
+        <th class="g-input">1${esc(unitWord(form))}당 ✎</th>
         <th class="g-prod">1일 최소</th><th class="g-prod">1일 최대</th>
       </tr>
     </thead><tbody>`;
@@ -543,7 +586,7 @@ function renderTable() {
       </div></td>
       <td class="num c-std">${critMin != null ? fmt(critMin) : '<span class="muted">—</span>'}</td>
       <td class="num c-std">${critMax != null ? fmt(critMax) : '<span class="muted">—</span>'}</td>
-      <td class="c-prod" style="text-align:right;">
+      <td class="c-input" style="text-align:right;">
         <input type="number" class="dose-input js-dose" data-id="${r.id}"
                value="${esc(r.dose)}" min="0" step="0.001" placeholder="0">
       </td>
@@ -566,7 +609,7 @@ function verdict(ok, reason) {
   if (ok === true)  return '<span class="v-ok">✓ 적합</span>';
   if (ok === false) return `<span class="v-fail">✕ 부적합</span>` +
     (reason && reason !== '부적합' ? `<span class="v-why">${esc(reason)}</span>` : '');
-  return '<span class="v-na">—</span>';
+  return '<span class="v-na">— 미입력</span>';
 }
 
 function bar(dMin, dMax, cMin, cMax, ok, unit) {
@@ -665,6 +708,7 @@ function updateLive(v) {
 
 /* ── 결과 ── */
 function runReview() {
+  const act = activeRows();
   const v = validateNow();
   const body = $('result-body');
   if (!v) { body.innerHTML = `<div class="note">연령·제형·성분을 모두 입력한 뒤 실행하세요.</div>`; return; }
@@ -715,7 +759,88 @@ function runReview() {
       <td class="verdict">${verdict(false, '')}</td></tr>`;
   }
   h += `</tbody></table></div>`;
+
+  // ── 효능효과 · 사용상 주의사항 자동 생성 ──
+  h += buildDocBlocks(act);
+
   body.innerHTML = h;
+  bindCopy();
+}
+
+/* 허가사항 문구 생성 — 판정 규칙 파일의 생성기를 그대로 쓴다 */
+function buildDocBlocks(act) {
+  const d = dosage();
+  let out = '';
+
+  let eff = null, prec = null;
+  try { eff = generateEfficacy(chKey, form, act, d); } catch (e) { console.warn('효능효과 생성', e); }
+  try { prec = generatePrecautions(chKey, form, act, [], [{ age: $('sel-age').value, ...d }]); }
+  catch (e) { console.warn('주의사항 생성', e); }
+
+  out += docBlock('효능효과', 'eff', effText(eff));
+  out += docBlock('사용상의 주의사항', 'prec', precText(prec));
+  return out;
+}
+
+function docBlock(title, key, lines) {
+  const has = lines.length > 0;
+  window['__copy_' + key] = lines.map(l => l.text).join('\n');
+  return `<div class="doc">
+    <div class="doc-head">
+      <span class="eyebrow">${esc(title)}</span>
+      ${has ? `<button class="btn btn-ghost btn-copy js-copy" data-key="${key}">복사</button>` : ''}
+    </div>
+    <div class="doc-body">${
+      has ? lines.map(l => `<div class="lv${l.lv}">${esc(l.text)}</div>`).join('')
+          : '<span class="none">해당 없음</span>'
+    }</div></div>`;
+}
+
+/* 생성기 결과를 화면용 줄 목록으로 (구조가 장마다 달라 유연하게 훑는다) */
+function effText(eff) {
+  const out = [];
+  const push = (t, lv) => { const v = String(t ?? '').trim(); if (v) out.push({ text: v, lv }); };
+  if (!eff) return out;
+  const walk = (v, lv) => {
+    if (v == null) return;
+    if (typeof v === 'string') { push(v, lv); return; }
+    if (Array.isArray(v)) { v.forEach(x => walk(x, lv)); return; }
+    if (typeof v === 'object') {
+      for (const k of ['기본기재', 'basic', 'header', 'text', 'label']) if (v[k]) walk(v[k], lv);
+      for (const k of ['세부항목', 'items', 'texts', 'list', 'details']) if (v[k]) walk(v[k], lv + 1);
+    }
+  };
+  for (const k of ['final', 'okBasic', 'okItems', 'lines', 'texts', 'result']) if (eff[k]) walk(eff[k], 1);
+  if (!out.length) walk(eff, 1);
+  return out;
+}
+
+function precText(prec) {
+  /* generatePrecautions 반환 형태
+     [{ cat, label, items:[{ text, sub, tags, displayNum, indent }] }, ...] */
+  const out = [];
+  const push = (t, lv) => { const v = String(t ?? '').trim(); if (v) out.push({ text: v, lv }); };
+  for (const sec of (Array.isArray(prec) ? prec : [])) {
+    push(sec.label ?? sec.cat, 1);
+    for (const it of (sec.items ?? [])) {
+      const no = it.displayNum != null ? `${it.displayNum}) ` : '';
+      const tag = (it.tags && it.tags.length) ? `  [${it.tags.join(', ')}]` : '';
+      push(no + (it.text ?? '') + tag, it.indent ? 3 : 2);
+      for (const sub of (it.sub ?? [])) push(typeof sub === 'string' ? sub : sub.text, 3);
+    }
+  }
+  return out;
+}
+
+function bindCopy() {
+  document.querySelectorAll('.js-copy').forEach(b => b.addEventListener('click', () => {
+    const txt = window['__copy_' + b.dataset.key] || '';
+    const done = () => { b.textContent = '복사됨 ✓'; b.classList.add('done');
+      setTimeout(() => { b.textContent = '복사'; b.classList.remove('done'); }, 1500); };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(txt).then(done).catch(() => {});
+    else { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta);
+           ta.select(); try { document.execCommand('copy'); done(); } catch (e) {} ta.remove(); }
+  }));
 }
 
 /* ══════════ 제품 검색 ══════════
