@@ -65,6 +65,15 @@ body {
   text-transform: uppercase; color: var(--graphite);
 }
 .topbar .spacer { flex: 1; }
+.topbar select { height: 30px; font-size: 12.5px; }
+.tb-div { width: 1px; height: 20px; background: var(--hairline); }
+.tb-product {
+  font-size: 13px; font-weight: 500; color: var(--obsidian);
+  padding: 3px 10px; border-radius: var(--r); background: var(--white);
+  box-shadow: var(--ring2); max-width: 240px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.tb-product:empty { display: none; }
 
 /* ── 폼 요소 ── */
 label.field { display: inline-flex; flex-direction: column; gap: 4px; }
@@ -141,7 +150,11 @@ main.result-open #pane-result { flex: 1 1 auto; }
 .toolbar .sp { flex: 1; }
 
 /* ══════════ 표 — 이 화면의 핵심 ══════════ */
-.tbl-wrap { overflow-x: auto; border-radius: var(--r); box-shadow: var(--ring2); }
+/* 47행을 내려도 머리글이 붙어 있어야 어느 열인지 알 수 있다 */
+.tbl-wrap { overflow-x: auto; overflow-y: visible; border-radius: var(--r); box-shadow: var(--ring2); }
+.tbl thead th { position: sticky; top: 0; z-index: 3; }
+.tbl thead tr.h2 th { top: 27px; }
+tr.grp td { position: sticky; top: 51px; z-index: 2; }
 table.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
 
 .tbl thead th {
@@ -160,6 +173,10 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
 
 .tbl tbody td { padding: 2px 8px; border-bottom: 1px solid #f3f3f3; vertical-align: middle; }
 .tbl tbody tr:last-child td { border-bottom: none; }
+/* 옅은 줄무늬 — 가로로 눈이 미끄러지지 않게.
+   그룹 행이 사이에 끼어 nth-of-type 순번이 어긋나므로 렌더에서 alt를 붙인다. */
+.tbl tbody tr.alt > td { background-image: linear-gradient(rgba(0,0,0,.014), rgba(0,0,0,.014)); }
+.tbl tbody tr[data-id]:hover > td { background-image: linear-gradient(rgba(0,0,0,.032), rgba(0,0,0,.032)); }
 .tbl td.c-std  { background: var(--std-bg); }
 .tbl td.c-prod { background: var(--prod-bg); }
 .num {
@@ -187,9 +204,10 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
 
 /* 그룹 헤더 — ▲ 접기 표시 */
 tr.grp td {
-  background: var(--paper); font-family: var(--mono); font-size: 10.5px;
-  letter-spacing: .05em; color: var(--stone); padding: 5px 8px;
-  cursor: pointer; user-select: none; border-bottom: 1px solid var(--hairline);
+  background: #f0f0f0; font-size: 10.5px; font-weight: 500;
+  letter-spacing: .05em; color: var(--charcoal); padding: 5px 8px;
+  cursor: pointer; user-select: none;
+  border-top: 1px solid var(--ash); border-bottom: 1px solid var(--hairline);
 }
 tr.grp td:hover { background: #f2f2f2; }
 tr.grp .tri { display: inline-block; width: 10px; color: var(--carbon); font-size: 8px; }
@@ -312,29 +330,19 @@ input.dose-input:focus { background: #fffdf3; box-shadow: 0 0 0 2px var(--input-
   <div class="brand">
     <span class="tri">▲</span>
     <span class="name">표제기 검토</span>
-    <span class="tag">식약처 고시 2025-3호</span>
   </div>
+  <span class="tb-div"></span>
+  <select id="sel-ch" style="min-width:230px;"><option value="">— 적용 기준 —</option></select>
+  <select id="sel-form" style="min-width:160px;" disabled><option value="">— 제형 —</option></select>
+  <span id="tb-product" class="tb-product"></span>
   <div class="spacer"></div>
-  <span class="tag" style="font-family:var(--mono);font-size:10.5px;color:var(--ash);">새 화면 · 작업 중</span>
+  <span class="tag" style="font-size:10.5px;color:var(--ash);">새 화면 · 작업 중</span>
 </header>
 
 <main id="main">
   <!-- 입력 -->
   <section class="pane" id="pane-input">
     <div class="card">
-      <div class="card-head">
-        <span class="eyebrow">입력</span>
-        <div class="spacer" style="flex:1"></div>
-        <label class="row" style="gap:6px;">
-          <span class="eyebrow">적용 기준</span>
-          <select id="sel-ch" style="min-width:230px;"><option value="">— 선택 —</option></select>
-        </label>
-        <label class="row" style="gap:6px;">
-          <span class="eyebrow">제형</span>
-          <select id="sel-form" style="min-width:150px;" disabled><option value="">— 장 선택 후 —</option></select>
-        </label>
-      </div>
-
       <div class="card-body">
         <div class="section">
           <span class="eyebrow">제품 검색</span>
@@ -365,6 +373,7 @@ input.dose-input:focus { background: #fffdf3; box-shadow: 0 0 0 2px var(--input-
           <span class="eyebrow">배합 성분</span>
           <div class="toolbar">
             <label><input type="checkbox" id="only-filled"> 입력된 성분만 보기</label>
+            <label><input type="checkbox" id="show-all"> 전체 성분 보기</label>
             <span class="count" id="cnt">—</span>
             <span class="sp"></span>
             <button class="btn btn-link" id="expand-all" style="display:none;">전체 펼치기</button>
@@ -384,7 +393,7 @@ input.dose-input:focus { background: #fffdf3; box-shadow: 0 0 0 2px var(--input-
   <!-- 결과 -->
   <section class="pane" id="pane-result">
     <div class="card">
-      <div class="card-head"><span class="eyebrow">결과</span></div>
+      <div class="card-head"><span class="eyebrow">검토 결과</span></div>
       <div class="card-body" id="result-body">
         <div class="empty">
           <span class="tri">▲</span>
@@ -418,6 +427,7 @@ const VALIDATORS = {
 let chKey = '', form = '', rows = [];
 const collapsed = new Set();
 let onlyFilled = false;
+let showAll = false;   // 주로 쓰는 성분만 보일지, 전체를 보일지
 
 /* 제형 → 복용 단위 */
 function unitWord(f) {
@@ -484,15 +494,20 @@ function buildRows() {
         const minSrc = Array.isArray(first['1일최소분량']) ? first['1일최소분량'][0] : first['1일최소분량'];
         const p = (maxSrc && maxSrc !== '-') ? parseAmountStr(maxSrc, names[0], names)
                 : (minSrc ? parseAmountStr(minSrc, names[0], names) : null);
-        rows.push({ id: rows.length, group: section, item,
+        // 제1장은 표1(비타민)·표2(미네랄)가 기본, 표3·표4는 필요할 때만
+        rows.push({ id: rows.length, group: section, item, main: section === '비타민' || section === '미네랄',
                     names, ingr: names[0], dose: '', unit: p?.unit ?? 'mg' });
       }
     }
   } else {
     // 그 외 장: 성분 하나가 한 행, 구분(Ⅰ항 등)으로 묶는다
+    // 장마다 실무에서 주로 쓰는 성분이 정해져 있다 (판정_규칙.js의 MAIN_INGR).
+    // 나머지는 "전체 성분 보기"를 켜야 나온다.
+    const main = (typeof MAIN_INGR !== 'undefined' && MAIN_INGR[chKey]) || null;
     for (const g of (chaptersMap[chKey]?.ingredientGroups ?? [])) {
       for (const n of g.ingredients) {
         rows.push({ id: rows.length, group: g.label, item: g.label,
+                    main: main ? main.has(n) : true,
                     names: [n], ingr: n, dose: '', unit: 'mg' });
       }
     }
@@ -528,10 +543,12 @@ function renderTable() {
   const vmap = new Map((v?.itemResults ?? []).map(r => [r.ingr, r]));
 
   const filled = rows.filter(hasDose).length;
-  const shown = (onlyFilled && filled) ? rows.filter(hasDose) : rows;
+  // 기본은 주로 쓰는 성분만. 값이 들어간 행은 주요 성분이 아니어도 항상 보인다.
+  const base = showAll ? rows : rows.filter(r => r.main || hasDose(r));
+  const shown = (onlyFilled && filled) ? base.filter(hasDose) : base;
 
   const stat = new Map();
-  for (const r of rows) {
+  for (const r of base) {
     const s = stat.get(r.group) ?? { t: 0, f: 0 };
     s.t++; if (hasDose(r)) s.f++;
     stat.set(r.group, s);
@@ -555,6 +572,7 @@ function renderTable() {
     </thead><tbody>`;
 
   let lastGroup = null;
+  let dataIdx = 0;
   for (const r of shown) {
     if (r.group !== lastGroup) {
       lastGroup = r.group;
@@ -579,7 +597,8 @@ function renderTable() {
           `<option${n === r.ingr ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>`
       : `<span>${esc(r.ingr)}</span>`;
 
-    html += `<tr class="${ok === false ? 'fail' : ''}" data-id="${r.id}">
+    const cls = [ok === false ? 'fail' : '', (dataIdx++ % 2) ? 'alt' : ''].filter(Boolean).join(' ');
+    html += `<tr class="${cls}" data-id="${r.id}">
       <td class="name"><div class="name-wrap">
         <span class="item-no">${esc(r.item)}</span>${nameCell}
         <span class="unit">${esc(r.unit)}</span>
@@ -599,7 +618,9 @@ function renderTable() {
   html += `</tbody></table></div>`;
   host.innerHTML = html;
 
-  $('cnt').innerHTML = `전체 ${rows.length}개 중 <b>${filled}개</b> 입력됨`;
+  const hidden = rows.length - base.length;
+  $('cnt').innerHTML = `${base.length}개 중 <b>${filled}개</b> 입력됨`
+    + (hidden ? ` <span style="color:var(--ash);">· ${hidden}개 숨김</span>` : '');
   $('expand-all').style.display = (collapsed.size || onlyFilled) ? '' : 'none';
   bindTable();
   updateLive(v);
@@ -690,7 +711,10 @@ function refreshComputed() {
     if (st && c) c.textContent = `${st.f}/${st.t} 입력`;
   }
   const filled = rows.filter(hasDose).length;
-  $('cnt').innerHTML = `전체 ${rows.length}개 중 <b>${filled}개</b> 입력됨`;
+  const shownCnt = showAll ? rows.length : rows.filter(r => r.main || hasDose(r)).length;
+  const hidden = rows.length - shownCnt;
+  $('cnt').innerHTML = `${shownCnt}개 중 <b>${filled}개</b> 입력됨`
+    + (hidden ? ` <span style="color:var(--ash);">· ${hidden}개 숨김</span>` : '');
   updateLive(v);
 }
 
@@ -903,6 +927,7 @@ function runSearch(text) {
 function applyProduct(item) {
   $('q-results').style.display = 'none';
   $('q').value = item.name;
+  $('tb-product').textContent = item.name;
   const notes = [];
 
   const parsed = item.ingr ? _parseExcelIngredients(item.ingr) : [];
@@ -973,8 +998,8 @@ function fillNums(id, n, sel) {
 }
 
 function onChapter(key, keepNote) {
-  chKey = key; form = ''; collapsed.clear(); onlyFilled = false;
-  $('only-filled').checked = false;
+  chKey = key; form = ''; collapsed.clear(); onlyFilled = false; showAll = false;
+  $('only-filled').checked = false; $('show-all').checked = false;
   $('main').classList.remove('result-open');
   if (!keepNote) showNote([]);
   $('result-body').innerHTML = `<div class="empty"><span class="tri">▲</span><span class="t">검토 실행을 누르세요</span></div>`;
@@ -1012,6 +1037,7 @@ document.addEventListener('DOMContentLoaded', () => {
   ['sel-age', 'freq-min', 'freq-max', 'amt-min', 'amt-max'].forEach(id =>
     $(id).addEventListener('change', renderTable));
   $('only-filled').addEventListener('change', e => { onlyFilled = e.target.checked; renderTable(); });
+  $('show-all').addEventListener('change', e => { showAll = e.target.checked; renderTable(); });
   $('expand-all').addEventListener('click', () => {
     collapsed.clear(); onlyFilled = false; $('only-filled').checked = false; renderTable();
   });
