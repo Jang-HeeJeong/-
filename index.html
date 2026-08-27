@@ -98,27 +98,24 @@
 
     /* 첫 화면 안내 — 장을 고르기 전에는 빈 표 대신 이것을 보여준다 */
     #start-hint {
-      margin: 6px 0 4px; padding: 22px 24px;
-      background: var(--white); box-shadow: var(--ring2); border-radius: var(--r);
+      margin: 0 0 16px; padding: 16px 18px;
+      background: var(--paper); box-shadow: var(--ring2); border-radius: var(--r);
     }
     #start-hint .sh-title {
-      font-size: 15px; font-weight: 600; color: var(--obsidian);
-      letter-spacing: -.01em; margin-bottom: 16px;
+      font-size: 13px; font-weight: 600; color: var(--obsidian);
+      letter-spacing: -.01em; margin-bottom: 12px;
     }
-    #start-hint .sh-steps { display: flex; flex-direction: column; gap: 12px; }
-    #start-hint .sh-step { display: flex; gap: 11px; align-items: flex-start; }
+    #start-hint .sh-steps { display: flex; gap: 22px; flex-wrap: wrap; }
+    #start-hint .sh-step { display: flex; gap: 9px; align-items: flex-start; flex: 1 1 240px; }
+    /* 번호는 안내일 뿐이니 조용하게 */
     #start-hint .sh-num {
-      flex: 0 0 22px; height: 22px; border-radius: 50%;
-      background: var(--obsidian); color: #fff;
-      font-size: 11.5px; font-weight: 600;
+      flex: 0 0 19px; height: 19px; border-radius: 50%;
+      background: var(--white); color: var(--stone); box-shadow: var(--ring2);
+      font-size: 11px; font-weight: 600;
       display: inline-flex; align-items: center; justify-content: center;
     }
-    #start-hint .sh-step b { font-size: 13.5px; font-weight: 600; color: var(--obsidian); }
-    #start-hint .sh-step p { margin: 3px 0 0; font-size: 12px; color: var(--stone); line-height: 1.65; }
-    #start-hint .sh-go { margin-top: 9px; padding: 6px 14px; font-size: 12.5px; height: auto; }
-    #start-hint .sh-or {
-      font-size: 11px; color: var(--graphite); padding-left: 33px;
-    }
+    #start-hint .sh-step b { font-size: 12.5px; font-weight: 600; color: var(--obsidian); }
+    #start-hint .sh-step p { margin: 3px 0 0; font-size: 11.5px; color: var(--stone); line-height: 1.6; }
 
     /* 입력 단계를 눈으로 나눈다 — 용법용량 / 배합 성분 */
     .input-step {
@@ -250,7 +247,7 @@
     .mx-table thead tr.mx-hdr2 th {
       background: var(--paper); color: var(--graphite);
       font-size: 10px; font-weight: 500;
-      padding: 4px 5px; top: 27px;
+      padding: 4px 5px; top: 0;   /* 실제 값은 syncStickyHeaders()가 정한다 */
     }
     /* 머리글 밑선은 표 전체를 가로지르는 한 줄로.
        위아래 2단이라 그냥 두면 묶음 칸 아래에만 선이 하나 더 생긴다. */
@@ -590,17 +587,40 @@
   <section class="panel" id="panel-input">
     <div class="panel-body">
 
+      <!-- 아직 아무것도 안 골랐을 때: 무엇부터 할지 먼저 알려준다 -->
+      <div id="start-hint">
+        <div class="sh-title">어디부터 시작할까요?</div>
+        <div class="sh-steps">
+          <div class="sh-step">
+            <span class="sh-num">1</span>
+            <div>
+              <b>제품명으로 검색</b>
+              <p>허가목록에서 찾아 장·제형·성분을 한 번에 채웁니다. 대부분 이 방법이 빠릅니다.</p>
+            </div>
+          </div>
+          <div class="sh-step">
+            <span class="sh-num">2</span>
+            <div>
+              <b>적용 기준을 직접 선택</b>
+              <p>아래에서 장과 제형을 고르면 해당 장의 배합 성분표가 나타납니다.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+
       <!-- 기본 정보 2열 -->
       <div class="form-row">
         <div class="form-group">
-          <label>적용 기준</label>
-          <select id="sel-chapter" disabled>
+          <label>적용 기준 <span class="need">✎ 선택</span></label>
+          <select id="sel-chapter" class="need-input" disabled>
             <option value="">— 로드 중 —</option>
           </select>
         </div>
         <div class="form-group">
-          <label>제형</label>
-          <select id="sel-dosage-form" disabled>
+          <label>제형 <span class="need">✎ 선택</span></label>
+          <select id="sel-dosage-form" class="need-input" disabled>
             <option value="">— 장 선택 후 —</option>
           </select>
         </div>
@@ -653,29 +673,6 @@
           <button id="btn-add-dosage" class="btn btn-add" style="padding:3px 10px; font-size:13px;">+ 연령 추가</button>
         </div>
         <div id="dosage-rows-container"></div>
-      </div>
-
-      <!-- 아직 아무것도 안 골랐을 때: 표 대신 무엇부터 할지 알려준다 -->
-      <div id="start-hint">
-        <div class="sh-title">어디부터 시작할까요?</div>
-        <div class="sh-steps">
-          <div class="sh-step">
-            <span class="sh-num">1</span>
-            <div>
-              <b>제품명으로 검색</b>
-              <p>허가목록에서 찾아 장·제형·성분을 한 번에 채웁니다. 대부분 이 방법이 빠릅니다.</p>
-              <button class="btn btn-primary sh-go" onclick="document.getElementById('unified-search').focus()">검색창으로 이동</button>
-            </div>
-          </div>
-          <div class="sh-or">또는</div>
-          <div class="sh-step">
-            <span class="sh-num">2</span>
-            <div>
-              <b>적용 기준을 직접 선택</b>
-              <p>위에서 장과 제형을 고르면 해당 장의 배합 성분표가 나타납니다.</p>
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- 성분 섹션 -->
@@ -752,6 +749,7 @@
       </div>
 
       <!-- 첨가제 섹션 -->
+      <div id="fg-excipient" style="display:none;">
       <div class="section-title" style="margin-top:14px;">기타 첨가제 <span style="font-size:10px;font-weight:400;color:var(--graphite);">(사용상 주의사항 추가 적용)</span></div>
       <div class="excipient-add-row">
         <select id="excipient-select" onchange="addExcipient()">
@@ -784,11 +782,12 @@
         </select>
       </div>
       <div class="excipient-tags" id="excipient-tags"></div>
+      </div>
 
     </div>
 
     <!-- 하단 고정 액션바: 실시간 요약 + 저장 + 검토 실행 -->
-    <div class="panel-footer">
+    <div class="panel-footer" id="action-bar" style="display:none;">
       <div id="live-summary"><span>성분 배합량을 입력하면 실시간으로 집계됩니다</span></div>
       <button class="btn btn-add" onclick="saveProduct()"
               title="현재 입력 내용을 제품명으로 저장">💾 저장</button>
@@ -1222,9 +1221,11 @@ function onChapterChange(key) {
   const useClassicDosage = ch && !isCh2Now && !isCh1Now && !mxEarly;
   $('fg-dosage-section').style.display = useClassicDosage ? '' : 'none';
   $('fg-product-name').style.display  = ch ? '' : 'none';
-  // 아직 장을 고르지 않았으면 빈 표 대신 "어디부터 시작할까요?" 안내를 보여준다
+  // 아직 장을 고르지 않았으면 성분표·첨가제·액션바를 감추고 안내만 보여준다
   { const hint = $('start-hint'); if (hint) hint.style.display = ch ? 'none' : ''; }
   { const st = document.querySelector('.section-title[data-sec="ingr"]'); if (st) st.style.display = ch ? '' : 'none'; }
+  { const ex = $('fg-excipient');  if (ex) ex.style.display = ch ? '' : 'none'; }
+  { const ab = $('action-bar');    if (ab) ab.style.display = ch ? '' : 'none'; }
   $('btn-add-dosage').disabled = !ch;
   if (useClassicDosage) renderDosageRows();
 
@@ -1791,6 +1792,19 @@ function addCh1ElevatedAgeRow(minMonths) {
   renderCh1Integrated();
 }
 
+/* 고정(sticky) 머리글 — 아래 단이 붙을 높이를 실제로 재서 맞춘다.
+   CSS에 27px처럼 못박아 두면 표마다 머리글 높이가 달라 1px씩 어긋나고,
+   그 어긋난 선이 "두께가 다른 실선"으로 보인다. */
+function syncStickyHeaders(root) {
+  const scope = root || document;
+  for (const h1 of scope.querySelectorAll('tr.mx-hdr1')) {
+    const h = Math.round(h1.getBoundingClientRect().height);
+    if (!h) continue;
+    const h2 = h1.parentElement?.querySelector('tr.mx-hdr2');
+    if (h2) for (const th of h2.children) th.style.top = h + 'px';
+  }
+}
+
 function renderCh1Integrated() {
   const wrap = $('ch1-integrated-wrap');
   if (!wrap || currentKey !== '제1장_비타민미네랄') return;
@@ -2012,7 +2026,7 @@ function renderCh1Integrated() {
         <th rowspan="2" style="min-width:60px;text-align:center;white-space:nowrap;">항목</th>
         <th rowspan="2" style="min-width:140px;text-align:center;">성분명</th>
         <th rowspan="2" class="mx-th-input" style="min-width:68px;">배합량 ✎</th>
-        <th rowspan="2" class="mx-th-input mx-th-unit">단위 ✎</th>
+        <th rowspan="2" class="mx-th-unit">단위</th>
         <th colspan="2" class="mx-th-std">표제기 기준 (1일)</th>
         <th colspan="2" class="mx-th-prod">제품 1일 함량</th>
         <th rowspan="2" style="min-width:62px;">판정</th>
@@ -2398,6 +2412,7 @@ function renderCh1Integrated() {
   html += `</div>`;
 
   wrap.innerHTML = html;
+  syncStickyHeaders(wrap);
 
   // ── 이벤트 바인딩 ──
 
@@ -3072,6 +3087,7 @@ function renderCh2Integrated() {
   html += `</div></div>`;
 
   wrap.innerHTML = html;
+  syncStickyHeaders(wrap);
 
   /* ── 이벤트 바인딩 ── */
   // 연령 변경
