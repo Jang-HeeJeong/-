@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "표제기",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["serve.py", "7777"],
+      "port": 7777
+    }
+  ]
+}

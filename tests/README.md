@@ -7,7 +7,7 @@
 로컬 서버로 `tests.html`을 엽니다. (파일을 직접 더블클릭하면 브라우저 보안 정책 때문에 iframe 내용을 읽지 못합니다.)
 
 ```bash
-python -m http.server 7777
+python serve.py
 ```
 
 그다음 브라우저에서 `http://localhost:7777/tests.html` 로 접속합니다.

@@ -810,6 +810,8 @@
 <script src="app/표제기_데이터.js"></script>
 <!-- 판정 로직 (배합 규칙 개정 시 수정 대상) -->
 <script src="app/판정_규칙.js"></script>
+<!-- 허가목록 (제품 검색용) -->
+<script src="app/허가목록.js"></script>
 
 <script>
 // 표준제조기준 데이터는 app/표제기_데이터.js 로 분리됨 (__EMBEDDED_DB__)
@@ -7862,7 +7864,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ════════════════════════════════════════════════════════════════════
 // 허가목록 엑셀 DB
 // ════════════════════════════════════════════════════════════════════
-const _BUILTIN_PRODUCT_DB = [{"name": "엠지파워연질캡슐", "ingr": "산화마그네슘 414.53mg\n토코페롤아세테이트 500mg"}, {"name": "비타미노펜연질캡슐", "ingr": "티아민질산염4mg,  아세트아미노펜250mg"}, {"name": "안티노을연질캡슐", "ingr": "셀레늄함유건조효모 39.46mg  \nβ-카로틴현탁액30% 50.00mg  \n아스코르브산 500.000mg  \n토코페롤 363.64mg"}, {"name": "순소청룡탕액", "ingr": "감초,  건강,  계지,  마황,  반하,  세신,  오미자,  작약"}, {"name": "순갈근탕액", "ingr": "작약,  계지,  감초,  갈근,  마황,  대추,  건강"}, {"name": "순삼소천액(삼소음액)", "ingr": "갈근,  감초,  건강,  길경,  대추,  반하,  복령,  인삼,  자소엽,  전호,  지각,  진피"}, {"name": "순쌍화액(쌍화탕액)", "ingr": "감초,  당귀,  대추,  생강,  숙지황,  육계,  작약,  천궁,  황기"}, {"name": "폴세틴캡슐10밀리그램(플루옥세틴염산염)", "ingr": "플루옥세틴염산염 10mg"}, {"name": "일이관지반하사심탕과립(반하사심탕엑스과립)", "ingr": "황금 1g, 건강 0.83g, 감초 1g, 대추 1g, \n황련 0.3mg, 반하 1.67g, 인삼 1g"}, {"name": "비타코플러스연질캡슐", "ingr": "아스코르브산 50.00mg  \n레티놀팔미테이트 1.471mg  \n콜레칼시페롤농축물(유상형) 0.40mg  \n리보플라빈 1.00mg  \n티아민염산염 1.00mg  \n니코틴산아미드 20.00mg"}, {"name": "헤모퀸탑연질캡슐", "ingr": "글루콘산제일철수화물 200.00mg  \n니코틴산아미드 25.00mg  \n피리독신염산염 30.00mg  \n시아노코발라민1000배산 10.00mg  \n폴산 0.50mg  \n오로트산수화물 10.00mg  \n아스코르브산 50.00mg"}, {"name": "시스틴500연질캡슐(L-시스틴)", "ingr": "L-시스틴 500mg"}, {"name": "와이디1000연질캡슐", "ingr": "토코페롤아세테이트 10.00mg  \n농축콜레칼시페롤(유상) 1.00mg"}, {"name": "카세롤연질캡슐", "ingr": "셀레늄함유건조효모 38.462mg  \nβ-카로틴현탁액30% 50.00mg  \n아스코르브산 500.00mg  \n토코페롤 363.64mg"}, {"name": "일이관지위령탕과립", "ingr": "감초 0.67g, 건강 0.67g, 후박 1g, 진피 1g, \n택사 1g, 계지 0.83g, 창출 1g, 복령 1g, 대추 1g, \n저령 1g, 백출 1g, 작약 1g"}, {"name": "비메가연질캡슐300밀리그램(이코사펜트산에틸)", "ingr": "이코사펜트산에틸 300mg"}, {"name": "리버큐엔연질캡슐(밀크시슬열매건조엑스)", "ingr": "밀크시슬엑스 350.00mg"}, {"name": "실리토닉연질캡슐(밀크시슬열매건조엑스)", "ingr": "밀크시슬엑스 175.00mg"}, {"name": "미리코프파워연질캡슐", "ingr": "DL-메틸에페드린염산염 25.000mg\n클로르페니라민말레산염 4.000mg\n구아이페네신 80.000mg\n덱스트로메토르판브롬화수소산염수화물 18.000mg"}, {"name": "순갈근탕에이액", "ingr": "갈근,감초,건강,대추,마황,아세트아미노펜,육계,작약"}, {"name": "일이관지맥문동탕과립(맥문동탕엑스과립)", "ingr": "맥문동 3.33g, 반하 1.67g, 갱미 3.33g, \n대추 1 g, 인삼 0.67g, 감초 0.67g"}, {"name": "일이관지천왕보심단액(천왕보심단)", "ingr": "생지황 500mg, 인삼 62.5mg, 현삼 62.5mg, \n단삼 62.5mg, 원지 62.5mg, 길경 62.5mg, \n복령 62.5mg, 오미자 125mg, 당귀 125mg,\n천문동 125mg, 맥문동 125mg, 백자인 125mg, 산조인 125mg, 황련 250mg"}, {"name": "알피레보플록사신정250mg(레보플록사신수화물)", "ingr": "레보플록사신수화물 256.15mg"}, {"name": "노즈알연질캡슐(펙소페나딘염산염)", "ingr": "펙소페나딘염산염 60mg"}, {"name": "글리피린정(글리메피리드)", "ingr": "글리메피리드 2mg"}, {"name": "알피세파클러캡슐250밀리그램(세파클러수화물)", "ingr": ""}, {"name": "레드코프에프연질캡슐", "ingr": "아세트아미노펜 250.00mg  \n수도에페드린염산염 22.50mg  \n클로르페니라민말레산염 1.90mg  \n덱스트로메토르판브롬화수소산염수화물 8.00mg"}, {"name": "이브큐레이디연질캡슐", "ingr": "이부프로펜 200.00mg  \n파마브롬 25.00mg"}, {"name": "토라메이트정(토피라메이트)", "ingr": "토피라메이트 100mg"}, {"name": "알피바스타틴정20mg(아토르바스타틴칼슘삼수화물)", "ingr": ""}, {"name": "알피클로피아정(클로피도그렐황산염)", "ingr": "클로피도그렐황산염 97.875mg"}, {"name": "디큐펜맥스정500밀리그램(아세트아미노펜)", "ingr": "아세트아미노펜 500mg"}, {"name": "엑쎈코연질캡슐", "ingr": "아세트아미노펜 200.000mg  \n브롬페니라민말레산염 2.660mg  \n슈도에페드린염산염 15.000mg"}, {"name": "엑쎈콜연질캡슐", "ingr": "아세트아미노펜 200.00mg  \n클로르페니라민말레산염 1.25mg  \ndl-메틸에페드린염산염 12.50mg  \n슈도에페드린염산염 15.00mg  \n덱스트로메토르판브롬화수소산염수화물 8.00mg  \n구아이페네신 41.66mg"}, {"name": "캐롤비노즈연질캡슐", "ingr": "아세트아미노펜 180.00밀리그램  \n브롬페니라민말레산염 2.66밀리그램  \n슈도에페드린염산염 15.00밀리그램  \n리보플라빈 2.00밀리그램"}, {"name": "캐롤비코프연질캡슐", "ingr": "아세트아미노펜 180.00밀리그램  \n클로르페니라민말레산염 1.25밀리그램  \n클로페라스틴염산염 4.00밀리그램  \n구아이페네신 41.60밀리그램  \n리보플라빈 2.00밀리그램"}, {"name": "캐롤비콜드연질캡슐", "ingr": "아세트아미노펜 180.00밀리그램  \n클로르페니라민말레산염 1.25밀리그램  \n슈도에페드린염산염 15.00밀리그램  \ndl-메틸에페드린염산염 12.50밀리그램  \n덱스트로메토르판브롬화수소산염수화물 8.00밀리그램  \n구아이페네신 20.84밀리그램  \n리보플라빈 2.00밀리그램"}, {"name": "알피모피드정(모사프리드시트르산염수화물)", "ingr": "모사프리드시트르산염수화물 5.29mg"}, {"name": "알피디연질캡슐0.5마이크로그램(알파칼시돌)", "ingr": "알파칼시돌 0.5㎍"}, {"name": "알피디연질캡슐1마이크로그램(알파칼시돌)", "ingr": "알파칼시돌 1㎍"}, {"name": "알피록소펜정(록소프로펜나트륨수화물)", "ingr": "록소프로펜나트륨수화물 68.1mg"}, {"name": "디펙타민연질캡슐(디펜히드라민염산염)", "ingr": "디펜히드라민염산염 50mg"}, {"name": "알피레드정(레보드로프로피진)", "ingr": "레보드로프로피진 60mg"}, {"name": "제로콜연질캡슐", "ingr": "아세트아미노펜 325.00mg  \n클로르페니라민말레산염 2.00mg  \n슈도에페드린염산염 30.00mg  \n덱스트로메토르판브롬화수소산염수화물 14.00mg  \n구아이페네신 80.00mg"}, {"name": "스피콜드연질캡슐", "ingr": "아세트아미노펜 200mg\n클로르페니라민말레산염 1.25mg\ndl-메틸에페드린염산염 12.5mg\n슈도에페드린염산염 15mg\n덱스트로메토르판브롬화수소산염수화물 8mg\n구아이페네신 41.6mg"}, {"name": "레드콜연질캡슐", "ingr": "아세트아미노펜 325.00mg  \n수도에페드린염산염 30.00mg  \n덱스트로메토르판브롬화수소산염수화물 16.00mg 클로르페니라민말레산염 2.50mg"}, {"name": "미리콜연질캡슐", "ingr": "클로르페니라민말레산염 2.00mg  \n수도에페드린염산염 30.00mg  \n덱스트로메토르판브롬화수소산염수화물 12.00mg \n구아이페네신 80.00mg  \n아세트아미노펜 325.00mg"}, {"name": "에스빌연질캡슐(덱시부프로펜)", "ingr": "덱시부프로펜 300mg"}, {"name": "디큐펜프로연질캡슐(이부프로펜)", "ingr": "이부프로펜 200mg"}, {"name": "에이스펜연질캡슐(나프록센)", "ingr": "나프록센 250mg"}, {"name": "콜스탑연질캡슐", "ingr": "아세트아미노펜 325.00mg  \n구아이페네신 80.00mg  \n클로르페니라민말레산염 2.00mg  \n수도에페드린염산염 30.00mg  \n덱스트로메토르판브롬화수소산염수화물 10.00mg"}, {"name": "그린콜연질캡슐", "ingr": "아세트아미노펜 325.00mg  \n클로르페니라민말레산염 2.50mg  \n수도에페드린염산염 30.00mg"}, {"name": "미그펜400연질캡슐(이부프로펜)", "ingr": "이부프로펜 400mg"}, {"name": "알피올로파타딘정(올로파타딘염산염)", "ingr": "올로파타딘염산염 5mg"}, {"name": "리드콜연질캡슐", "ingr": "아세트아미노펜 200.00mg  \n클로르페니라민말레산염 1.25mg  \ndl-메틸에페드린염산염 12.50mg  \n수도에페드린염산염 15.00mg  \n덱스트로메토르판브롬화수소산염수화물 8.00mg  \n구아이페네신 25.00mg"}, {"name": "쉐러콜에스연질캡슐", "ingr": "아세트아미노펜 200.00mg  \n수도에페드린염산염 15.00mg  \n클로르페니라민말레산염 1.25mg  \ndl-메틸에페드린염산염 6.25mg  \n티페피딘시트르산염 5.00mg"}, {"name": "모아노즈연질캡슐", "ingr": "아세트아미노펜 200.00mg  \n클로르페니라민말레산염 1.25mg  \n수도에페드린염산염 15.00mg"}, {"name": "알피라베정10mg(라베프라졸나트륨)", "ingr": "라베프라졸나트륨 10mg"}, {"name": "아이간유연질캡슐", "ingr": "리보플라빈 3.00mg\n티아민질산염 6.30mg\n콘드로이틴설페이트나트륨 25.00mg\n간유 500.00mg"}, {"name": "엑쎈코프에스연질캡슐", "ingr": "아세트아미노펜 200mg,  dl-메틸에페드린염산염 12.5mg,  덱스트로메토르판 8mg,  구아이페네신 41.66mg"}, {"name": "토라메이트정25mg(토피라메이트)", "ingr": "토피라메이트 25mg"}, {"name": "비비코에스연질캡슐", "ingr": "아세트아미노펜 200.00mg  \n수도에페드린염산염 15.00mg  \nd-클로르페니라민말레산염 0.58mg  \ndl-메틸에페드린염산염 12.50mg"}, {"name": "모아콜연질캡슐", "ingr": "아세트아미노펜 200mg\n클로르페니라민말레산염 1.25mg\ndl-메틸에페드린염산염 12.5mg\n슈도에페드린염산염 14mg\n덱스트로메토르판브롬화수소산염수화물 8mg\n구아이페네신 41.6mg"}, {"name": "콜감나이트연질캡슐", "ingr": "아세트아미노펜 200.00mg\n디펜히드라민염산염 12.50mg\n슈도에페드린염산염 15.00mg\nDL-메틸에페드린염산염 12.50mg\n구아이페네신 41.66mg\n덱스트로메토르판브롬화수소산염수화물 8.00mg\n감초가루 25.00mg"}, {"name": "알피에소정20mg(에스오메프라졸마그네슘이수화물)", "ingr": "에스오메프라졸마그네슘이수화물 21.69mg"}, {"name": "알피라베정20mg(라베프라졸나트륨)", "ingr": "라베프라졸나트륨 20mg"}, {"name": "알피에소정40mg(에스오메프라졸마그네슘이수화물)", "ingr": "에스오메프라졸마그네슘이수화물 43.38mg"}, {"name": "탐슬로서방정0.2밀리그램(탐스로신염산염)", "ingr": ""}, {"name": "알피레보플록사신정100밀리그램(레보플록사신수화물)", "ingr": ""}, {"name": "레드넥콜연질캡슐", "ingr": "덱스트로메토르판 16mg,  구아이페네신 80mg,  클로르페니라민 4mg,  dl-메틸에페드린 25mg"}, {"name": "부스트젤리", "ingr": "타우린 250mg\n아스코르브산 50mg\n티아민질산염 5mg\n리보플라빈부티레이트 3mg\n우루소데옥시콜산 5mg"}, {"name": "셀레뉴연질캡슐", "ingr": "아스코르브산 500.000mg,  셀레늄함유건조효모 19.231mg,  레티놀팔미테이트 1.176mg,  유비데카레논 5.000mg,  우르소데옥시콜산 10.000mg,  토코페롤아세테이트 200.000mg,  산화아연 17.430mg"}, {"name": "징코셀정(은행엽건조엑스)", "ingr": "은행엽엑스 80mg"}, {"name": "써큐엔연질캡슐(은행엽건조엑스)", "ingr": "은행엽엑스 120mg"}, {"name": "알피시프록정250mg(시프로플록사신염산염수화물)", "ingr": "시프로플록사신염산염수화물 291mg"}, {"name": "알피레바미피드정", "ingr": "레바미피드 100mg"}, {"name": "엠지플러스큐연질캡슐", "ingr": "산화마그네슘 349mg,  토코페롤아세테이트 500mg,  벤포티아민 25mg,  리보플라빈 25mg,  유비데카레논 5mg,  피리독신염산염 50mg,  시아노코발라민 0.5mg,  감마오리자놀 5mg"}, {"name": "기가렉스연질캡슐", "ingr": "L-카르보시스테인 125.00mg  \n브롬헥신염산염 2.00mg"}, {"name": "목기천연질캡슐", "ingr": "덱스트로메토르판브롬화수소산염수화물 7.50mg  \n노스카핀염산염수화물 8.00mg  \n트리메토퀴놀염산염수화물 1.00mg  \n구아이페네신 37.50mg  \n클로르페니라민말레산염 1.50mg"}, {"name": "두캅스에이연질캡슐", "ingr": "덱스트로메토르판브롬화수소산염수화물 15.00mg  \n노스카핀염산염수화물 20.00mg  \n트리메토퀴놀염산염수화물 2.00mg  \n구아이페네신 75.00mg  \n클로르페니라민말레산염 3.00mg"}, {"name": "제로코프연질캡슐", "ingr": "덱스트로메토르판브롬화수소산염수화물 20.00mg  \n클로르페니라민말레산염 4.00mg  \ndl-메틸에페드린염산염 25.00mg  \n구아이페네신 95.00mg"}, {"name": "기가에이연질캡슐", "ingr": "덱스트로메토르판브롬화수소산염수화물 15.00mg \n노스카핀염산염수화물 20.00mg  \n트리메토퀴놀염산염수화물 2.00mg  \n구아이페네신 75.00mg  \nd-클로르페니라민말레산염 2.00mg"}, {"name": "푸푸에프연질캡슐", "ingr": "클로르페니라민말레산염 4.00mg  \ndl-메틸에페드린염산염 25.00mg  \n구아이페네신 100.00mg  \n덱스트로메토르판브롬화수소산염수화물 20.00mg"}, {"name": "블루콜엠연질캡슐", "ingr": "덱스트로메토르판브롬화수소산염수화물 20.00mg  \n구아이페네신 90.00mg  \n트리메토퀴놀염산염수화물 1.00mg"}, {"name": "썬비타민연질캡슐", "ingr": "리보플라빈 5mg\n농축콜레칼시페롤유 1mg\n우르소데옥시콜산 10mg"}, {"name": "알피티딘정20밀리그램(파모티딘)", "ingr": "파모티딘 20mg"}, {"name": "클리어딘연질캡슐(로라타딘)", "ingr": "로라타딘 10mg"}, {"name": "타이로펜연질캡슐(아세트아미노펜)", "ingr": "아세트아미노펜 325mg"}, {"name": "코큐헬씨타민포르테연질캡슐", "ingr": ""}, {"name": "코텐파워골드연질캡슐", "ingr": ""}, {"name": "알피사포정100밀리그램(사르포그렐레이트염산염)", "ingr": "사르포그렐레이트염산염 100mg"}, {"name": "비타미노펜스트롱연질캡슐", "ingr": "아세트아미노펜 500mg\n리보플라빈부티레이트 4mg"}, {"name": "팜스비타에이연질캡슐", "ingr": ""}, {"name": "오크맥틴정375밀리그램(아목시실린·클라불란산칼륨(2:1))", "ingr": "아목시실린수화물 250mg,  묽은클라불란산칼륨 212.73mg"}, {"name": "로스타정20밀리그램(로수바스타틴칼슘)", "ingr": "로수바스타틴칼슘 20.8mg"}, {"name": "코텐비타큐연질캡슐", "ingr": "레티놀팔미테이트 2.941mg  \n농축콜레칼시페롤유 0.400mg  \n토코페롤아세테이트 30.000mg  \n유비데카레논 10.000mg  \n아스코르브산 200.000mg  \n티아민질산염 10.000mg  \n리보플라빈 10.000mg \n니코틴산아미드 10.000mg  \n피리독신염산염 6.000mg  \n폴산 0.400mg  \n시아노코발라민 0.018mg  \n판토텐산칼슘 30.000mg  \n셀레늄함유건조효모 38.462mg  \n크롬함유건조효모 38.462mg \n푸마르산철 54.760mg  \n산화마그네슘 65.810mg  \n산화아연 31.120mg    \n황산망간수화물 3.168mg  \n요오드화칼륨 0.196mg  \n황산칼륨 5.57mg"}, {"name": "웰빙멀티비타에스연질캡슐", "ingr": "레티놀팔미테이트 1.353mg  \n농축콜레칼시페롤(유상) 0.20mg  \n토코페롤아세테이트 10.00mg  \n티아민질산염 1.50mg  \n리보플라빈 1.20mg  \n니코틴산아미드 15.00mg  \n판토텐산칼슘 30.00mg \n피리독신염산염 1.40mg  \n시아노코발라민1000배산 2.50mg  \n아스코르브산 60.00mg  \n피토나디온5% 1.10mg  \n폴산 300.00mcg  \n비오틴 20.00mcg  \n셀레늄함유건조효모 15.385mg \n침강탄산칼슘 75.00mg  \n무수인산수소칼슘 102.00mg  \n푸마르산철 31.40mg  \n산화아연 6.20mg  \n산화마그네슘 10.00mg  \n황산망간수화물 2.00mg"}, {"name": "아이맥트레할로스점안액(트레할로스수화물)(1회용)", "ingr": "트레할로스수화물 33.16mg"}, {"name": "아이맥씨엠씨점안액1%(카르복시메틸셀룰로오스나트륨)(1회용)", "ingr": "카르복시메틸셀룰로오스나트륨 10mg"}, {"name": "알피플루코나졸캡슐", "ingr": "플루코나졸 50mg"}, {"name": "캐롤비코프플러스연질캡슐", "ingr": ""}, {"name": "알피가바펜틴캡슐300mg", "ingr": "가바펜틴 300mg"}, {"name": "알피가바펜틴캡슐100mg", "ingr": "가바펜틴 100mg"}, {"name": "비타콜연질캡슐", "ingr": ""}, {"name": "이브듀얼연질캡슐", "ingr": ""}, {"name": "이브비듀얼연질캡슐", "ingr": ""}, {"name": "비프리연질캡슐", "ingr": "슈도에페드린염산염 60mg,  트리프롤리딘염산염수화물 2.5mg"}, {"name": "비프리스트롱연질캡슐", "ingr": ""}, {"name": "이지페인클린연질캡슐(클로닉신리시네이트)", "ingr": "클로닉신리시네이트 125mg"}, {"name": "아임파인-콜드연질캡슐", "ingr": ""}, {"name": "아르텍연질캡슐10mg(세티리진염산염)", "ingr": "세티리진염산염 10.00mg"}, {"name": "제스부틴정(트리메부틴말레산염)", "ingr": "말레인산트리메부틴 100mg"}, {"name": "디큐펜프로나이트연질캡슐", "ingr": "이부프로펜 200mg,  디펜히드라민염산염 25mg"}, {"name": "알피클래리정250mg(클래리트로마이신)", "ingr": "클래리트로마이신 250mg"}, {"name": "이지콜드플러스연질캡슐", "ingr": "dl-메틸에페드린염산염 12.5mg,  덱스트로메토르판브롬화수소산염수화물 8mg,  슈도에페드린염산염 15mg, 아세트아미노펜 200mg,  육계가루 17mg,  클로르페니라민말레산염 1.25mg"}, {"name": "오크맥틴정625밀리그램(아목시실린·클라불란산칼륨(4:1))", "ingr": "아목시실린수화물 500mg,  묽은클라불란산칼륨212.73mg"}, {"name": "이지콜드코프연질캡슐", "ingr": "구아이페네신 41.66mg,  노스카핀염산염수화물 5mg,  덱스트로메토르판브롬화수소산염수화물 8mg,  아세트아미노펜 200mg"}, {"name": "이지콜드노즈연질캡슐", "ingr": "dl-메틸에페드린염산염 12.5mg,  슈도에페드린염산염 15mg,  아세트아미노펜 200mg,  클로르페니라민말레산염 1.25mg"}, {"name": "마그포연질캡슐", "ingr": ""}, {"name": "하디큐노즈연질캡슐", "ingr": "아세트아미노펜 200.00mg  \n브롬페니라민말레산염 2.500mg\n슈도에페드린염산염 15.00mg"}, {"name": "알피바스타틴정10mg(아토르바스타틴칼슘삼수화물)", "ingr": ""}, {"name": "암로디정(암로디핀베실산염)", "ingr": "암로디핀베실산염 6.944mg"}, {"name": "엘리도스캡슐(에르도스테인)", "ingr": "에르도스테인 300mg"}, {"name": "이지페인릴리프연질캡슐", "ingr": "이부프로펜 200.00mg  \n파마브롬 24.00mg"}, {"name": "캐롤비콜드플러스연질캡슐", "ingr": ""}, {"name": "하디큐콜드연질캡슐", "ingr": "DL-메틸에페드린염산염 12.5mg,  덱스트로메토르판브롬화수소산염수화물 8mg,  슈도에페드린염산염 15mg,  아세트아미노펜 200mg,  클로르페니라민말레산염 1.25mg,  구아이페네신 41.5mg"}, {"name": "하디큐코프연질캡슐", "ingr": "DL-메틸에페드린염산염 12.5mg,  덱스트로메토르판브롬화수소산염수화물 8mg,  아세트아미노펜 200mg,  구아이페네신 41.66mg"}, {"name": "가스트큐정(반하사심탕)", "ingr": "반하 835.0mg,  황금 500.0mg,  건강 415.0mg,  인삼 500.0mg,  감초 500.0mg,  대추 500.0mg,  황련 165.0mg"}, {"name": "캐롤비노즈플러스연질캡슐", "ingr": ""}, {"name": "뉴클로페낙정(아세클로페낙)", "ingr": "아세클로페낙 100mg"}, {"name": "알피쿠쿠르비트연질캡슐(쿠쿠르비트종자유엑스(15~25→1))", "ingr": ""}, {"name": "페이지연질캡슐", "ingr": "구아이페네신 50mg,  덱스트로메토르판브롬화수소산염수화물 10mg,  클로르페니라민말레산염 1.5mg,  트리메토퀴놀염산염수화물 1mg,  노스카핀염산염수화물 8mg"}, {"name": "이브쎈듀얼연질캡슐", "ingr": ""}, {"name": "참노즈연질캡슐", "ingr": ""}, {"name": "참콜드연질캡슐", "ingr": ""}, {"name": "참코프연질캡슐", "ingr": ""}, {"name": "일이관지배농산급탕캡슐", "ingr": "감초 0.5g,  건강 0.17g,  길경 0.67g,  대추 0.5g,  작약 0.5g,  지실 0.5g"}, {"name": "일이관지은교산캡슐", "ingr": "감초 426mg,  금은화 710mg,  길경 426mg,  담죽엽 284mg,  두시 356mg,  박하 426mg,  연교 710mg,  영양각 22mg,  우방자 356mg,  형개 284mg"}, {"name": "일이관지소청룡탕과립(소청룡탕엑스과립)", "ingr": "마황 1g,  작약 1g,  건강 1g,  감초 1g,  계지 1g,  세신 1g,  오미자 1g,  반하 2g"}, {"name": "일이관지갈근탕과립(갈근탕엑스과립)", "ingr": "DL-메틸에페드린염산염 12.5mg,  덱스트로메토르판브롬화수소산염수화물 8mg,  슈도에페드린염산염 15mg,  아세트아미노펜 200mg,  클로르페니라민말레산염 1.25mg,  구아이페네신 41.5mg"}, {"name": "엠지플러스포엑스연질캡슐", "ingr": ""}, {"name": "알피칼리정(칼리디노게나제)", "ingr": "칼리디노게나제 50IU"}, {"name": "로스타정5mg(로수바스타틴칼슘)", "ingr": "로수바스타틴칼슘 5.20mg"}, {"name": "로스타정10mg(로수바스타틴칼슘)", "ingr": "로수바스타틴칼슘 10.40mg"}, {"name": "일이관지청폐탕과립", "ingr": "황금, 상백피, 행인, 맥문동, 건강, 감초, 치자, 진피, 복령, 오미자, 절패모, 대추, 길경, 천문동, 당귀"}, {"name": "덴티민연질캡슐(옥수수불검화정량추출물)(수출용)", "ingr": "옥수수불검화정량추출물 35mg"}, {"name": "란프라졸정(란소프라졸)(수출용)", "ingr": "란소프라졸 30mg"}, {"name": "블루콜연질캡슐(수출용)", "ingr": "구아이페네신 82.00mg  \n수도에페드린염산염 30.00mg  \n덱스트로메토르판브롬화수소산염수화물 16.00mg"}, {"name": "데삭연질캡슐10mg(이소트레티노인)(수출용)", "ingr": "이소트레티노인 10mg"}, {"name": "데삭연질캡슐20mg(이소트레티노인)(수출용)", "ingr": "이소트레티노인 20mg"}];
+// 허가목록은 app/허가목록.js 로 분리됨 (_BUILTIN_PRODUCT_DB)
 let _excelDB = [..._BUILTIN_PRODUCT_DB];
 
 function loadExcelDB(input) {
@@ -7965,133 +7967,28 @@ function searchUnified(query) {
 }
 
 /* 성분명 정규화: 공백·대소문자 무시 + "(비타민A로서)" 같은 괄호 주석 제거 */
-function _normIngrName(s) {
-  return String(s ?? '').replace(/\([^)]*\)/g, '').replace(/\s/g, '').toLowerCase();
-}
 
 /* 한 성분명의 표기 후보들
    예) "아미노에틸설폰산(타우린)" → ["아미노에틸설폰산", "아미노에틸설폰산타우린", "타우린"] */
-function _ingrAliases(name) {
-  const raw = String(name ?? '');
-  const out = new Set();
-  const push = v => {
-    const n = String(v ?? '').replace(/\s/g, '').toLowerCase();
-    if (n) out.add(n);
-  };
-  push(raw.replace(/\([^)]*\)/g, ''));                       // 괄호 주석 제거
-  push(raw.replace(/[()]/g, ''));                            // 괄호 기호만 제거
-  for (const m of raw.matchAll(/\(([^)]*)\)/g)) push(m[1]);   // 괄호 안 별칭
-  push(raw);
-  return [...out];
-}
 
 /* 한글 음절 분해 (초성/중성/종성) */
-function _hangulParts(ch) {
-  const c = ch.codePointAt(0) - 0xAC00;
-  if (c < 0 || c > 11171) return null;
-  return { cho: Math.floor(c / 588), jung: Math.floor((c % 588) / 28), jong: c % 28 };
-}
 
 /* 모음 표기 흔들림만 다른가 — "우루소…" vs "우르소…" 처럼 한 음절의 중성만 다른 경우.
    초성·종성이 같아야 하므로 "염산염" vs "질산염"(다른 염) 같은 것은 걸러진다. */
-function _vowelVariantOnly(a, b) {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] === b[i]) continue;
-    if (++diff > 1) return false;
-    const pa = _hangulParts(a[i]), pb = _hangulParts(b[i]);
-    if (!pa || !pb) return false;
-    if (pa.cho !== pb.cho || pa.jong !== pb.jong) return false;
-  }
-  return diff === 1;
-}
 
 /* 두 성분명의 일치 강도 — 3: 완전일치, 2: 부분일치, 1: 표기 흔들림, 0: 불일치.
    같은 항목 안에 여러 성분이 있을 때 가장 정확한 것을 고르기 위해 등급으로 반환한다. */
-function ingrMatchLevel(nameA, nameB) {
-  const A = _ingrAliases(nameA), B = _ingrAliases(nameB);
-  let best = 0;
-  for (const a of A) {
-    for (const b of B) {
-      if (!a || !b) continue;
-      if (a === b) return 3;
-      const shorter = a.length <= b.length ? a : b;
-      if (shorter.length < 3) continue;   // "물", "황" 등 짧은 이름의 부분일치 오탐 차단
-      if (a.includes(b) || b.includes(a)) best = Math.max(best, 2);
-      else if (shorter.length >= 5 && _vowelVariantOnly(a, b)) best = Math.max(best, 1);
-    }
-  }
-  return best;
-}
 
 /* 두 성분명이 같은 성분인지 */
-function ingrNamesEqual(nameA, nameB) {
-  return ingrMatchLevel(nameA, nameB) > 0;
-}
 
 /* 후보 목록에서 가장 정확하게 일치하는 항목을 고른다 */
-function bestIngrMatch(candidates, target, nameOf = (c => c)) {
-  let best = null, bestLv = 0;
-  for (const c of candidates) {
-    const lv = ingrMatchLevel(nameOf(c), target);
-    if (lv > bestLv) { best = c; bestLv = lv; }
-    if (bestLv === 3) break;
-  }
-  return bestLv ? { item: best, level: bestLv } : null;
-}
 
 /* 허가목록 성분 구성으로 적용 기준(장) 후보를 점수순으로 반환 */
-function rankChaptersByIngredients(parsed) {
-  const targets = (parsed || []).map(p => p.name).filter(Boolean);
-  if (!targets.length) return [];
-
-  const ranked = [];
-  for (const key of Object.keys(chaptersMap)) {
-    const names = chapterIngredientNames(key);
-    if (!names.length) continue;
-
-    let hits = 0;
-    for (const t of targets) {
-      if (names.some(n => ingrNamesEqual(n, t))) hits++;
-    }
-    if (hits) ranked.push({ key, hits, ratio: hits / targets.length, total: targets.length });
-  }
-  ranked.sort((a, b) => b.hits - a.hits || b.ratio - a.ratio);
-  return ranked;
-}
 
 /* 해당 장에서 배합 가능한 전체 성분명
    — 제1장은 기본 표시되지 않는 표3(기타성분)·표4(생약)까지 포함해야 한다 */
-function chapterIngredientNames(key) {
-  const names = [];
-  for (const g of (chaptersMap[key]?.ingredientGroups || [])) {
-    for (const n of (g.ingredients || [])) names.push(n);
-  }
-  if (key === '제1장_비타민미네랄') {
-    for (const it of ch1ExtraIngrCatalog()) names.push(it.ingr);
-  }
-  return names;
-}
 
 /* 제1장 표3(기타성분)·표4(생약)의 추가 가능 성분 목록 */
-function ch1ExtraIngrCatalog() {
-  const tables = DB['제1장_비타민미네랄']?.['표'] ?? {};
-  const out = [];
-  const collect = (tbl, type) => {
-    for (const item of (tables[tbl] ?? [])) {
-      const 항목 = item['항목'];
-      const names = Array.isArray(item['성분명']) ? item['성분명'] : [item['성분명']];
-      names.forEach((ingr, idx) => { if (ingr) out.push({ type, 항목, ingr, idx }); });
-    }
-  };
-  collect('표3_기타성분', 'etc');
-  collect('표4_생약',    'herb');
-  return out;
-}
-function inferChapterFromIngredients(parsed) {
-  return rankChaptersByIngredients(parsed)[0] ?? null;
-}
 /* 장 표시명 — [적용 기준] 드롭다운과 같은 문구를 쓴다 */
 function _chapterLabel(key) {
   const opt = [...($('sel-chapter')?.options ?? [])].find(o => o.value === key);
@@ -8099,35 +7996,8 @@ function _chapterLabel(key) {
 }
 
 /* 자동 선택 결과를 그대로 믿어도 되는지 (성분 대부분이 그 장에 속하는지) */
-function _isConfidentGuess(g) {
-  return !!g && g.hits >= 2 && g.ratio >= 0.6;
-}
 
 /* 제품명에서 제형을 추정 (장 자동 선택 시에만 사용) — 앞쪽 항목일수록 우선 */
-const FORM_NAME_HINTS = [
-  { form: '구강용해필름',  keys: ['구강용해필름', '필름'] },
-  { form: '경구용젤리제',  keys: ['젤리'] },
-  { form: '시럽제',        keys: ['시럽'] },
-  { form: '과립제',        keys: ['과립'] },
-  { form: '환제',          keys: ['환제'] },
-  { form: '산제',          keys: ['산제'] },
-  { form: '경구용 액제',   keys: ['내용액', '드링크', '액제'] },
-  { form: '캡슐제',        keys: ['캡슐'] },
-  { form: '정제',          keys: ['정'], endsWith: true },   // '정'은 흔한 글자라 어미일 때만
-];
-function inferFormFromName(name, forms) {
-  const n = String(name ?? '').replace(/\s/g, '');
-  if (!n || !forms?.length) return null;
-  for (const hint of FORM_NAME_HINTS) {
-    const hit = hint.endsWith ? hint.keys.some(k => n.endsWith(k))
-                              : hint.keys.some(k => n.includes(k));
-    if (!hit) continue;
-    // 해당 장이 실제로 허용하는 제형 문자열을 찾는다
-    const form = forms.find(f => f === hint.form || f.startsWith(hint.form));
-    if (form) return form;
-  }
-  return null;
-}
 
 
 /* 허가목록 성분 중 현재 장의 표에서 찾지 못한 것을 안내 */
@@ -8328,14 +8198,6 @@ function switchChapterForExcelProduct(key) {
   selectExcelProduct(idx);
 }
 
-function _parseExcelIngredients(ingrStr) {
-  const parts = ingrStr.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
-  return parts.map(part => {
-    const m = part.match(/^(.+?)\s*([\d.]+)\s*(mg|g|㎍|μg|IU|mL|ml|%|mcg)?$/i);
-    if (m) return { name: m[1].trim(), dose: m[2], unit: m[3] || 'mg' };
-    return { name: part, dose: '', unit: 'mg' };
-  });
-}
 </script>
 </body>
 </html>

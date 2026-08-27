@@ -7,7 +7,10 @@
 <title>의약품 표준제조기준 검토 — 새 화면(작업 중)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- 가이드가 지정한 Geist를 실제로 사용 (Google Fonts에 등재됨) -->
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- 한글은 Pretendard — Geist와 결이 맞는 기하학적 산세리프 -->
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css" rel="stylesheet">
 <style>
 /* ══════════════════════════════════════════════════════════════════
    디자인_가이드.md 적용 — Vercel 스타일을 조밀한 업무 화면에 맞게 조정
@@ -25,9 +28,10 @@
   --std-bg:    #f4f4f4;   --std-head:  #171717;  --std-head-fg: #ffffff;
   --prod-bg:   #ffffff;   --prod-head: #ebebeb;  --prod-head-fg: #171717;
 
-  /* 서체 — 한글이 대부분이므로 한글 폰트를 앞에 둔다 */
-  --sans: 'Pretendard', 'Inter', -apple-system, 'Malgun Gothic', sans-serif;
-  --mono: 'JetBrains Mono', 'D2Coding', Consolas, monospace;
+  /* 서체 — 라틴은 Geist, 한글은 Pretendard가 이어받는다.
+     Geist를 앞에 둬도 한글 글리프가 없어 자동으로 Pretendard로 넘어간다. */
+  --sans: 'Geist', 'Pretendard Variable', 'Pretendard', system-ui, sans-serif;
+  --mono: 'Geist Mono', 'Pretendard Variable', ui-monospace, Consolas, monospace;
 
   --r: 6px;                                    /* 모서리 */
   --ring:  0 0 0 1px rgba(0,0,0,.08);          /* 헤어라인 (그림자 대신) */
@@ -40,6 +44,7 @@ body {
   color: var(--obsidian); background: var(--paper);
   height: 100vh; display: flex; flex-direction: column; overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  font-feature-settings: "calt" 0, "rlig", "ss11";
 }
 
 /* ── 상단바 ── */
@@ -234,6 +239,26 @@ tr.fail td:first-child { box-shadow: inset 2px 0 0 var(--red); }
 #live .st.ok   { color: var(--green); }
 #live .st.fail { color: var(--red); }
 
+.search-box { position: relative; }
+.search-box input { width: 100%; height: 34px; }
+#q-results {
+  display: none; position: absolute; z-index: 40; left: 0; right: 0; top: calc(100% + 4px);
+  max-height: 260px; overflow-y: auto; background: var(--white);
+  border-radius: var(--r); box-shadow: var(--ring), 0 4px 14px rgba(0,0,0,.06);
+}
+#q-results .hit {
+  padding: 7px 12px; cursor: pointer; font-size: 12.5px;
+  border-bottom: 1px solid #f3f3f3; display: flex; align-items: baseline; gap: 8px;
+}
+#q-results .hit:last-child { border-bottom: none; }
+#q-results .hit:hover, #q-results .hit.on { background: var(--paper); }
+#q-results .hit .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#q-results .hit .ing {
+  font-family: var(--mono); font-size: 10px; color: var(--graphite);
+  flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 45%;
+}
+#q-results .none { padding: 10px 12px; font-size: 12px; color: var(--graphite); }
+
 .note { font-size: 11.5px; color: var(--stone); padding: 8px 10px; background: var(--paper); border-radius: var(--r); box-shadow: var(--ring2); margin-bottom: 10px; }
 .note b { color: var(--obsidian); font-weight: 500; }
 </style>
@@ -268,6 +293,15 @@ tr.fail td:first-child { box-shadow: inset 2px 0 0 var(--red); }
       </div>
 
       <div class="card-body">
+        <div class="section">
+          <span class="eyebrow">제품 검색</span>
+          <div class="search-box">
+            <input type="text" id="q" placeholder="제품명으로 허가목록 검색… (예: 부스트젤리)" autocomplete="off">
+            <div id="q-results"></div>
+          </div>
+          <div id="q-note" class="note" style="display:none;"></div>
+        </div>
+
         <div class="section">
           <span class="eyebrow">용법용량</span>
           <div class="row">
@@ -320,6 +354,7 @@ tr.fail td:first-child { box-shadow: inset 2px 0 0 var(--red); }
 
 <script src="app/표제기_데이터.js"></script>
 <script src="app/판정_규칙.js"></script>
+<script src="app/허가목록.js"></script>
 <script>
 /* ══════════════════════════════════════════════════════════════════
    새 화면 (작업 중) — 판정은 app/판정_규칙.js를 그대로 재사용한다.
@@ -551,7 +586,10 @@ function bindTable() {
   document.querySelectorAll('.js-dose').forEach(el => {
     el.addEventListener('input', e => {
       const r = rows.find(x => x.id === +e.target.dataset.id);
-      if (r) { r.dose = e.target.value; renderTable(); restoreFocus(e.target); }
+      // 표를 통째로 다시 그리면 입력칸이 교체되면서 커서가 맨 앞으로 간다.
+      // (number 입력은 setSelectionRange를 지원하지 않아 되돌릴 수도 없다 —
+      //  500을 치면 005가 되던 원인) 계산된 셀만 제자리에서 갱신한다.
+      if (r) { r.dose = e.target.value; refreshComputed(); }
     });
     el.addEventListener('keydown', e => {
       if (e.key !== 'Enter') return;
@@ -572,11 +610,45 @@ function bindTable() {
   }));
 }
 
-/* 표를 다시 그리면 포커스가 날아가므로 되돌린다 */
-function restoreFocus(prev) {
-  const id = prev.dataset.id;
-  const el = document.querySelector(`.js-dose[data-id="${id}"]`);
-  if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+/* 입력 중에는 표 구조를 건드리지 않고 계산 결과만 제자리에서 바꾼다.
+   입력칸 DOM이 그대로 유지되므로 커서 위치가 보존된다. */
+function refreshComputed() {
+  const v = validateNow();
+  const vmap = new Map((v?.itemResults ?? []).map(r => [r.ingr, r]));
+
+  for (const tr of document.querySelectorAll('.tbl tbody tr[data-id]')) {
+    const r = rows.find(x => x.id === +tr.dataset.id);
+    if (!r) continue;
+    const res = vmap.get(r.ingr);
+    const ok = hasDose(r) ? (res ? res.ok : null) : null;
+    const al = res?.allowed ?? {}, ac = res?.actual ?? {};
+    const critMin = res?.critMin ?? al.min1d ?? null;
+    const critMax = res?.critMax ?? al.max1d ?? null;
+    const dMin = res?.dailyMin ?? ac.min1d ?? null;
+    const dMax = res?.dailyMax ?? ac.max1d ?? null;
+    const td = tr.querySelectorAll('td');
+    const put = (i, val) => { td[i].innerHTML = val != null ? fmt(val) : '<span class="muted">—</span>'; };
+    put(1, critMin); put(2, critMax); put(4, dMin); put(5, dMax);
+    td[6].innerHTML = bar(dMin, dMax, critMin, critMax, ok, res?.useUnit ?? r.unit);
+    td[7].innerHTML = verdict(ok, res?.reason);
+    tr.classList.toggle('fail', ok === false);
+  }
+
+  // 그룹별 입력 개수와 하단 요약
+  const stat = new Map();
+  for (const r of rows) {
+    const st = stat.get(r.group) ?? { t: 0, f: 0 };
+    st.t++; if (hasDose(r)) st.f++;
+    stat.set(r.group, st);
+  }
+  for (const td of document.querySelectorAll('tr.grp td[data-grp]')) {
+    const st = stat.get(td.dataset.grp);
+    const c = td.querySelector('.gcount');
+    if (st && c) c.textContent = `${st.f}/${st.t} 입력`;
+  }
+  const filled = rows.filter(hasDose).length;
+  $('cnt').innerHTML = `전체 ${rows.length}개 중 <b>${filled}개</b> 입력됨`;
+  updateLive(v);
 }
 
 function updateLive(v) {
@@ -646,16 +718,117 @@ function runReview() {
   body.innerHTML = h;
 }
 
+/* ══════════ 제품 검색 ══════════
+   허가목록에서 제품을 고르면 성분 구성으로 적용 기준(장)과 제형을 추정하고
+   배합량을 채운다. 매칭·추정 로직은 app/판정_규칙.js의 것을 그대로 쓴다. */
+
+function productDB() {
+  try {
+    const saved = localStorage.getItem('excelProductDB');
+    if (saved) { const a = JSON.parse(saved); if (Array.isArray(a) && a.length) return a; }
+  } catch (e) { /* 저장본이 없으면 내장 목록 */ }
+  return typeof _BUILTIN_PRODUCT_DB !== 'undefined' ? _BUILTIN_PRODUCT_DB : [];
+}
+
+let qHits = [], qIdx = -1;
+
+function runSearch(text) {
+  const box = $('q-results');
+  const q = (text || '').trim().toLowerCase();
+  if (!q) { box.style.display = 'none'; return; }
+  qHits = productDB().filter(p => p.name.toLowerCase().includes(q)).slice(0, 20);
+  qIdx = -1;
+  if (!qHits.length) {
+    box.innerHTML = '<div class="none">검색 결과 없음</div>';
+    box.style.display = 'block'; return;
+  }
+  box.innerHTML = qHits.map((p, i) =>
+    `<div class="hit" data-i="${i}">
+       <span class="nm">${esc(p.name)}</span>
+       <span class="ing">${esc((p.ingr || '').split('\n').map(x => x.trim()).filter(Boolean).join(' · '))}</span>
+     </div>`).join('');
+  box.style.display = 'block';
+  box.querySelectorAll('.hit').forEach(el =>
+    el.addEventListener('mousedown', e => { e.preventDefault(); applyProduct(qHits[+el.dataset.i]); }));
+}
+
+function applyProduct(item) {
+  $('q-results').style.display = 'none';
+  $('q').value = item.name;
+  const notes = [];
+
+  const parsed = item.ingr ? _parseExcelIngredients(item.ingr) : [];
+  if (!parsed.length) {
+    showNote([`<b>${esc(item.name)}</b>의 성분 정보가 허가목록에 없습니다. 배합량은 직접 입력하세요.`]);
+    return;
+  }
+
+  // 적용 기준(장) 추정
+  const ranked = rankChaptersByIngredients(parsed);
+  const guess = ranked[0];
+  if (!guess) {
+    showNote([`<b>${esc(item.name)}</b>의 성분이 어느 장의 배합 성분표에도 없습니다.`,
+              `표준제조기준 대상 품목이 아닐 수 있습니다.`]);
+    return;
+  }
+  if (guess.key !== chKey) {
+    $('sel-ch').value = guess.key;
+    onChapter(guess.key, true);
+  } else {
+    // 같은 장이면 이전 제품 입력만 지운다
+    rows.forEach(r => { r.dose = ''; });
+  }
+  const score = `성분 ${guess.total}개 중 ${guess.hits}개 일치`;
+  notes.push(_isConfidentGuess(guess)
+    ? `적용 기준을 <b>${esc(chaptersMap[guess.key]?.label ?? guess.key)}</b>(으)로 자동 선택했습니다 (${score}).`
+    : `<b style="color:var(--red)">일치율이 낮습니다 (${score}).</b> 표준제조기준 대상 품목이 맞는지 확인하세요.`);
+
+  // 제형 추정
+  const gf = inferFormFromName(item.name, chaptersMap[guess.key]?.dosageForms);
+  if (gf) {
+    $('sel-form').value = gf; form = gf; $('unit-word').textContent = unitWord(form);
+    notes.push(`제형은 제품명을 보고 <b>${esc(gf)}</b>로 설정했습니다.`);
+  }
+
+  // 배합량 채우기
+  const missing = [];
+  for (const pi of parsed) {
+    const hit = bestIngrMatch(rows, pi.name, r => r.names.join(' '));
+    let target = null;
+    if (hit) {
+      // 항목 안에서 실제로 맞는 성분명을 고른다
+      const nm = bestIngrMatch(hit.item.names, pi.name);
+      if (nm) { hit.item.ingr = nm.item; hit.item.unit = unitFor(hit.item); }
+      target = hit.item;
+    }
+    if (target) { target.dose = pi.dose; }
+    else missing.push(pi.name);
+  }
+  if (missing.length)
+    notes.push(`<b style="color:var(--red)">이 장의 배합 성분표에 없어 반영되지 않은 성분 ${missing.length}개:</b> ${missing.map(esc).join(', ')}`);
+
+  showNote(notes);
+  renderTable();
+}
+
+function showNote(lines) {
+  const el = $('q-note');
+  if (!lines.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.innerHTML = lines.map(l => `<div>${l}</div>`).join('');
+  el.style.display = '';
+}
+
 /* ── 초기화 ── */
 function fillNums(id, n, sel) {
   $(id).innerHTML = Array.from({ length: n }, (_, i) =>
     `<option${i + 1 === sel ? ' selected' : ''}>${i + 1}</option>`).join('');
 }
 
-function onChapter(key) {
+function onChapter(key, keepNote) {
   chKey = key; form = ''; collapsed.clear(); onlyFilled = false;
   $('only-filled').checked = false;
   $('main').classList.remove('result-open');
+  if (!keepNote) showNote([]);
   $('result-body').innerHTML = `<div class="empty"><span class="tri">▲</span><span class="t">검토 실행을 누르세요</span></div>`;
 
   const ch = chaptersMap[key];
@@ -695,6 +868,22 @@ document.addEventListener('DOMContentLoaded', () => {
     collapsed.clear(); onlyFilled = false; $('only-filled').checked = false; renderTable();
   });
   $('btn-run').addEventListener('click', runReview);
+
+  $('q').addEventListener('input', e => runSearch(e.target.value));
+  $('q').addEventListener('focus', e => { if (e.target.value) runSearch(e.target.value); });
+  $('q').addEventListener('blur', () => setTimeout(() => { $('q-results').style.display = 'none'; }, 150));
+  $('q').addEventListener('keydown', e => {
+    const box = $('q-results');
+    if (box.style.display === 'none' || !qHits.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      qIdx = (qIdx + (e.key === 'ArrowDown' ? 1 : -1) + qHits.length) % qHits.length;
+      box.querySelectorAll('.hit').forEach((el, i) => el.classList.toggle('on', i === qIdx));
+      box.querySelector('.hit.on')?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault(); applyProduct(qHits[qIdx >= 0 ? qIdx : 0]);
+    } else if (e.key === 'Escape') { box.style.display = 'none'; }
+  });
 });
 </script>
 </body>

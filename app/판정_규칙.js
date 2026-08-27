@@ -1273,3 +1273,164 @@ function validateChapter9(tables, form, ageGroup, rows, dosage) {
   return { itemResults, ruleErrors, prop2Result, coeff, freqMin, freqMax, amtMax, Ⅴ란감소, dose1MaxFactor };
 }
 
+
+
+/* ══════════ 4) 성분명 매칭 · 적용 기준 추정 ══════════
+   허가목록의 성분 표기를 표준제조기준 성분명과 이어주고,
+   성분 구성으로 어느 장에 해당하는지 추정한다.
+   화면(DOM)을 건드리지 않으므로 어느 화면에서든 재사용된다. */
+
+function _normIngrName(s) {
+  return String(s ?? '').replace(/\([^)]*\)/g, '').replace(/\s/g, '').toLowerCase();
+}
+
+function _ingrAliases(name) {
+  const raw = String(name ?? '');
+  const out = new Set();
+  const push = v => {
+    const n = String(v ?? '').replace(/\s/g, '').toLowerCase();
+    if (n) out.add(n);
+  };
+  push(raw.replace(/\([^)]*\)/g, ''));                       // 괄호 주석 제거
+  push(raw.replace(/[()]/g, ''));                            // 괄호 기호만 제거
+  for (const m of raw.matchAll(/\(([^)]*)\)/g)) push(m[1]);   // 괄호 안 별칭
+  push(raw);
+  return [...out];
+}
+
+function _hangulParts(ch) {
+  const c = ch.codePointAt(0) - 0xAC00;
+  if (c < 0 || c > 11171) return null;
+  return { cho: Math.floor(c / 588), jung: Math.floor((c % 588) / 28), jong: c % 28 };
+}
+
+function _vowelVariantOnly(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] === b[i]) continue;
+    if (++diff > 1) return false;
+    const pa = _hangulParts(a[i]), pb = _hangulParts(b[i]);
+    if (!pa || !pb) return false;
+    if (pa.cho !== pb.cho || pa.jong !== pb.jong) return false;
+  }
+  return diff === 1;
+}
+
+function ingrMatchLevel(nameA, nameB) {
+  const A = _ingrAliases(nameA), B = _ingrAliases(nameB);
+  let best = 0;
+  for (const a of A) {
+    for (const b of B) {
+      if (!a || !b) continue;
+      if (a === b) return 3;
+      const shorter = a.length <= b.length ? a : b;
+      if (shorter.length < 3) continue;   // "물", "황" 등 짧은 이름의 부분일치 오탐 차단
+      if (a.includes(b) || b.includes(a)) best = Math.max(best, 2);
+      else if (shorter.length >= 5 && _vowelVariantOnly(a, b)) best = Math.max(best, 1);
+    }
+  }
+  return best;
+}
+
+function ingrNamesEqual(nameA, nameB) {
+  return ingrMatchLevel(nameA, nameB) > 0;
+}
+
+function bestIngrMatch(candidates, target, nameOf = (c => c)) {
+  let best = null, bestLv = 0;
+  for (const c of candidates) {
+    const lv = ingrMatchLevel(nameOf(c), target);
+    if (lv > bestLv) { best = c; bestLv = lv; }
+    if (bestLv === 3) break;
+  }
+  return bestLv ? { item: best, level: bestLv } : null;
+}
+
+function rankChaptersByIngredients(parsed) {
+  const targets = (parsed || []).map(p => p.name).filter(Boolean);
+  if (!targets.length) return [];
+
+  const ranked = [];
+  for (const key of Object.keys(chaptersMap)) {
+    const names = chapterIngredientNames(key);
+    if (!names.length) continue;
+
+    let hits = 0;
+    for (const t of targets) {
+      if (names.some(n => ingrNamesEqual(n, t))) hits++;
+    }
+    if (hits) ranked.push({ key, hits, ratio: hits / targets.length, total: targets.length });
+  }
+  ranked.sort((a, b) => b.hits - a.hits || b.ratio - a.ratio);
+  return ranked;
+}
+
+function chapterIngredientNames(key) {
+  const names = [];
+  for (const g of (chaptersMap[key]?.ingredientGroups || [])) {
+    for (const n of (g.ingredients || [])) names.push(n);
+  }
+  if (key === '제1장_비타민미네랄') {
+    for (const it of ch1ExtraIngrCatalog()) names.push(it.ingr);
+  }
+  return names;
+}
+
+function ch1ExtraIngrCatalog() {
+  const tables = DB['제1장_비타민미네랄']?.['표'] ?? {};
+  const out = [];
+  const collect = (tbl, type) => {
+    for (const item of (tables[tbl] ?? [])) {
+      const 항목 = item['항목'];
+      const names = Array.isArray(item['성분명']) ? item['성분명'] : [item['성분명']];
+      names.forEach((ingr, idx) => { if (ingr) out.push({ type, 항목, ingr, idx }); });
+    }
+  };
+  collect('표3_기타성분', 'etc');
+  collect('표4_생약',    'herb');
+  return out;
+}
+
+function inferChapterFromIngredients(parsed) {
+  return rankChaptersByIngredients(parsed)[0] ?? null;
+}
+
+function _isConfidentGuess(g) {
+  return !!g && g.hits >= 2 && g.ratio >= 0.6;
+}
+
+const FORM_NAME_HINTS = [
+  { form: '구강용해필름',  keys: ['구강용해필름', '필름'] },
+  { form: '경구용젤리제',  keys: ['젤리'] },
+  { form: '시럽제',        keys: ['시럽'] },
+  { form: '과립제',        keys: ['과립'] },
+  { form: '환제',          keys: ['환제'] },
+  { form: '산제',          keys: ['산제'] },
+  { form: '경구용 액제',   keys: ['내용액', '드링크', '액제'] },
+  { form: '캡슐제',        keys: ['캡슐'] },
+  { form: '정제',          keys: ['정'], endsWith: true },   // '정'은 흔한 글자라 어미일 때만
+];
+
+function inferFormFromName(name, forms) {
+  const n = String(name ?? '').replace(/\s/g, '');
+  if (!n || !forms?.length) return null;
+  for (const hint of FORM_NAME_HINTS) {
+    const hit = hint.endsWith ? hint.keys.some(k => n.endsWith(k))
+                              : hint.keys.some(k => n.includes(k));
+    if (!hit) continue;
+    // 해당 장이 실제로 허용하는 제형 문자열을 찾는다
+    const form = forms.find(f => f === hint.form || f.startsWith(hint.form));
+    if (form) return form;
+  }
+  return null;
+}
+
+function _parseExcelIngredients(ingrStr) {
+  const parts = ingrStr.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
+  return parts.map(part => {
+    const m = part.match(/^(.+?)\s*([\d.]+)\s*(mg|g|㎍|μg|IU|mL|ml|%|mcg)?$/i);
+    if (m) return { name: m[1].trim(), dose: m[2], unit: m[3] || 'mg' };
+    return { name: part, dose: '', unit: 'mg' };
+  });
+}

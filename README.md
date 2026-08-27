@@ -71,7 +71,7 @@ git push
 `tests.html`을 열면 자동으로 실행됩니다. (사이트 주소로 열어도 되고, 로컬에서 확인하려면 아래)
 
 ```bash
-python -m http.server 7777
+python serve.py
 ```
 → `http://localhost:7777/tests.html`
 
