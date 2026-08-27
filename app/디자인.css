@@ -22,9 +22,18 @@
   --green: #1a7f37;  --green-bg: #eaf6ec;   /* 적합 */
   --red:   #c62828;  --red-bg:   #fdecea;   /* 부적합 */
 
-  /* 표제기 기준 vs 제품 함량 — 색조가 아니라 명도 차이로 */
-  --std-bg:  #f4f4f4;  --std-head:  #575757;  --std-head-fg:  #ffffff;
-  --prod-bg: #ffffff;  --prod-head: #ebebeb;  --prod-head-fg: #3d3d3d;
+  /* 표제기 기준 vs 제품 함량
+     회색 명도만으로는 구분이 잘 안 된다는 현장 의견을 받아,
+     "기준"에만 옅은 남색 계열을 쓰고 "제품"은 흰 바탕으로 둔다.
+     추가한 색조는 이 하나뿐이다 (초록·빨강은 판정, 노랑은 입력 전용). */
+  --std-head:  #dbe4f0;  --std-head-fg:  #1e3a5f;   /* 기준 — 머리글 */
+  --std-head2: #eaf0f8;  --std-head2-fg: #2f5480;   /* 기준 — 작은 머리글 */
+  --std-bg:    #f5f8fc;                             /* 기준 — 본문 칸 */
+  --std-rule:  #b9cbe2;                             /* 기준/제품 사이 세로 경계 */
+
+  --prod-head: #f0f0f0;  --prod-head-fg: #3d3d3d;
+  --prod-head2:#f7f7f7;  --prod-head2-fg:#666666;
+  --prod-bg:   #ffffff;
 
   /* 작업자가 채워야 하는 곳 */
   --input-bg: #fff8db;  --input-line: #e8d071;  --input-focus: #b8912a;

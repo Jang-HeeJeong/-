@@ -90,6 +90,42 @@
     }
     .section-title::after { content: ''; flex: 1; border-top: 1px solid var(--hairline); }
 
+    /* 비고 — 성분명 아래 작은 줄 */
+    .mx-note {
+      font-size: 10px; color: var(--stone); font-weight: 400;
+      white-space: normal; line-height: 1.5; margin-top: 1px;
+    }
+
+    /* 첫 화면 안내 — 장을 고르기 전에는 빈 표 대신 이것을 보여준다 */
+    #start-hint {
+      margin: 6px 0 4px; padding: 22px 24px;
+      background: var(--white); box-shadow: var(--ring2); border-radius: var(--r);
+    }
+    #start-hint .sh-title {
+      font-size: 15px; font-weight: 600; color: var(--obsidian);
+      letter-spacing: -.01em; margin-bottom: 16px;
+    }
+    #start-hint .sh-steps { display: flex; flex-direction: column; gap: 12px; }
+    #start-hint .sh-step { display: flex; gap: 11px; align-items: flex-start; }
+    #start-hint .sh-num {
+      flex: 0 0 22px; height: 22px; border-radius: 50%;
+      background: var(--obsidian); color: #fff;
+      font-size: 11.5px; font-weight: 600;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    #start-hint .sh-step b { font-size: 13.5px; font-weight: 600; color: var(--obsidian); }
+    #start-hint .sh-step p { margin: 3px 0 0; font-size: 12px; color: var(--stone); line-height: 1.65; }
+    #start-hint .sh-go { margin-top: 9px; padding: 6px 14px; font-size: 12.5px; height: auto; }
+    #start-hint .sh-or {
+      font-size: 11px; color: var(--graphite); padding-left: 33px;
+    }
+
+    /* 입력 단계를 눈으로 나눈다 — 용법용량 / 배합 성분 */
+    .input-step {
+      margin-bottom: 4px; padding-bottom: 14px;
+      border-bottom: 1px solid var(--hairline);
+    }
+
     /* ── 제품 검색 / 제품명 줄 ── */
     #fg-product-name { margin-bottom: 12px; }
     .fld-label {
@@ -210,19 +246,29 @@
       background: var(--paper); color: var(--charcoal);
       font-size: 10.5px; font-weight: 600;
       padding: 6px 5px; top: 0;
-      box-shadow: inset 0 -1px 0 var(--hairline);
     }
     .mx-table thead tr.mx-hdr2 th {
       background: var(--paper); color: var(--graphite);
       font-size: 10px; font-weight: 500;
       padding: 4px 5px; top: 27px;
-      box-shadow: inset 0 -1px 0 var(--hairline);
     }
-    /* 표제기 기준 (어두움) / 제품 함량 (밝음) */
-    .mx-table thead th.mx-th-std  { background: var(--std-head)  !important; color: var(--std-head-fg)  !important; box-shadow: none; }
-    .mx-table thead th.mx-th-prod { background: var(--prod-head) !important; color: var(--prod-head-fg) !important; box-shadow: none; }
-    .mx-table thead tr.mx-hdr2 th.mx-th-std  { background: #6e6e6e !important; }
-    .mx-table thead tr.mx-hdr2 th.mx-th-prod { background: #f4f4f4 !important; color: var(--stone) !important; }
+    /* 머리글 밑선은 표 전체를 가로지르는 한 줄로.
+       위아래 2단이라 그냥 두면 묶음 칸 아래에만 선이 하나 더 생긴다. */
+    .mx-table thead tr.mx-hdr1 th          { border-bottom: none; }
+    .mx-table thead tr.mx-hdr1 th[rowspan] { border-bottom: 1px solid var(--ash); }
+    .mx-table thead tr.mx-hdr2 th          { border-bottom: 1px solid var(--ash); }
+    /* 표제기 기준 = 옅은 남색 / 제품 함량 = 흰 바탕 */
+    .mx-table thead th.mx-th-std  { background: var(--std-head)  !important; color: var(--std-head-fg)  !important; }
+    .mx-table thead th.mx-th-prod { background: var(--prod-head) !important; color: var(--prod-head-fg) !important; }
+    .mx-table thead tr.mx-hdr2 th.mx-th-std  { background: var(--std-head2)  !important; color: var(--std-head2-fg)  !important; }
+    .mx-table thead tr.mx-hdr2 th.mx-th-prod { background: var(--prod-head2) !important; color: var(--prod-head2-fg) !important; }
+    /* 두 무리 사이 세로 경계 */
+    .mx-table th.mx-th-std,
+    .mx-table td.mx-std:first-of-type  { border-left: 2px solid var(--std-rule); }
+    .mx-table thead tr.mx-hdr2 th.mx-th-std ~ th.mx-th-std { border-left: none; }
+    .mx-table th.mx-th-prod,
+    .mx-table td.mx-prod:first-of-type { border-left: 2px solid var(--std-rule); }
+    .mx-table thead tr.mx-hdr2 th.mx-th-prod ~ th.mx-th-prod { border-left: none; }
     /* 작업자가 채우는 열 — 머리글에도 같은 노랑 */
     .mx-table thead th.mx-th-input { background: #fdf3c4 !important; color: #6b5410 !important; box-shadow: none; }
     .mx-table tbody td {
@@ -425,17 +471,30 @@
       border: none; border-bottom: 1px solid #f3f3f3;
       padding: 5px 8px; vertical-align: middle;
     }
-    /* 2단 헤더 — 입력부 표와 같은 규칙 (어두움=표제기 기준, 밝음=제품) */
-    .res-table thead th { font-weight: 500; text-align: center; white-space: nowrap; }
-    .res-table thead tr.res-h1 th { font-size: 10.5px; padding: 6px; background: var(--std-head); color: var(--std-head-fg); }
-    .res-table thead tr.res-h2 th { font-size: 10px; padding: 4px 6px; background: #6e6e6e; color: #fff; }
-    .res-table th.res-g-std  { background: var(--std-head) !important; color: var(--std-head-fg) !important; }
+    /* 2단 머리글 — 입력부 표와 같은 규칙 */
+    .res-table thead th {
+      font-weight: 600; text-align: center; white-space: nowrap;
+      background: var(--paper); color: var(--charcoal);
+    }
+    .res-table thead tr.res-h1 th { font-size: 10.5px; padding: 6px; }
+    .res-table thead tr.res-h2 th { font-size: 10px; padding: 4px 6px; font-weight: 500; color: var(--graphite); }
+    /* 머리글 밑선은 표 전체를 가로지르는 한 줄로 */
+    .res-table thead tr.res-h1 th          { border-bottom: none; }
+    .res-table thead tr.res-h1 th[rowspan] { border-bottom: 1px solid var(--ash); }
+    .res-table thead tr.res-h2 th          { border-bottom: 1px solid var(--ash); }
+    /* 표제기 기준 = 옅은 남색, 제품 = 흰 바탕 */
+    .res-table th.res-g-std  { background: var(--std-head)  !important; color: var(--std-head-fg)  !important; }
     .res-table th.res-g-prod { background: var(--prod-head) !important; color: var(--prod-head-fg) !important; }
-    .res-table tr.res-h2 th.res-g-std  { background: #6e6e6e !important; color: #fff !important; }
-    .res-table tr.res-h2 th.res-g-prod { background: #f4f4f4 !important; color: var(--stone) !important; }
-    /* 열 그룹 음영 — 명도로 "기준 vs 제품"을 가른다 */
+    .res-table tr.res-h2 th.res-g-std  { background: var(--std-head2)  !important; color: var(--std-head2-fg)  !important; }
+    .res-table tr.res-h2 th.res-g-prod { background: var(--prod-head2) !important; color: var(--prod-head2-fg) !important; }
     .res-table td.res-c-std  { background: var(--std-bg); }
     .res-table td.res-c-prod { background: var(--prod-bg); }
+    /* 두 무리 사이 세로 경계 — 어디까지가 기준인지 한눈에 */
+    .res-table th.res-g-std:first-of-type,
+    .res-table td.res-c-std:first-of-type  { border-left: 2px solid var(--std-rule); }
+    .res-table th.res-g-prod,
+    .res-table td.res-c-prod:first-of-type { border-left: 2px solid var(--std-rule); }
+    .res-table tr.res-h2 th.res-g-prod ~ th.res-g-prod { border-left: none; }
     .res-table td.res-name   { text-align: left; }
     .res-table td.res-name .res-item-no {
       display: inline-block; font-size: 9.5px; color: var(--stone);
@@ -461,17 +520,6 @@
     .res-verdict { text-align: center; white-space: nowrap; }
     /* .v-ok / .v-fail / .v-na 모양은 app/디자인.css 의 판정 칩을 쓴다 */
     .res-verdict .v-reason { display: block; margin-top: 2px; font-size: 9.5px; color: var(--red); font-weight: 400; white-space: normal; }
-
-    /* 허용 범위 막대 — 기준 구간 위에 제품 함량 위치 */
-    .res-bar {
-      position: relative; height: 14px; min-width: 84px;
-      background: var(--hairline); border-radius: 3px; overflow: hidden;
-    }
-    .res-bar-allow { position: absolute; top: 0; bottom: 0; background: #d9d9d9; }
-    .res-bar-val   { position: absolute; top: 3px; bottom: 3px; border-radius: 2px; min-width: 3px; }
-    .res-bar-val.ok   { background: var(--green); }
-    .res-bar-val.fail { background: var(--red); }
-    .res-bar-cap { display: block; margin-top: 2px; font-size: 9px; color: var(--graphite); white-space: nowrap; }
 
     /* 기재가능 효능효과 — 숫자 표에서 분리한 목록 */
     .res-eff-list { margin: 0 0 12px; padding: 9px 12px; background: var(--white); box-shadow: var(--ring2); border-radius: var(--r); }
@@ -599,16 +647,39 @@
       </div>
 
       <!-- 연령별 용법용량 -->
-      <div id="fg-dosage-section" style="display:none; margin-bottom:10px;">
+      <div id="fg-dosage-section" class="input-step" style="display:none;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <span class="section-title" style="margin-bottom:0;">용법용량</span>
+          <span class="section-title" style="margin-bottom:0;">용법용량 <span class="need">✎ 선택</span></span>
           <button id="btn-add-dosage" class="btn btn-add" style="padding:3px 10px; font-size:13px;">+ 연령 추가</button>
         </div>
         <div id="dosage-rows-container"></div>
       </div>
 
+      <!-- 아직 아무것도 안 골랐을 때: 표 대신 무엇부터 할지 알려준다 -->
+      <div id="start-hint">
+        <div class="sh-title">어디부터 시작할까요?</div>
+        <div class="sh-steps">
+          <div class="sh-step">
+            <span class="sh-num">1</span>
+            <div>
+              <b>제품명으로 검색</b>
+              <p>허가목록에서 찾아 장·제형·성분을 한 번에 채웁니다. 대부분 이 방법이 빠릅니다.</p>
+              <button class="btn btn-primary sh-go" onclick="document.getElementById('unified-search').focus()">검색창으로 이동</button>
+            </div>
+          </div>
+          <div class="sh-or">또는</div>
+          <div class="sh-step">
+            <span class="sh-num">2</span>
+            <div>
+              <b>적용 기준을 직접 선택</b>
+              <p>위에서 장과 제형을 고르면 해당 장의 배합 성분표가 나타납니다.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 성분 섹션 -->
-      <div class="section-title">배합 성분</div>
+      <div class="section-title" data-sec="ingr" style="margin-top:18px;display:none;">배합 성분 <span class="need">✎ 입력</span></div>
 
       <!-- ch1: 기존 드롭다운 방식 -->
       <div id="ingr-classic-wrap">
@@ -668,7 +739,7 @@
           <button class="btn btn-add" id="btn-add-row-mx" disabled onclick="openMxAddPanel()">+ 성분 추가</button>
         </div>
         <div id="mx-age-note" style="display:none;margin-top:5px;padding:4px 10px;background:#fffbe6;border:1px solid #f0c040;border-radius:4px;font-size:11px;color:#7a5c00;"></div>
-        <div id="mx-add-panel" style="display:none; margin-top:4px; padding:8px; background:var(--paper); border-radius:4px; border:1px solid #c5d0e0;">
+        <div id="mx-add-panel" style="display:none; margin-top:4px; padding:8px; background:var(--paper); border-radius:4px; border:1px solid var(--hairline);">
           <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
             <span style="font-size:12px; color:#555; white-space:nowrap;">성분 선택:</span>
             <select id="mx-add-select" style="flex:1; min-width:200px; padding:4px 6px; font-size:12px; border:1px solid var(--hairline); border-radius:4px;">
@@ -779,9 +850,9 @@ let dosageRowIdSeq = 0;
 // selectedExcipients 선언은 app/판정_규칙.js 로 이동
 
 // ── UI 상태 ──
-let ch1OnlyFilled      = false;      // true → 배합량이 입력된 성분만 표시
+let ch1OnlyFilled      = true;       // 기본 켜짐 — 채운 성분만 표시 (없으면 자동으로 전체)
 const ch1Collapsed     = new Set();  // 접힌 그룹(비타민/미네랄/기타성분/생약)
-let mxOnlyFilled       = false;      // ch2/3/7/9 매트릭스용 동일 필터
+let mxOnlyFilled       = true;       // ch2/3/7/9 매트릭스용 동일 필터
 const mxCollapsed      = new Set();  // 접힌 구분(gubun) 그룹
 let resultsCollapsed   = true;       // 결과 패널 접힘 여부 (검토 실행 전 기본 접힘)
 let _lastExcelIdx      = null;       // 마지막으로 적용한 허가목록 항목 (기준 재적용용)
@@ -855,7 +926,7 @@ function resetChapterState(key) {
 
   // 표 접기·"입력된 성분만" 필터
   ch1Collapsed.clear(); mxCollapsed.clear();
-  ch1OnlyFilled = false; mxOnlyFilled = false;
+  ch1OnlyFilled = true; mxOnlyFilled = true;
 
   // 드롭다운에서 직접 고른 경우에만 호출부가 true로 되돌린다
   chapterUserSet = false;
@@ -1151,6 +1222,9 @@ function onChapterChange(key) {
   const useClassicDosage = ch && !isCh2Now && !isCh1Now && !mxEarly;
   $('fg-dosage-section').style.display = useClassicDosage ? '' : 'none';
   $('fg-product-name').style.display  = ch ? '' : 'none';
+  // 아직 장을 고르지 않았으면 빈 표 대신 "어디부터 시작할까요?" 안내를 보여준다
+  { const hint = $('start-hint'); if (hint) hint.style.display = ch ? 'none' : ''; }
+  { const st = document.querySelector('.section-title[data-sec="ingr"]'); if (st) st.style.display = ch ? '' : 'none'; }
   $('btn-add-dosage').disabled = !ch;
   if (useClassicDosage) renderDosageRows();
 
@@ -1418,13 +1492,13 @@ function buildCh1RefPanel() {
   const minBigo = table5['미네랄']?.['비고'] ?? '';
   const vitBigo = table5['비고'] ?? '';
 
-  const th = s => `<th style="background:#e8eef8;padding:5px 8px;border:1px solid #c5d0e0;font-size:11px;white-space:nowrap;">${s}</th>`;
+  const th = s => `<th style="background:#e8eef8;padding:5px 8px;border:1px solid var(--hairline);font-size:11px;white-space:nowrap;">${s}</th>`;
   const td = (s,c='') => `<td style="padding:4px 8px;border:1px solid var(--hairline);font-size:11px;text-align:center;${c}">${s??'—'}</td>`;
   const tds = s => `<td style="padding:4px 8px;border:1px solid var(--hairline);font-size:11px;text-align:left;">${s??'—'}</td>`;
 
   const tStyle = 'border-collapse:collapse;width:100%;margin-bottom:8px;';
 
-  let h = `<div style="padding:12px 14px;background:var(--paper);border:1px solid #c5d0e0;border-radius:5px;font-size:12px;">`;
+  let h = `<div style="padding:12px 14px;background:var(--paper);border:1px solid var(--hairline);border-radius:5px;font-size:12px;">`;
 
   // ① 비타민 연령구분계수
   h += `<div style="font-weight:700;color:var(--obsidian);margin-bottom:5px;">① 비타민 연령구분계수 (표5)</div>`;
@@ -1941,7 +2015,6 @@ function renderCh1Integrated() {
         <th rowspan="2" class="mx-th-input mx-th-unit">단위 ✎</th>
         <th colspan="2" class="mx-th-std">표제기 기준 (1일)</th>
         <th colspan="2" class="mx-th-prod">제품 1일 함량</th>
-        <th rowspan="2" style="min-width:130px;text-align:center;">비고</th>
         <th rowspan="2" style="min-width:62px;">판정</th>
       </tr>
       <tr class="mx-hdr2">
@@ -2000,7 +2073,7 @@ function renderCh1Integrated() {
         const st = secStat.get(section) ?? { total: 0, filled: 0 };
         const collapsed = ch1Collapsed.has(section);
         const caret = collapsed ? '▶' : '▼';
-        rows += `<tr class="mx-group-hdr"><td colspan="11" data-sec="${esc(section)}" onclick="toggleCh1Section('${esc(section)}')" title="클릭하여 접기/펼치기">`
+        rows += `<tr class="mx-group-hdr"><td colspan="10" data-sec="${esc(section)}" onclick="toggleCh1Section('${esc(section)}')" title="클릭하여 접기/펼치기">`
              +  `<span class="mx-group-caret">${caret}</span>${esc(section)}`
              +  `<span class="grp-count" style="font-weight:400;color:#6b8ec4;margin-left:8px;font-size:10px;">${st.filled}/${st.total} 입력</span>`
              +  `</td></tr>`;
@@ -2087,7 +2160,6 @@ function renderCh1Integrated() {
         rows += `<td class="mx-prod" data-col="actDMin">${fmtN(mgActDMin)}</td>`;
         rows += `<td class="mx-prod" data-col="actDMax">${fmtN(mgActDMax)}</td>`;
         rows += `<td data-col="ok" style="text-align:center;">${mgOkHtml}</td>`;
-        rows += `<td data-col="note" style="padding:3px 6px;font-size:10.5px;vertical-align:middle;"></td>`;
         rows += `</tr>`;
         continue;
       }
@@ -2181,6 +2253,29 @@ function renderCh1Integrated() {
       const rowCls = isActive ? 'mx-row mx-active' : 'mx-row';
       const canRemove = isFirst && !row.isMain;
 
+      // 비고 — 열을 따로 두지 않고 성분명 아래에 작은 줄로 붙인다
+      let noteHtml = '';
+      if (isActive) {
+        if (vr?.elevHint) {
+          const yr = Math.round(vr.elevHint.threshMonths / 12);
+          noteHtml = `만 ${yr}세 이상이면 최대 ${vr.elevHint.max} ${esc(vr.elevHint.unit)}`;
+        } else if (row.type === 'min') {
+          const ageCol = getMineralAgeCol(dr.age ?? '');
+          if (ageCol) {
+            const minRow2 = findMineralRow(table2, row.ingr);
+            if (minRow2) {
+              const adultVal = parseAmountStr(minRow2['1일최대분량'])?.value;
+              if (adultVal != null && critMax != null && critMax !== adultVal) {
+                const colDisp = MINERAL_COL_DISPLAY[ageCol] ?? ageCol;
+                noteHtml = `${esc(colDisp)} 기준 (성인 ${fmtN(adultVal)} ${esc(useUnit)})`;
+              }
+            }
+          }
+        }
+      }
+      const noteLine = noteHtml
+        ? `<div class="mx-note">${noteHtml}</div>` : '';
+
       const unitLabel = useUnit || row.unit;
       // 단위 열과 기준 단위가 같으면 중복 표기 생략, 다를 때만 강조해서 표시
       const uSfx = stdUnitSuffix(unitLabel, row.unit);
@@ -2199,12 +2294,12 @@ function renderCh1Integrated() {
           rows += `<button class="js-mg-mode-toggle" data-row-id="${row.id}" style="font-size:10px;padding:2px 7px;background:#eef2fb;border:1px solid #7a9fd4;border-radius:3px;color:#3366aa;cursor:pointer;white-space:nowrap;">🧪 복합염 입력</button>`;
           rows += `</span></td>`;
         } else {
-          rows += `<td style="padding:2px 4px;"><select class="js-ch1-ingr" data-id="${row.id}" style="width:100%;max-width:175px;padding:2px 4px;border:1px solid #b0bcd8;border-radius:3px;font-size:11px;background:#f8f9fc;">
+          rows += `<td style="padding:2px 4px;"><select class="js-ch1-ingr" data-id="${row.id}" style="width:100%;max-width:175px;padding:2px 4px;border:none;box-shadow:var(--ring2);border-radius:4px;font-size:11px;background:var(--white);">
             ${row.ingrNames.map(n=>`<option value="${esc(n)}"${n===row.ingr?' selected':''}>${esc(n)}</option>`).join('')}
-          </select></td>`;
+          </select>${noteLine}</td>`;
         }
       } else {
-        rows += `<td style="font-size:11px;padding:3px 5px;color:#555;">${esc(row.ingr)}</td>`;
+        rows += `<td style="font-size:11px;padding:3px 5px;color:var(--charcoal);">${esc(row.ingr)}${noteLine}</td>`;
       }
       // 배합량
       if (isFirst) {
@@ -2218,27 +2313,6 @@ function renderCh1Integrated() {
       rows += `<td class="mx-std" data-col="critMax">${stdMaxHtml}</td>`;
       rows += `<td class="mx-prod" data-col="actDMin">${fmtN(actDMin)}</td>`;
       rows += `<td class="mx-prod" data-col="actDMax">${fmtN(actDMax)}</td>`;
-      // 비고 셀
-      let noteHtml = '';
-      if (isActive) {
-        if (vr?.elevHint) {
-          const yr = Math.round(vr.elevHint.threshMonths / 12);
-          noteHtml = `<span style="color:#f57f17;">만 ${yr}세 이상 최대 ${vr.elevHint.max} ${esc(vr.elevHint.unit)}</span>`;
-        } else if (row.type === 'min') {
-          const ageCol = getMineralAgeCol(dr.age ?? '');
-          if (ageCol) {
-            const minRow2 = findMineralRow(table2, row.ingr);
-            if (minRow2) {
-              const adultVal = parseAmountStr(minRow2['1일최대분량'])?.value;
-              if (adultVal != null && critMax != null && critMax !== adultVal) {
-                const colDisp = MINERAL_COL_DISPLAY[ageCol] ?? ageCol;
-                noteHtml = `<span style="color:#555;">${esc(colDisp)} 기준 (성인 ${fmtN(adultVal)} ${esc(useUnit)})</span>`;
-              }
-            }
-          }
-        }
-      }
-      rows += `<td data-col="note" style="padding:3px 6px;font-size:10.5px;vertical-align:middle;">${noteHtml}</td>`;
       rows += `<td data-col="ok" style="text-align:center;">${okHtml}</td>`;
       rows += `</tr>`;
     }
@@ -2315,7 +2389,7 @@ function renderCh1Integrated() {
   html += `<button class="btn btn-add" onclick="addCh1AgeGroup()" style="padding:4px 12px;font-size:13px;">+ 연령 추가</button>`;
   html += `<button class="btn btn-add" onclick="openCh1AddIngrPanel()" style="padding:4px 12px;font-size:13px;">+ 성분 추가</button>`;
   html += `</div>`;
-  html += `<div id="ch1-add-ingr-panel" style="display:none;margin-top:5px;padding:8px;background:var(--paper);border-radius:4px;border:1px solid #c5d0e0;">`;
+  html += `<div id="ch1-add-ingr-panel" style="display:none;margin-top:5px;padding:8px;background:var(--paper);border-radius:4px;border:1px solid var(--hairline);">`;
   html += `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">`;
   html += `<input id="ch1-ingr-search" type="text" placeholder="🔍 성분명 검색..." oninput="filterCh1IngrOptions()" autocomplete="off" style="flex:1;padding:5px 8px;font-size:12px;border:1px solid var(--hairline);border-radius:4px;"/>`;
   html += `<button class="btn" onclick="$('ch1-add-ingr-panel').style.display='none'" style="font-size:12px;padding:4px 10px;background:#999;color:#fff;">닫기</button>`;
@@ -2989,7 +3063,7 @@ function renderCh2Integrated() {
   html += `<button class="btn btn-add" onclick="addCh2AgeGroup()" style="padding:4px 12px;font-size:13px;">+ 연령 추가</button>`;
   html += `<button class="btn btn-add" onclick="openCh2AddIngrPanel()" style="padding:4px 12px;font-size:13px;">+ 성분 추가</button>`;
   html += `</div>`;
-  html += `<div id="ch2-add-ingr-panel" style="display:none;margin-top:5px;padding:8px;background:var(--paper);border-radius:4px;border:1px solid #c5d0e0;">`;
+  html += `<div id="ch2-add-ingr-panel" style="display:none;margin-top:5px;padding:8px;background:var(--paper);border-radius:4px;border:1px solid var(--hairline);">`;
   html += `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">`;
   html += `<span style="font-size:12px;color:#555;white-space:nowrap;">성분 선택:</span>`;
   html += `<select id="ch2-add-ingr-select" style="flex:1;min-width:200px;padding:4px 6px;font-size:12px;border:1px solid var(--hairline);border-radius:4px;"><option value="">-- 선택 --</option></select>`;
@@ -3856,36 +3930,6 @@ function resHeaderCard(allOk, metaItems) {
     ${chips ? `<div class="res-meta">${chips}</div>` : ''}
   </div>`;
 }
-
-/* 허용 범위 막대 — 기준 구간(연한 파랑) 위에 제품 1일 함량 구간을 얹는다.
-   숫자 4개를 눈으로 비교하는 대신 여유가 얼마나 있는지 바로 보이게 하는 용도. */
-function resRangeBar(dailyMin, dailyMax, critMin, critMax, ok, unit) {
-  const dMin = dailyMin != null ? +dailyMin : null;
-  const dMax = dailyMax != null ? +dailyMax : null;
-  const cMin = critMin  != null ? +critMin  : null;
-  const cMax = critMax  != null ? +critMax  : null;
-  if (dMax == null || (cMin == null && cMax == null)) return '<span style="color:#cbd5e1;">—</span>';
-
-  // 눈금 범위: 0 ~ (기준 최대와 제품 최대 중 큰 값) × 1.1
-  const top = Math.max(cMax ?? 0, dMax ?? 0, cMin ?? 0) * 1.1 || 1;
-  const pct = v => Math.max(0, Math.min(100, (v / top) * 100));
-
-  const aL = pct(cMin ?? 0);
-  const aR = pct(cMax ?? top);
-  const vL = pct(dMin ?? dMax);
-  const vR = pct(dMax);
-
-  const fmt = v => v != null ? (+v).toLocaleString('ko-KR', { maximumFractionDigits: 3 }) : '—';
-  const capMin = cMin != null ? fmt(cMin) : '0';
-  const cap = `기준 ${capMin}~${cMax != null ? fmt(cMax) : '제한없음'}${unit ? ' ' + unit : ''}`;
-
-  return `<div class="res-bar" title="${esc(cap)}">
-      <div class="res-bar-allow" style="left:${aL}%;width:${Math.max(0, aR - aL)}%;"></div>
-      <div class="res-bar-val ${ok === false ? 'fail' : 'ok'}" style="left:${vL}%;width:${Math.max(0, vR - vL)}%;"></div>
-    </div>
-    <span class="res-bar-cap">${esc(cap)}</span>`;
-}
-
 /* 복사 버튼 (효능효과·주의사항 공용) — 블록 제목 우측에 배치 */
 function resCopyBtn(varName) {
   return `<button type="button" class="btn-copy" onclick="resCopyText(this, '${varName}')">그대로 복사해서 사용하기</button>`;
@@ -3983,7 +4027,6 @@ function renderChapter1Results(validation, form, ageGroup) {
       <td class="res-num res-c-prod">${esc(perUnitNum(r))}${r.convNote ? `<br><span style="color:var(--graphite);font-size:9.5px;">${esc(r.convNote)}</span>` : ''}</td>
       <td class="res-num res-c-prod">${fmtV(r.dailyMin)}</td>
       <td class="res-num res-c-prod">${fmtV(r.dailyMax)}</td>
-      <td style="min-width:96px;">${resRangeBar(r.dailyMin, r.dailyMax, r.critMin, r.critMax, ok, u)}</td>
       <td class="res-verdict">${resVerdictCell(ok, r.reason)}</td>
     </tr>`;
   }).join('');
@@ -4035,7 +4078,6 @@ function renderChapter1Results(validation, form, ageGroup) {
           <th rowspan="2" style="text-align:left;min-width:150px;">성분명</th>
           <th colspan="2" class="res-g-std">표제기 기준 (1일)</th>
           <th colspan="3" class="res-g-prod">제품 함량</th>
-          <th rowspan="2" style="min-width:96px;">허용 범위</th>
           <th rowspan="2" style="min-width:62px;">판정</th>
         </tr>
         <tr class="res-h2">
@@ -4109,7 +4151,6 @@ function renderChapter2Results(validation, form, ageGroup) {
       <td class="res-num res-c-prod">${fmt(ac.max1dose)}</td>
       <td class="res-num res-c-prod">${fmt(ac.min1d)}</td>
       <td class="res-num res-c-prod">${fmt(ac.max1d)}</td>
-      <td style="min-width:96px;">${resRangeBar(ac.min1d, ac.max1d, al.min1d, al.max1d, r.ok, 'mg')}</td>
       <td class="res-verdict">${resVerdictCell(r.ok, r.ok !== true ? r.reason : '')}</td>
     </tr>`;
   }).join('');
@@ -4136,7 +4177,6 @@ function renderChapter2Results(validation, form, ageGroup) {
           <th rowspan="2" style="min-width:130px;text-align:left;">성분명</th>
           <th colspan="4" class="res-g-std">표제기 기준</th>
           <th colspan="4" class="res-g-prod">제품 함량</th>
-          <th rowspan="2" style="min-width:96px;">허용 범위</th>
           <th rowspan="2" style="min-width:62px;">판정</th>
         </tr>
         <tr class="res-h2">
@@ -4217,7 +4257,6 @@ function mkResultRow7(ts, ok, label, dose1, dailyMin, dailyMax, critMin, critMax
     <td class="res-num res-c-prod">${fmt(dose1)}</td>
     <td class="res-num res-c-prod">${fmt(dailyMin)}</td>
     <td class="res-num res-c-prod">${fmt(dailyMax)}</td>
-    <td style="min-width:96px;">${resRangeBar(dailyMin, dailyMax, critMin, critMax, ok, unit)}</td>
     <td class="res-verdict">${resVerdictCell(ok, reason)}</td>
   </tr>`;
 }
@@ -4248,7 +4287,6 @@ function mkResultBlock7(allOk, form, ageGroup, freqMin, freqMax, amtMax, coeff, 
           <th rowspan="2" style="text-align:left;min-width:150px;">성분명 / 항목</th>
           <th colspan="2" class="res-g-std">표제기 기준 (1일)</th>
           <th colspan="3" class="res-g-prod">제품 함량</th>
-          <th rowspan="2" style="min-width:96px;">허용 범위</th>
           <th rowspan="2" style="min-width:62px;">판정</th>
         </tr>
         <tr class="res-h2">
@@ -5069,7 +5107,7 @@ function searchUnified(query) {
     html += excelMatches.map(p => {
       const idx      = _excelDB.indexOf(p);
       const saved    = savedByName[p.name.toLowerCase()];
-      const selectJs = `selectExcelProduct(${idx});var u=$('unified-search');if(u)u.value='${p.name.replace(/'/g,"\\'")}';var r=$('unified-results');if(r)r.style.display='none';`;
+      const selectJs = `selectExcelProduct(${idx});var u=$('unified-search');if(u)u.value='';var r=$('unified-results');if(r)r.style.display='none';`;
       if (saved) {
         // 허가목록 + 저장 제품 동일 이름 → 병합 행
         const date    = new Date(saved.savedAt).toLocaleDateString('ko-KR', { month:'2-digit', day:'2-digit' });
