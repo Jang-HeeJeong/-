@@ -78,8 +78,15 @@ body {
 /* ── 폼 요소 ── */
 label.field { display: inline-flex; flex-direction: column; gap: 4px; }
 .eyebrow {
-  font-family: var(--mono); font-size: 11px; font-weight: 400;
-  letter-spacing: .071em; text-transform: uppercase; color: var(--stone);
+  font-size: 12.5px; font-weight: 600; letter-spacing: -.01em;
+  color: var(--obsidian);
+}
+/* 섹션 제목 앞의 작은 표식 — 제목 줄을 눈에 걸리게 한다 */
+.section > .eyebrow::before,
+.card-head > .eyebrow::before {
+  content: ''; display: inline-block; width: 3px; height: 12px;
+  background: var(--obsidian); border-radius: 2px;
+  margin-right: 7px; vertical-align: -1px;
 }
 select, input[type="text"], input[type="number"] {
   font-family: var(--sans); font-size: 13px; color: var(--obsidian);
@@ -163,7 +170,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
   padding: 6px 8px; text-align: center; white-space: nowrap;
   border-bottom: 1px solid var(--hairline);
 }
-.tbl thead tr.h1 th { background: var(--paper); color: var(--stone); }
+.tbl thead tr.h1 th { background: var(--paper); color: var(--charcoal); font-weight: 600; }
 .tbl thead tr.h2 th { background: var(--paper); color: var(--graphite); font-size: 10px; padding: 4px 8px; }
 /* 기준 = 어두운 헤더, 제품 = 밝은 헤더 (색조 아닌 명도로 구분) */
 .tbl th.g-std  { background: var(--std-head)  !important; color: var(--std-head-fg)  !important; }
@@ -227,6 +234,22 @@ tr.grp .gcount { color: var(--graphite); margin-left: 8px; }
 tr.fail td { background: var(--red-bg) !important; }
 tr.fail td:first-child { box-shadow: inset 3px 0 0 var(--red); }
 tr.fail td.name { font-weight: 500; }
+
+/* 작업자가 값을 넣거나 골라야 하는 곳 — 노란 음영으로 표시 */
+select.need-input {
+  background: var(--input-bg); box-shadow: 0 0 0 1px var(--input-line);
+}
+select.need-input:focus { background: #fffdf3; box-shadow: 0 0 0 2px var(--input-focus); }
+select.need-input:disabled { background: var(--paper); box-shadow: var(--ring2); }
+.fill-zone {
+  padding: 8px 10px; border-radius: var(--r);
+  background: #fffdf0; box-shadow: 0 0 0 1px #f2e6b8;
+}
+.need {
+  font-size: 10.5px; font-weight: 500; color: #8a6d1a; letter-spacing: 0;
+  background: var(--input-bg); border-radius: 3px; padding: 1px 6px; margin-left: 6px;
+}
+.need::before { content: none; }
 
 /* input[type=number] 규칙(0,1,1)이 .dose-input(0,1,0)을 이기므로 태그를 붙여 맞춘다 */
 input.dose-input {
@@ -354,23 +377,23 @@ input.dose-input:focus { background: #fffdf3; box-shadow: 0 0 0 2px var(--input-
         </div>
 
         <div class="section">
-          <span class="eyebrow">용법용량</span>
-          <div class="row">
-            <select id="sel-age" style="min-width:200px;" disabled><option>— 연령 —</option></select>
-            <span style="color:var(--stone);font-size:12px;">1일</span>
-            <select id="freq-min" class="unit-sel" style="width:52px;"></select>
+          <span class="eyebrow">용법용량 <span class="need">✎ 선택</span></span>
+          <div class="row fill-zone">
+            <select id="sel-age" class="need-input" style="min-width:200px;" disabled><option>— 연령 —</option></select>
+            <span style="color:var(--charcoal);font-size:12px;">1일</span>
+            <select id="freq-min" class="unit-sel need-input" style="width:56px;"></select>
             <span style="color:var(--ash);">~</span>
-            <select id="freq-max" class="unit-sel" style="width:52px;"></select>
-            <span style="color:var(--stone);font-size:12px;">회 · 1회</span>
-            <select id="amt-min" class="unit-sel" style="width:52px;"></select>
+            <select id="freq-max" class="unit-sel need-input" style="width:56px;"></select>
+            <span style="color:var(--charcoal);font-size:12px;">회 · 1회</span>
+            <select id="amt-min" class="unit-sel need-input" style="width:56px;"></select>
             <span style="color:var(--ash);">~</span>
-            <select id="amt-max" class="unit-sel" style="width:52px;"></select>
-            <span id="unit-word" style="color:var(--stone);font-size:12px;">정</span>
+            <select id="amt-max" class="unit-sel need-input" style="width:56px;"></select>
+            <span id="unit-word" style="color:var(--charcoal);font-size:12px;">정</span>
           </div>
         </div>
 
         <div class="section" style="margin-bottom:0;">
-          <span class="eyebrow">배합 성분</span>
+          <span class="eyebrow">배합 성분 <span class="need">✎ 입력</span></span>
           <div class="toolbar">
             <label><input type="checkbox" id="only-filled"> 입력된 성분만 보기</label>
             <label><input type="checkbox" id="show-all"> 전체 성분 보기</label>
@@ -561,7 +584,6 @@ function renderTable() {
         <th rowspan="2" style="text-align:left;min-width:190px;">성분명</th>
         <th colspan="2" class="g-std">표제기 기준 (1일)</th>
         <th colspan="3" class="g-prod">제품 함량</th>
-        <th rowspan="2" style="min-width:92px;">허용 범위</th>
         <th rowspan="2" style="min-width:58px;">판정</th>
       </tr>
       <tr class="h2">
@@ -578,7 +600,7 @@ function renderTable() {
       lastGroup = r.group;
       const s = stat.get(r.group) ?? { t: 0, f: 0 };
       const open = !collapsed.has(r.group);
-      html += `<tr class="grp"><td colspan="8" data-grp="${esc(r.group)}">
+      html += `<tr class="grp"><td colspan="7" data-grp="${esc(r.group)}">
         <span class="tri">${open ? '▼' : '▶'}</span>${esc(r.group)}
         <span class="gcount">${s.f}/${s.t} 입력</span></td></tr>`;
     }
@@ -611,7 +633,6 @@ function renderTable() {
       </td>
       <td class="num c-prod">${dMin != null ? fmt(dMin) : '<span class="muted">—</span>'}</td>
       <td class="num c-prod">${dMax != null ? fmt(dMax) : '<span class="muted">—</span>'}</td>
-      <td>${bar(dMin, dMax, critMin, critMax, ok, res?.useUnit ?? r.unit)}</td>
       <td class="verdict">${verdict(ok, res?.reason)}</td>
     </tr>`;
   }
@@ -693,8 +714,7 @@ function refreshComputed() {
     const td = tr.querySelectorAll('td');
     const put = (i, val) => { td[i].innerHTML = val != null ? fmt(val) : '<span class="muted">—</span>'; };
     put(1, critMin); put(2, critMax); put(4, dMin); put(5, dMax);
-    td[6].innerHTML = bar(dMin, dMax, critMin, critMax, ok, res?.useUnit ?? r.unit);
-    td[7].innerHTML = verdict(ok, res?.reason);
+    td[6].innerHTML = verdict(ok, res?.reason);
     tr.classList.toggle('fail', ok === false);
   }
 
