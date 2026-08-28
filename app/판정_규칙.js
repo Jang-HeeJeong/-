@@ -2544,21 +2544,21 @@ function renderPrecautions(sections) {
       }
       return `${subHdr}<tr><td style="${ts}${extraStyle}">${it.displayNum}) ${esc(cleanText).replace(/\n/g,'<br>')}${badge}</td></tr>`;
     }).join('');
-    // 다섯 절이 늘 펼쳐져 있으면 결과 화면이 지나치게 길어진다.
-    // 첫 절만 펴 두고 나머지는 접는다 — 복사 버튼은 전체 문구를 그대로 담는다.
-    return `<details class="fold"${secIdx === 0 ? ' open' : ''}>
-      <summary>${secIdx + 1}. ${esc(sec.label)}</summary>
-      <div class="fold-body">
-        <table style="width:100%;border-collapse:collapse;"><tbody>${rows}</tbody></table>
-      </div>
-    </details>`;
+    return `<div style="margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:600;color:var(--obsidian);padding:3px 0 5px;border-bottom:1px solid var(--hairline);margin-bottom:3px;">${secIdx + 1}. ${esc(sec.label)}</div>
+      <table style="width:100%;border-collapse:collapse;"><tbody>${rows}</tbody></table>
+    </div>`;
   }).join('');
+  // 다섯 절을 통째로 접는다 — 결과 화면이 세로로 너무 길어지지 않게.
   return `<div class="res-doc">
     <div class="res-doc-head">
-      <span class="res-sec-title">사용상의 주의사항 (성분 기반 자동 생성)</span>
+      <span class="res-sec-title">[사용상의 주의사항]</span>
       ${resCopyBtn('__precCopyText')}
     </div>
-    ${sectHtml}
+    <details class="fold" open>
+      <summary>전체 5개 항목 보기</summary>
+      <div class="fold-body">${sectHtml}</div>
+    </details>
     <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--hairline);">
       <button onclick="generateFullWordDoc()"
         style="padding:8px 20px;background:#2e2e2e;color:#fff;border:none;border-radius:var(--r);font-size:13px;cursor:pointer;font-weight:500;font-family:inherit;">

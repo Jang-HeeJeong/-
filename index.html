@@ -132,6 +132,28 @@
     }
     .dosage-sticky.is-stuck { box-shadow: 0 1px 0 var(--hairline), 0 6px 12px -8px rgba(0,0,0,.18); }
 
+    /* 검색으로 고른 제품 표시 */
+    #picked-product { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+    .picked-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--white); box-shadow: var(--ring2); border-radius: var(--r);
+      padding: 4px 8px 4px 11px; font-size: 13px; font-weight: 600; color: var(--obsidian);
+    }
+    .picked-chip button {
+      background: none; border: none; cursor: pointer;
+      color: var(--graphite); font-size: 13px; line-height: 1; padding: 2px 3px;
+    }
+    .picked-chip button:hover { color: var(--red); }
+
+    /* 검토가 끝난 뒤 저장하는 줄 — 결과 패널 아래 */
+    #save-bar {
+      display: flex; gap: 7px; align-items: center;
+      flex-shrink: 0; padding: 10px 14px;
+      background: var(--paper); box-shadow: 0 -1px 0 var(--hairline);
+    }
+    #save-bar .fld-label { flex: 0 0 auto; }
+    #save-bar input { flex: 1; min-width: 0; }
+
     /* ── 제품 검색 / 제품명 줄 ── */
     #fg-product-name { margin-bottom: 12px; }
     .fld-label {
@@ -727,11 +749,15 @@
         </div>
         <div id="excel-db-status" style="font-size:10px;color:var(--graphite);margin-top:3px;min-height:13px;"></div>
 
-        <!-- ② 제품명 (저장 버튼은 하단 액션바로 이동) -->
-        <div style="display:flex; gap:6px; margin-top:6px; align-items:center;">
-          <span class="fld-label">제품명</span>
-          <input type="text" id="product-name" placeholder="제품명 입력" class="fld-input">
+        <!-- 제품명은 결과 화면의 저장 줄에 있다. 여기서는 고른 제품만 보여준다. -->
+        <div id="picked-product" style="display:none;">
+          <span class="fld-label">선택됨</span>
+          <span class="picked-chip">
+            <span id="picked-name"></span>
+            <button type="button" onclick="clearPickedProduct()" title="선택 해제">✕</button>
+          </span>
         </div>
+        <input type="text" id="product-name" style="display:none;">
         <div id="excel-ingr-ref" style="display:none;margin-top:5px;padding:6px 9px;background:var(--paper);box-shadow:var(--ring2);border-radius:var(--r);font-size:11px;color:var(--stone);line-height:1.5;"></div>
 
         <!-- 구 ID 유지 (filterProductList 호환) -->
@@ -868,8 +894,6 @@
     <!-- 하단 고정 액션바: 실시간 요약 + 저장 + 검토 실행 -->
     <div class="panel-footer" id="action-bar" style="display:none;">
       <div id="live-summary"><span>성분 배합량을 입력하면 실시간으로 집계됩니다</span></div>
-      <button class="btn btn-add" onclick="saveProduct()"
-              title="현재 입력 내용을 제품명으로 저장">💾 저장</button>
       <button class="btn btn-primary" id="btn-validate" disabled>검토 실행</button>
     </div>
   </section>
@@ -893,6 +917,15 @@
         </svg>
         <span>성분을 입력하고 <b>검토 실행</b>을 누르세요</span>
       </div>
+    </div>
+
+    <!-- 저장은 검토가 끝난 뒤에 하는 일이라 결과 쪽에 둔다 -->
+    <div id="save-bar" style="display:none;">
+      <span class="fld-label">제품명</span>
+      <input type="text" id="save-name" class="fld-input" placeholder="저장할 제품명"
+             oninput="this.dataset.touched='1';"
+             onkeydown="if(event.key==='Enter')saveProduct();">
+      <button class="btn btn-add" onclick="saveProduct()" title="이 검토 내용을 제품명으로 저장">저장</button>
     </div>
   </section>
 
@@ -1157,6 +1190,26 @@ function refreshIngrCounts() {
   });
 }
 
+/* 검색으로 고른 제품을 위쪽에 칩으로 보여준다.
+   제품명 입력칸은 결과 쪽 저장 줄에 있다 — 검색(불러오기)과 저장을
+   같은 자리에 나란히 두니 어느 쪽이 입력인지 헷갈렸다. */
+function showPickedProduct(name) {
+  const box = document.getElementById('picked-product');
+  const el  = document.getElementById('picked-name');
+  if (!box || !el) return;
+  if (name) { el.textContent = name; box.style.display = ''; }
+  else { el.textContent = ''; box.style.display = 'none'; }
+}
+function clearPickedProduct() {
+  const hidden = document.getElementById('product-name');
+  if (hidden) hidden.value = '';
+  const save = document.getElementById('save-name');
+  if (save) save.value = '';
+  showPickedProduct('');
+  const u = document.getElementById('unified-search');
+  if (u) { u.value = ''; u.focus(); }
+}
+
 /* 노랑(= 아직 안 채움)을 켜고 끄는 곳. 값이 들어오면 흰 바탕으로 바꾼다. */
 function markFilled(el, filled, bad) {
   if (!el) return;
@@ -1204,6 +1257,12 @@ function jumpToNextFail() {
 
 function updateLiveSummary() {
   refreshFillMarks();
+  {
+    const nm = document.getElementById('product-name')?.value || '';
+    showPickedProduct(nm);
+    const save = document.getElementById('save-name');
+    if (save && !save.dataset.touched) save.value = nm;
+  }
   refreshIngrCounts();
   const bar = document.getElementById('live-summary');
   if (!bar) return;
@@ -1392,6 +1451,7 @@ function onChapterChange(key) {
   { const st = document.querySelector('.section-title[data-sec="ingr"]'); if (st) st.style.display = ch ? '' : 'none'; }
   { const ex = $('fg-excipient');  if (ex) ex.style.display = ch ? '' : 'none'; }
   { const ab = $('action-bar');    if (ab) ab.style.display = ch ? '' : 'none'; }
+  { const sb = $('save-bar');      if (sb) sb.style.display = ch ? '' : 'none'; }
   if (typeof refreshFillMarks === 'function') refreshFillMarks();
   $('btn-add-dosage').disabled = !ch;
   if (useClassicDosage) renderDosageRows();
@@ -4213,7 +4273,6 @@ function renderChapter1Results(validation, form, ageGroup) {
       <td class="res-name">
         ${r.gubun ? `<span class="res-item-no">${esc(r.gubun)}</span>` : ''}${esc(r.ingr)}
       </td>
-      <td class="res-num">${esc(perUnitNum(r))}${r.convNote ? `<br><span style="color:var(--graphite);font-size:9.5px;">${esc(r.convNote)}</span>` : ''}</td>
       <td class="res-num res-c-std">${fmtV(r.critMin)}</td>
       <td class="res-num res-c-std">${fmtV(r.critMax)}${r.ageNote ? `<br><span style="color:var(--graphite);font-size:9.5px;">${esc(r.ageNote)}</span>` : ''}</td>
       <td class="res-num res-c-prod">${fmtV(r.dailyMin)}</td>
@@ -4223,7 +4282,7 @@ function renderChapter1Results(validation, form, ageGroup) {
   }).join('');
 
   const sumRows = sumResults.length > 0 ? `
-    <tr class="res-grp"><td colspan="7">동일 항목 합산 검증</td></tr>
+    <tr class="res-grp"><td colspan="6">동일 항목 합산 검증</td></tr>
     ${sumResults.map(r => `<tr class="${resRowCls(r.ok)}">
         <td class="res-name" colspan="3">
           <span class="res-item-no">${esc(r.key)}</span>${(r.ingredients ?? []).map(esc).join(', ')}
@@ -4238,7 +4297,7 @@ function renderChapter1Results(validation, form, ageGroup) {
   // 기재가능 효능효과 — 숫자 표에서 분리해 별도 목록으로
   const effHtml = effRows.some(e => e.texts?.length || (e.note && e.note !== '—'))
     ? `<div class="res-eff-list">
-        <div class="res-sec-title">기재가능 효능효과 (성분별)</div>
+        <div class="res-sec-title">성분별 기재가능 여부</div>
         ${effRows.map(e => {
           const badge = e.badge ? `<span class="res-eff-badge">${esc(e.badge)}</span>` : '';
           let body;
@@ -4267,7 +4326,6 @@ function renderChapter1Results(validation, form, ageGroup) {
       <thead>
         <tr class="res-h1">
           <th rowspan="2" style="text-align:left;min-width:150px;">성분명</th>
-          <th rowspan="2" style="min-width:72px;">1${esc(unitWord)}당<br><span style="font-weight:400;color:var(--graphite);">배합량</span></th>
           <th colspan="2" class="res-g-std">표제기 기준 (1일)</th>
           <th colspan="2" class="res-g-prod">제품 1일 함량</th>
           <th rowspan="2" style="min-width:62px;">판정</th>
@@ -4443,7 +4501,6 @@ function mkResultRow7(ts, ok, label, dose1, dailyMin, dailyMax, critMin, critMax
   const fmt = v => v != null ? (+v).toLocaleString('ko-KR', { maximumFractionDigits: 3 }) : '—';
   return `<tr class="${resRowCls(ok)}">
     <td class="res-name">${esc(label)}</td>
-    <td class="res-num">${fmt(dose1)}</td>
     <td class="res-num res-c-std">${fmt(critMin)}</td>
     <td class="res-num res-c-std">${fmt(critMax)}</td>
     <td class="res-num res-c-prod">${fmt(dailyMin)}</td>
@@ -4476,7 +4533,6 @@ function mkResultBlock7(allOk, form, ageGroup, freqMin, freqMax, amtMax, coeff, 
       <thead>
         <tr class="res-h1">
           <th rowspan="2" style="text-align:left;min-width:150px;">성분명 / 항목</th>
-          <th rowspan="2" style="min-width:72px;">1${esc(dosageUnit)}당<br><span style="font-weight:400;color:var(--graphite);">배합량</span></th>
           <th colspan="2" class="res-g-std">표제기 기준 (1일)</th>
           <th colspan="2" class="res-g-prod">제품 1일 함량</th>
           <th rowspan="2" style="min-width:62px;">판정</th>
@@ -4536,7 +4592,6 @@ function mkResultRow9(ts, ok, label, dose1, dailyMin, dailyMax, dose1Max, critMi
   const fmt = v => v != null ? (+v).toLocaleString('ko-KR', { maximumFractionDigits: 3 }) : '—';
   return `<tr class="${resRowCls(ok)}">
     <td class="res-name">${esc(label)}</td>
-    <td class="res-num">${fmt(dose1)}</td>
     <td class="res-num res-c-std">—</td>
     <td class="res-num res-c-std">${fmt(dose1Max)}</td>
     <td class="res-num res-c-std">${fmt(critMin)}</td>
@@ -4573,7 +4628,6 @@ function mkResultBlock9(allOk, form, ageGroup, freqMin, freqMax, amtMax, coeff, 
       <thead>
         <tr class="res-h1">
           <th rowspan="2" style="text-align:left;min-width:150px;">성분명 / 항목</th>
-          <th rowspan="2" style="min-width:72px;">1${esc(dosageUnit)}당<br><span style="font-weight:400;color:var(--graphite);">배합량</span></th>
           <th colspan="4" class="res-g-std">표제기 기준</th>
           <th colspan="2" class="res-g-prod">제품 1일 함량</th>
           <th rowspan="2" style="min-width:62px;">판정</th>
@@ -4707,7 +4761,7 @@ function renderEfficacy(result) {
 
   return `<div class="res-doc">
     <div class="res-doc-head">
-      <span class="res-sec-title">효능효과 자동 생성</span>
+      <span class="res-sec-title">[효능효과]</span>
       ${hasFinal ? resCopyBtn('__effCopyText') : ''}
     </div>
     <div class="res-doc-body">
@@ -4958,6 +5012,12 @@ function captureProductState() {
 }
 
 async function saveProduct() {
+  // 저장 줄에 적은 이름을 정본으로 삼는다
+  const typed = document.getElementById('save-name')?.value.trim();
+  if (typed) {
+    const hidden = document.getElementById('product-name');
+    if (hidden) hidden.value = typed;
+  }
   const state = captureProductState();
   if (!state) return;
 
