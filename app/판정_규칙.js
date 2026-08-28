@@ -2544,10 +2544,14 @@ function renderPrecautions(sections) {
       }
       return `${subHdr}<tr><td style="${ts}${extraStyle}">${it.displayNum}) ${esc(cleanText).replace(/\n/g,'<br>')}${badge}</td></tr>`;
     }).join('');
-    return `<div style="margin-bottom:10px;">
-      <div style="font-size:11.5px;font-weight:600;color:var(--obsidian);padding:3px 0 5px;border-bottom:1px solid var(--hairline);margin-bottom:3px;">${secIdx + 1}. ${esc(sec.label)}</div>
-      <table style="width:100%;border-collapse:collapse;"><tbody>${rows}</tbody></table>
-    </div>`;
+    // 다섯 절이 늘 펼쳐져 있으면 결과 화면이 지나치게 길어진다.
+    // 첫 절만 펴 두고 나머지는 접는다 — 복사 버튼은 전체 문구를 그대로 담는다.
+    return `<details class="fold"${secIdx === 0 ? ' open' : ''}>
+      <summary>${secIdx + 1}. ${esc(sec.label)}</summary>
+      <div class="fold-body">
+        <table style="width:100%;border-collapse:collapse;"><tbody>${rows}</tbody></table>
+      </div>
+    </details>`;
   }).join('');
   return `<div class="res-doc">
     <div class="res-doc-head">
@@ -2813,6 +2817,19 @@ function runValidation() {
 
   if (!ch)   { setStatus('장을 선택하세요', 'error'); return; }
   if (!form) { setStatus('제형을 선택하세요', 'error'); return; }
+
+  // 못 쓰는 배합량(음수·문자)이 하나라도 있으면 검토하지 않는다.
+  // 그냥 넘기면 그 성분이 결과에서 통째로 빠지고 "적합"이 나온다.
+  if (typeof badDoseRows === 'function') {
+    const bad = badDoseRows();
+    if (bad.length) {
+      const names = bad.slice(0, 3).map(r => r.ingr).filter(Boolean).join(', ');
+      setStatus(`배합량을 확인하세요 — ${names}${bad.length > 3 ? ` 외 ${bad.length - 3}건` : ''} (0보다 큰 숫자만 넣을 수 있습니다)`, 'error');
+      const first = document.querySelector('.mx-dose-input.is-bad');
+      if (first) { first.scrollIntoView({ block: 'center' }); first.focus(); }
+      return;
+    }
+  }
 
   const validDosageRows = dosageRows.filter(dr => dr.age);
   if (!validDosageRows.length) { setStatus('연령을 1개 이상 선택하세요', 'error'); return; }

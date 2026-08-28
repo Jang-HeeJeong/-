@@ -215,6 +215,9 @@ function flowSnapshot(win) {
     ageUserSet: win.eval('(dosageRows)').map(r => !!r.ageUserSet),
     chapterUserSet: win.eval('(chapterUserSet)'),
     notice: noticeVisible ? noticeEl.textContent.replace(/\s+/g, ' ').trim() : '',
+    badCount: win.eval('(typeof badDoseRows === "function" ? badDoseRows().length : -1)'),
+    validateDisabled: !!d.getElementById('btn-validate').disabled,
+    resultShown: (d.getElementById('results-body').innerText || '').includes('전체 판정'),
   };
 }
 
@@ -233,6 +236,18 @@ function flowStep(win, step) {
     c.dispatchEvent(new win.Event('change', { bubbles: true }));
   } else if (step.restore != null) {
     win.restoreProductState(step.restore);
+  } else if (step.setDose != null) {
+    const wrapId = ['ch1-integrated-wrap', 'ch2-integrated-wrap']
+      .find(id => { const e = d.getElementById(id); return e && e.style.display !== 'none'; });
+    const ins = wrapId ? [...d.querySelectorAll('#' + wrapId + ' .mx-dose-input')] : [];
+    for (const [idx, val] of Object.entries(step.setDose)) {
+      const el = ins[+idx];
+      if (!el) throw new Error('배합량 입력칸 없음: ' + idx);
+      el.value = String(val);
+      el.dispatchEvent(new win.Event('input', { bubbles: true }));
+    }
+  } else if (step.runValidation) {
+    d.getElementById('btn-validate').click();
   } else if (step.chooseFirstAge) {
     const cb = d.querySelector('.js-ch1-age-cb, .js-ch2-age');
     if (!cb) throw new Error('연령 선택 요소를 찾지 못함');
@@ -404,7 +419,10 @@ async function main() {
         break;
       }
     }
-    const label = f.steps.map(st => st.pick ?? st.setChapter?.split('_')[0] ?? (st.restore ? '저장제품' : '연령선택')).join(' → ');
+    const label = f.steps.map(st =>
+      st.pick ?? st.setChapter?.split('_')[0]
+      ?? (st.setDose ? '배합량 입력' : st.runValidation ? '검토 실행' : st.restore ? '저장제품' : '연령선택')
+    ).join(' → ');
     if (errMsg)      { results.err++;  renderCase(s4, 'err',  f.id, f.desc, null, errMsg); }
     else if (diffs.length) { results.fail++; renderCase(s4, 'fail', f.id, `${f.desc}  [${label}]`, diffs); }
     else             { results.pass++; renderCase(s4, 'pass', f.id, `${f.desc}  [${label}]`); }

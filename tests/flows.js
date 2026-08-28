@@ -87,4 +87,27 @@ window.FLOW_CASES = [
                   noticeHasNot: '표준제조기준 대상 품목이 아닐 수 있습니다' } },
     ],
   },
+  {
+    id: 'flow-bad-dose-blocks',
+    desc: '음수 배합량은 조용히 빠지지 않고 검토를 막아야 함 (R-01)',
+    steps: [
+      { setChapter: '제1장_비타민미네랄' },
+      // 정상값 하나 + 오타값 하나
+      { setDose: { 3: 5 },   expect: { badCount: 0, validateDisabled: false } },
+      { setDose: { 4: -30 }, expect: { badCount: 1, validateDisabled: true } },
+      // 이 상태로 검토를 눌러도 결과가 나오면 안 된다
+      { runValidation: true, expect: { resultShown: false } },
+      // 값을 고치면 다시 검토할 수 있다
+      { setDose: { 4: 30 },  expect: { badCount: 0, validateDisabled: false } },
+      { runValidation: true, expect: { resultShown: true } },
+    ],
+  },
+  {
+    id: 'flow-bad-dose-stays-visible',
+    desc: '못 쓰는 값이 든 행은 "입력된 성분만 보기"에도 남아야 함 (R-01)',
+    steps: [
+      { setChapter: '제1장_비타민미네랄' },
+      { setDose: { 3: 5, 4: -30 }, expect: { filled: 2 } },
+    ],
+  },
 ];

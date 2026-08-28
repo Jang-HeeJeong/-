@@ -318,6 +318,72 @@ window.EXPECTED = {
       "prop": null,
       "coeff": 1
     },
+    "ch1-edge-exact-max": {
+      "items": [
+        {
+          "ingr": "아스코르브산",
+          "ok": true,
+          "dailyMin": 1500,
+          "dailyMax": 1500,
+          "critMin": 50,
+          "critMax": 1500,
+          "dose1Min": null,
+          "dose1Max": null,
+          "crit1Min": null,
+          "crit1Max": null,
+          "unit": "mg",
+          "reason": ""
+        }
+      ],
+      "sums": [],
+      "rules": [],
+      "prop": null,
+      "coeff": 1
+    },
+    "ch1-edge-exact-min": {
+      "items": [
+        {
+          "ingr": "티아민질산염",
+          "ok": true,
+          "dailyMin": 1,
+          "dailyMax": 1,
+          "critMin": 1,
+          "critMax": 100,
+          "dose1Min": null,
+          "dose1Max": null,
+          "crit1Min": null,
+          "crit1Max": null,
+          "unit": "mg",
+          "reason": ""
+        }
+      ],
+      "sums": [],
+      "rules": [],
+      "prop": null,
+      "coeff": 1
+    },
+    "ch1-edge-decimal": {
+      "items": [
+        {
+          "ingr": "시아노코발라민",
+          "ok": false,
+          "dailyMin": 0.3,
+          "dailyMax": 0.3,
+          "critMin": 1,
+          "critMax": 1500,
+          "dose1Min": null,
+          "dose1Max": null,
+          "crit1Min": null,
+          "crit1Max": null,
+          "unit": "μg",
+          "reason": "1일 최소 미달: 0.3 < 1 μg"
+        }
+      ],
+      "sums": [],
+      "rules": [],
+      "prop": null,
+      "coeff": 1
+    },
     "ch2-apap-ok": {
       "items": [
         {

@@ -122,6 +122,15 @@
       margin-bottom: 4px; padding-bottom: 14px;
       border-bottom: 1px solid var(--hairline);
     }
+    /* 배합량을 넣는 동안 "1일 몇 회 기준이었지?"를 계속 볼 수 있어야 한다.
+       용법용량 줄을 패널 위에 붙여 둔다. */
+    .dosage-sticky {
+      position: sticky; top: 0; z-index: 20;
+      background: var(--white);
+      margin: 0 -14px; padding: 8px 14px 10px;
+      box-shadow: 0 1px 0 var(--hairline);
+    }
+    .dosage-sticky.is-stuck { box-shadow: 0 1px 0 var(--hairline), 0 6px 12px -8px rgba(0,0,0,.18); }
 
     /* ── 제품 검색 / 제품명 줄 ── */
     #fg-product-name { margin-bottom: 12px; }
@@ -241,13 +250,13 @@
     }
     .mx-table thead tr.mx-hdr1 th {
       background: var(--paper); color: var(--charcoal);
-      font-size: 10.5px; font-weight: 600;
-      padding: 6px 5px; top: 0;
+      font-size: var(--t-sm); font-weight: var(--w-bold);
+      padding: 7px 6px; top: 0;
     }
     .mx-table thead tr.mx-hdr2 th {
-      background: var(--paper); color: var(--graphite);
-      font-size: 10px; font-weight: 500;
-      padding: 4px 5px; top: 0;   /* 실제 값은 syncStickyHeaders()가 정한다 */
+      background: var(--paper); color: var(--stone);
+      font-size: var(--t-xs); font-weight: var(--w-normal);
+      padding: 5px 6px; top: 0;   /* 실제 값은 syncStickyHeaders()가 정한다 */
     }
     /* 머리글 밑선은 표 전체를 가로지르는 한 줄로.
        위아래 2단이라 그냥 두면 묶음 칸 아래에만 선이 하나 더 생긴다. */
@@ -259,20 +268,26 @@
     .mx-table thead th.mx-th-prod { background: var(--prod-head) !important; color: var(--prod-head-fg) !important; }
     .mx-table thead tr.mx-hdr2 th.mx-th-std  { background: var(--std-head2)  !important; color: var(--std-head2-fg)  !important; }
     .mx-table thead tr.mx-hdr2 th.mx-th-prod { background: var(--prod-head2) !important; color: var(--prod-head2-fg) !important; }
-    /* 두 무리 사이 세로 경계 */
-    .mx-table th.mx-th-std,
-    .mx-table td.mx-std:first-of-type  { border-left: 2px solid var(--std-rule); }
-    .mx-table thead tr.mx-hdr2 th.mx-th-std ~ th.mx-th-std { border-left: none; }
-    .mx-table th.mx-th-prod,
-    .mx-table td.mx-prod:first-of-type { border-left: 2px solid var(--std-rule); }
-    .mx-table thead tr.mx-hdr2 th.mx-th-prod ~ th.mx-th-prod { border-left: none; }
+    /* 무리가 바뀌는 자리에만 세로선 한 줄 — 결과표와 같은 규칙 */
+    .mx-table th.mx-th-std, .mx-table th.mx-th-prod,
+    .mx-table td.mx-std, .mx-table td.mx-prod { border-left: none; }
+    .mx-table tr.mx-hdr1 th.mx-th-std,
+    .mx-table tr.mx-hdr1 th.mx-th-prod            { border-left: 2px solid var(--std-rule); }
+    .mx-table tr.mx-hdr2 th:first-child           { border-left: 2px solid var(--std-rule); }
+    .mx-table tr.mx-hdr2 th.mx-th-std + th.mx-th-prod { border-left: 2px solid var(--std-rule); }
+    .mx-table td:not(.mx-std) + td.mx-std          { border-left: 2px solid var(--std-rule); }
+    .mx-table td.mx-std + td.mx-prod               { border-left: 2px solid var(--std-rule); }
     /* 작업자가 채우는 열 — 머리글에도 같은 노랑 */
     .mx-table thead th.mx-th-input { background: #fdf3c4 !important; color: #6b5410 !important; box-shadow: none; }
     .mx-table tbody td {
-      padding: 3px 6px;
+      padding: 4px 7px;
       border: none; border-bottom: 1px solid #f3f3f3;
-      text-align: right; vertical-align: middle; font-size: 12px;
+      text-align: right; vertical-align: middle; font-size: var(--t-md);
     }
+    /* 실제로 눈이 오가는 네 숫자에 자리를 준다.
+       예전에는 이 칸들이 34~44px로 표에서 가장 좁았다. */
+    .mx-table td.mx-std, .mx-table td.mx-prod,
+    .mx-table th.mx-th-std, .mx-table th.mx-th-prod { min-width: 72px; }
     .mx-table tbody td.mx-name { text-align: left; white-space: nowrap; min-width: 150px; }
     .mx-table tbody td.mx-gubun-cell { text-align: center; font-size: 11px; color: #555; }
     .mx-table tbody tr.mx-group-hdr td {
@@ -320,6 +335,30 @@
     }
     input.mx-dose-input::placeholder { color: #c8b268; }
     /* .mx-ok / .mx-fail / .mx-na 는 app/디자인.css 의 판정 칩을 쓴다 */
+    /* 노랑은 "아직 안 채운 곳"만 뜻한다.
+       채우고 나면 흰 바탕으로 바뀌어, 화면에 남은 노랑이 곧 남은 할 일이 된다. */
+    input.mx-dose-input.is-filled {
+      background: var(--white);
+      box-shadow: var(--ring2);
+    }
+    .mx-table tbody td.mx-dose-cell-input.is-filled { background: transparent; }
+    select.need-input.is-filled, button.need-input.is-filled {
+      background: var(--white); box-shadow: var(--ring2);
+    }
+    .fill-zone.is-filled { background: transparent; box-shadow: none; padding-left: 0; padding-right: 0; }
+    .need.is-done { display: none; }
+
+    /* 값 확인 — 못 쓰는 배합량이 든 행 */
+    .mx-bad {
+      display: inline-block; border-radius: 4px; padding: 2px 8px;
+      font-size: 11px; font-weight: 600; letter-spacing: -.01em;
+      background: var(--red); color: #fff;
+    }
+    input.mx-dose-input.is-bad {
+      background: var(--red-bg);
+      box-shadow: 0 0 0 2px var(--red);
+      color: var(--red); font-weight: 600;
+    }
     .mx-remove-btn {
       background: none; border: none; cursor: pointer; color: #999; font-size: 14px; padding: 0 2px; line-height: 1;
     }
@@ -381,6 +420,17 @@
     }
     #live-summary .ls-chip.ok   { background: var(--green-bg); color: var(--green); box-shadow: 0 0 0 1px #cfe6d4; }
     #live-summary .ls-chip.fail { background: var(--red); color: #fff; font-weight: 600; }
+    /* 부적합이 있으면 눌러서 그 행으로 갈 수 있다 */
+    #live-summary .ls-jump {
+      background: none; border: none; box-shadow: var(--ring2);
+      border-radius: 4px; padding: 2px 9px; cursor: pointer;
+      font-family: inherit; font-size: 12px; color: var(--charcoal);
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    #live-summary .ls-jump:hover { background: var(--white); color: var(--obsidian); }
+    .mx-table tbody tr.mx-row.is-flash > td {
+      background-image: linear-gradient(rgba(198,40,40,.14), rgba(198,40,40,.14));
+    }
     .panel-footer .btn-primary { flex: 0 0 auto; min-width: 130px; }
 
     /* ② 성분표 도구모음 (필터 / 접기) */
@@ -421,6 +471,9 @@
       font-family: inherit;
     }
     #btn-toggle-results:hover { background: var(--paper); color: var(--obsidian); }
+    /* 붙여 넣을 문구가 좁은 칸에 갇히지 않도록 6:4로 나눈다 */
+    #panel-input   { flex: 6 1 0; min-width: 0; }
+    #panel-results { flex: 4 1 0; min-width: 0; }
     main.results-collapsed #panel-input   { flex: 1 1 auto; min-width: 0; }
     main.results-collapsed #panel-results { flex: 0 0 38px; }
     main.results-collapsed #panel-results .panel-body { display: none; }
@@ -462,7 +515,7 @@
     .res-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 12px; }
     table.res-table {
       width: 100%; min-width: 620px;
-      border-collapse: collapse; font-size: 11px;
+      border-collapse: collapse; font-size: var(--t-md);
     }
     .res-table th, .res-table td {
       border: none; border-bottom: 1px solid #f3f3f3;
@@ -473,8 +526,8 @@
       font-weight: 600; text-align: center; white-space: nowrap;
       background: var(--paper); color: var(--charcoal);
     }
-    .res-table thead tr.res-h1 th { font-size: 10.5px; padding: 6px; }
-    .res-table thead tr.res-h2 th { font-size: 10px; padding: 4px 6px; font-weight: 500; color: var(--graphite); }
+    .res-table thead tr.res-h1 th { font-size: var(--t-sm); padding: 7px 6px; }
+    .res-table thead tr.res-h2 th { font-size: var(--t-xs); padding: 5px 6px; font-weight: var(--w-normal); color: var(--stone); }
     /* 머리글 밑선은 표 전체를 가로지르는 한 줄로 */
     .res-table thead tr.res-h1 th          { border-bottom: none; }
     .res-table thead tr.res-h1 th[rowspan] { border-bottom: 1px solid var(--ash); }
@@ -486,12 +539,15 @@
     .res-table tr.res-h2 th.res-g-prod { background: var(--prod-head2) !important; color: var(--prod-head2-fg) !important; }
     .res-table td.res-c-std  { background: var(--std-bg); }
     .res-table td.res-c-prod { background: var(--prod-bg); }
-    /* 두 무리 사이 세로 경계 — 어디까지가 기준인지 한눈에 */
-    .res-table th.res-g-std:first-of-type,
-    .res-table td.res-c-std:first-of-type  { border-left: 2px solid var(--std-rule); }
-    .res-table th.res-g-prod,
-    .res-table td.res-c-prod:first-of-type { border-left: 2px solid var(--std-rule); }
-    .res-table tr.res-h2 th.res-g-prod ~ th.res-g-prod { border-left: none; }
+    /* 무리가 바뀌는 자리에만 세로선 한 줄 */
+    .res-table th.res-g-std, .res-table th.res-g-prod,
+    .res-table td.res-c-std, .res-table td.res-c-prod { border-left: none; }
+    .res-table tr.res-h1 th.res-g-std,
+    .res-table tr.res-h1 th.res-g-prod          { border-left: 2px solid var(--std-rule); }
+    .res-table tr.res-h2 th:first-child         { border-left: 2px solid var(--std-rule); }
+    .res-table tr.res-h2 th.res-g-std + th.res-g-prod { border-left: 2px solid var(--std-rule); }
+    .res-table td:not(.res-c-std) + td.res-c-std      { border-left: 2px solid var(--std-rule); }
+    .res-table td.res-c-std + td.res-c-prod           { border-left: 2px solid var(--std-rule); }
     .res-table td.res-name   { text-align: left; }
     .res-table td.res-name .res-item-no {
       display: inline-block; font-size: 9.5px; color: var(--stone);
@@ -550,6 +606,25 @@
     }
     .btn-copy:hover { background: var(--paper); color: var(--obsidian); }
     .btn-copy.copied { background: var(--green); box-shadow: none; color: #fff; }
+    /* 접이식 묶음 — 주의사항 5개 절, 기타 첨가제 */
+    details.fold { margin-bottom: 12px; }
+    details.fold > summary {
+      cursor: pointer; list-style: none;
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 10px; border-radius: var(--r);
+      background: var(--paper); box-shadow: var(--ring2);
+      font-size: var(--t-sm); font-weight: var(--w-bold); color: var(--obsidian);
+      user-select: none;
+    }
+    details.fold > summary::-webkit-details-marker { display: none; }
+    details.fold > summary::before {
+      content: '▸'; font-size: 9px; color: var(--graphite);
+      transition: transform .12s;
+    }
+    details.fold[open] > summary::before { transform: rotate(90deg); }
+    details.fold > summary:hover { background: var(--white); }
+    details.fold > .fold-body { padding: 10px 2px 2px; }
+
     .res-doc-body {
       background: var(--paper); border: none; box-shadow: var(--ring2); border-radius: 4px;
       padding: 10px 14px; min-height: 40px;
@@ -750,7 +825,9 @@
 
       <!-- 첨가제 섹션 -->
       <div id="fg-excipient" style="display:none;">
-      <div class="section-title" style="margin-top:14px;">기타 첨가제 <span style="font-size:10px;font-weight:400;color:var(--graphite);">(사용상 주의사항 추가 적용)</span></div>
+      <details class="fold" style="margin-top:14px;">
+        <summary>기타 첨가제 <span style="font-weight:400;color:var(--graphite);">(사용상 주의사항 추가 적용)</span></summary>
+        <div class="fold-body">
       <div class="excipient-add-row">
         <select id="excipient-select" onchange="addExcipient()">
           <option value="">-- 첨가제 선택 --</option>
@@ -782,6 +859,8 @@
         </select>
       </div>
       <div class="excipient-tags" id="excipient-tags"></div>
+        </div>
+      </details>
       </div>
 
     </div>
@@ -935,6 +1014,30 @@ function resetChapterState(key) {
 function ch1SectionOf(r) {
   return r.type === 'vit' ? '비타민' : r.type === 'min' ? '미네랄' : r.type === 'etc' ? '기타성분' : '생약';
 }
+/* 못 쓰는 배합량인지 — 값은 들어 있는데 계산에 쓸 수 없는 경우.
+   예전에는 이런 값을 "안 넣은 것"으로 처리해서, 화면에는 -30이 보이는데
+   검토에서는 그 성분이 통째로 빠지고 결과가 "적합"으로 나왔다. */
+function doseIsBad(v) {
+  if (v === '' || v == null) return false;
+  const n = +v;
+  return Number.isNaN(n) || n < 0;
+}
+function ch1RowHasBadDose(r) {
+  if (r.type === 'min' && r.mgSaltMode) {
+    return (r.mgSalts ?? []).some(sa => doseIsBad(sa.saltDose));
+  }
+  return doseIsBad(r.dose);
+}
+function mxRowHasBadDose(r) { return doseIsBad(r.dose); }
+
+/* 지금 화면에서 못 쓰는 값이 든 행 */
+function badDoseRows() {
+  if (currentKey === '제1장_비타민미네랄') {
+    return ch1Rows.filter(r => r.isShown && ch1RowHasBadDose(r));
+  }
+  return matrixRows.filter(r => (r.isMain || r.isShown) && mxRowHasBadDose(r));
+}
+
 function ch1RowHasDose(r) {
   if (r.type === 'min' && r.mgSaltMode) {
     return (r.mgSalts ?? []).some(sa => +sa.saltDose > 0);
@@ -1054,10 +1157,69 @@ function refreshIngrCounts() {
   });
 }
 
+/* 노랑(= 아직 안 채움)을 켜고 끄는 곳. 값이 들어오면 흰 바탕으로 바꾼다. */
+function markFilled(el, filled, bad) {
+  if (!el) return;
+  el.classList.toggle('is-bad', !!bad);
+  el.classList.toggle('is-filled', !!filled && !bad);
+  const cell = el.closest('.mx-dose-cell-input');
+  if (cell) cell.classList.toggle('is-filled', !!filled && !bad);
+}
+
+/* 용법용량·연령처럼 "고르면 끝"인 칸의 노랑을 정리한다 */
+function refreshFillMarks() {
+  for (const el of document.querySelectorAll('.need-input')) {
+    const done = el.tagName === 'BUTTON'
+      ? !/연령을 선택|— 연령 —/.test(el.textContent)
+      : !!el.value;
+    el.classList.toggle('is-filled', done);
+  }
+  for (const zone of document.querySelectorAll('.fill-zone')) {
+    const inputs = [...zone.querySelectorAll('.need-input')];
+    const allDone = inputs.length > 0 && inputs.every(i => i.classList.contains('is-filled'));
+    zone.classList.toggle('is-filled', allDone);
+    const tag = zone.closest('.input-step, .ch2-block')?.querySelector('.need');
+    if (tag) tag.classList.toggle('is-done', allDone);
+  }
+}
+
+/* 부적합 행 사이를 오간다 — 47행에서 걸린 곳을 찾아 내려가지 않아도 되게 */
+let _failCursor = 0;
+function jumpToNextFail() {
+  const wrap = activeIngrWrap();
+  if (!wrap) return;
+  const rows = [...wrap.querySelectorAll('tr.mx-row, tr.mg-subtotal-row')]
+    .filter(tr => tr.querySelector('[data-col="ok"] .mx-fail, [data-col="ok"] .mx-bad'));
+  if (!rows.length) return;
+  _failCursor = _failCursor % rows.length;
+  const tr = rows[_failCursor];
+  _failCursor = (_failCursor + 1) % rows.length;
+  tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  for (const r of rows) r.classList.remove('is-flash');
+  tr.classList.add('is-flash');
+  setTimeout(() => tr.classList.remove('is-flash'), 1600);
+  const label = wrap.querySelector('.ls-jump-label');
+  if (label) label.textContent = `${(_failCursor || rows.length)}/${rows.length}`;
+}
+
 function updateLiveSummary() {
+  refreshFillMarks();
   refreshIngrCounts();
   const bar = document.getElementById('live-summary');
   if (!bar) return;
+
+  // 못 쓰는 값이 하나라도 있으면 다른 집계보다 먼저 알린다
+  const bad = badDoseRows();
+  const btn = document.getElementById('btn-validate');
+  if (bad.length) {
+    bar.innerHTML = `<span class="ls-chip fail">값 확인 ${bad.length}건</span>`
+      + `<span style="color:var(--red);">배합량에 0보다 큰 숫자만 넣을 수 있습니다 —`
+      + ` ${esc(bad[0].ingr ?? '')}${bad.length > 1 ? ` 외 ${bad.length - 1}건` : ''}</span>`;
+    if (btn) { btn.disabled = true; btn.title = '배합량을 고친 뒤 검토할 수 있습니다'; }
+    return;
+  }
+  if (btn && currentKey) { btn.disabled = false; btn.title = ''; }
+
   const wrap = activeIngrWrap();
   const okSet = new Set(), failSet = new Set();
   if (!wrap) {
@@ -1078,6 +1240,10 @@ function updateLiveSummary() {
     return;
   }
   let h = '';
+  if (nFail) {
+    h += `<button type="button" class="ls-jump" onclick="jumpToNextFail()" title="부적합 항목으로 이동">`
+       + `부적합 보기 <span class="ls-jump-label">1/${nFail}</span> &rsaquo;</button>`;
+  }
   h += `<span class="ls-chip ok">적합 ${nOk}</span>`;
   h += `<span class="ls-chip fail" style="${nFail ? '' : 'opacity:.45;'}">부적합 ${nFail}</span>`;
   h += nFail
@@ -1226,6 +1392,7 @@ function onChapterChange(key) {
   { const st = document.querySelector('.section-title[data-sec="ingr"]'); if (st) st.style.display = ch ? '' : 'none'; }
   { const ex = $('fg-excipient');  if (ex) ex.style.display = ch ? '' : 'none'; }
   { const ab = $('action-bar');    if (ab) ab.style.display = ch ? '' : 'none'; }
+  if (typeof refreshFillMarks === 'function') refreshFillMarks();
   $('btn-add-dosage').disabled = !ch;
   if (useClassicDosage) renderDosageRows();
 
@@ -1817,9 +1984,11 @@ function renderCh1Integrated() {
 
   const shownRows    = ch1Rows.filter(r => r.isShown);
   const filledCount  = shownRows.filter(ch1RowHasDose).length;
+  // 못 쓰는 값이 든 행은 "입력된 성분만 보기"에도 반드시 남긴다 — 안 보이면 고칠 수 없다
+  const keepVisible  = r => ch1RowHasDose(r) || ch1RowHasBadDose(r);
   // "입력된 성분만 보기"가 켜져 있으면 배합량이 있는 행만 (없으면 전체 유지)
   const visibleRows  = (ch1OnlyFilled && filledCount)
-    ? shownRows.filter(ch1RowHasDose)
+    ? shownRows.filter(keepVisible)
     : shownRows;
   const drElevHints  = new Map(); // dr.id → [{ingr, max, unit, threshMonths}]
 
@@ -2023,8 +2192,8 @@ function renderCh1Integrated() {
     <thead>
       <tr class="mx-hdr1">
         <th rowspan="2" style="width:24px;"></th>
-        <th rowspan="2" style="min-width:60px;text-align:center;white-space:nowrap;">항목</th>
-        <th rowspan="2" style="min-width:140px;text-align:center;">성분명</th>
+        <th rowspan="2" style="min-width:52px;text-align:center;white-space:nowrap;">항목</th>
+        <th rowspan="2" style="min-width:118px;text-align:left;">성분명</th>
         <th rowspan="2" class="mx-th-input" style="min-width:68px;">배합량 ✎</th>
         <th rowspan="2" class="mx-th-unit">단위</th>
         <th colspan="2" class="mx-th-std">표제기 기준 (1일)</th>
@@ -2254,7 +2423,9 @@ function renderCh1Integrated() {
         }
       }
       let okHtml;
-      if (ok === null) {
+      if (ch1RowHasBadDose(row)) {
+        okHtml = '<span class="mx-bad">값 확인</span>';
+      } else if (ok === null) {
         okHtml = '<span class="mx-na">미입력</span>';
       } else if (ok) {
         okHtml = '<span class="mx-ok">적합</span>';
@@ -2317,7 +2488,7 @@ function renderCh1Integrated() {
       }
       // 배합량
       if (isFirst) {
-        rows += `<td class="mx-dose-cell-input" style="text-align:center;padding:2px 3px;"><input type="number" class="mx-dose-input" data-id="${row.id}" value="${esc(doseFieldVal(row.dose))}" min="0" step="0.001" placeholder="0"></td>`;
+        rows += `<td class="mx-dose-cell-input${ch1RowHasDose(row)&&!ch1RowHasBadDose(row)?' is-filled':''}" style="text-align:center;padding:2px 3px;"><input type="number" class="mx-dose-input${ch1RowHasBadDose(row)?' is-bad':ch1RowHasDose(row)?' is-filled':''}" data-id="${row.id}" value="${esc(doseFieldVal(row.dose))}" min="0" step="0.001" placeholder="0"></td>`;
         rows += `<td class="mx-unit-cell" style="text-align:center;padding:2px 3px;"><select class="js-ch1-unit" data-id="${row.id}">${unitOpts(row.unit)}</select></td>`;
       } else {
         rows += `<td class="ch1-dose-cell" data-row-id="${row.id}" style="text-align:center;background:var(--paper);font-size:12px;padding:3px 5px;">${dose!=null?fmtN(dose):'<span style="color:#ccc;">—</span>'}</td>`;
@@ -2360,7 +2531,7 @@ function renderCh1Integrated() {
     const badge       = isFirst ? '기본 연령' : '추가 연령';
 
     html += `<div class="ch2-block" data-dr-id="${dr.id}" style="box-shadow:var(--ring2);border-radius:var(--r);padding:9px 11px;margin-bottom:10px;background:var(--white);">`;
-    html += `<div class="fill-zone" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:7px;">`;
+    html += `<div class="fill-zone dosage-sticky" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:7px;">`;
     html += `<span style="font-size:10.5px;font-weight:600;color:${labelColor};white-space:nowrap;">${badge}</span>`;
     html += buildAgeMultiSelect(dr);
     html += `<span style="color:var(--charcoal);font-size:12px;font-weight:600;white-space:nowrap;">1일</span>`;
@@ -2482,6 +2653,7 @@ function renderCh1Integrated() {
     const row = ch1Rows.find(r => r.id === +e.target.dataset.id);
     if (!row) return;
     row.dose = e.target.value;
+    markFilled(e.target, +e.target.value > 0, doseIsBad(e.target.value));
     const dose = (row.dose!==''&&!isNaN(+row.dose)&&+row.dose>0) ? +row.dose : null;
     wrap.querySelectorAll(`.ch1-dose-cell[data-row-id="${row.id}"]`).forEach(td => {
       td.innerHTML = dose!=null ? fmtN(dose) : '<span style="color:#ccc;">—</span>';
@@ -2847,7 +3019,9 @@ function renderCh2Integrated() {
   const ss = 'padding:4px 5px;font-size:13px;font-family:inherit;';
   const shownRows   = matrixRows.filter(r => r.isMain || r.isShown);
   const filledCount = shownRows.filter(mxRowHasDose).length;
-  const visibleRows = (mxOnlyFilled && filledCount) ? shownRows.filter(mxRowHasDose) : shownRows;
+  const visibleRows = (mxOnlyFilled && filledCount)
+    ? shownRows.filter(r => mxRowHasDose(r) || mxRowHasBadDose(r))
+    : shownRows;
   // 표제기 기준 1회 최소/최대 열: 해당 장에 1회 기준값이 있을 때만 표시
   const hasStd1dose = visibleRows.some(r => r.std.min1 != null || r.std.max1 != null);
   const stdColspan  = hasStd1dose ? 4 : 2;
@@ -2994,7 +3168,8 @@ function renderCh2Integrated() {
                  (dispMax1d!=null&&act1dmax>dispMax1d)||(dispMin1d!=null&&act1dmin<dispMin1d));
         }
       }
-      const okHtml = ok===null ? '<span class="mx-na">미입력</span>'
+      const okHtml = mxRowHasBadDose(row) ? '<span class="mx-bad">값 확인</span>'
+                   : ok===null ? '<span class="mx-na">미입력</span>'
                    : ok ? '<span class="mx-ok">적합</span>' : '<span class="mx-fail">부적합</span>';
       const rowCls = isActive ? 'mx-row mx-active' : 'mx-row';
       const canRemove = isFirst && !row.isMain && row.isShown;
@@ -3013,7 +3188,7 @@ function renderCh2Integrated() {
       rows += `<td class="mx-std">${fmtN(dispMax1d)}</td>`;
       // 단위당 함량: 첫 번째 블록은 편집 가능, 추가 블록은 읽기 전용
       if (isFirst) {
-        rows += `<td class="mx-dose-cell-input" style="text-align:center;"><input type="number" class="mx-dose-input" data-id="${row.id}" value="${esc(doseFieldVal(row.dose))}" min="0" step="0.001" placeholder="0"></td>`;
+        rows += `<td class="mx-dose-cell-input${mxRowHasDose(row)&&!mxRowHasBadDose(row)?' is-filled':''}" style="text-align:center;"><input type="number" class="mx-dose-input${mxRowHasBadDose(row)?' is-bad':mxRowHasDose(row)?' is-filled':''}" data-id="${row.id}" value="${esc(doseFieldVal(row.dose))}" min="0" step="0.001" placeholder="0"></td>`;
       } else {
         rows += `<td class="ch2-dose-cell" data-row-id="${row.id}" style="text-align:center;background:var(--paper);font-size:12px;padding:3px 5px;">${dose!=null?fmtN(dose):'<span style="color:#ccc;">—</span>'}</td>`;
       }
@@ -3039,7 +3214,7 @@ function renderCh2Integrated() {
     html += `<div class="ch2-block" data-dr-id="${dr.id}" style="box-shadow:var(--ring2);border-radius:var(--r);padding:9px 11px;margin-bottom:10px;background:var(--white);">`;
 
     /* 헤더: 연령/복용량 선택 */
-    html += `<div class="fill-zone" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:7px;">`;
+    html += `<div class="fill-zone dosage-sticky" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:7px;">`;
     html += `<span style="font-size:10.5px;font-weight:600;color:${labelColor};white-space:nowrap;">${badge}</span>`;
     html += `<select class="js-ch2-age need-input" data-id="${dr.id}" style="${ss}min-width:190px;">${buildAgeOpts(dr.age)}</select>`;
     html += `<span style="color:var(--charcoal);font-size:12px;font-weight:600;white-space:nowrap;">1일</span>`;
@@ -3124,6 +3299,7 @@ function renderCh2Integrated() {
     const row = matrixRows.find(r => r.id === +e.target.dataset.id);
     if (!row) return;
     row.dose = e.target.value;
+    markFilled(e.target, +e.target.value > 0, doseIsBad(e.target.value));
     const dose = (row.dose!==''&&!isNaN(+row.dose)&&+row.dose>0) ? +row.dose : null;
     // 추가 블록들의 dose 표시 셀 업데이트
     wrap.querySelectorAll(`.ch2-dose-cell[data-row-id="${row.id}"]`).forEach(td => {
@@ -4036,11 +4212,10 @@ function renderChapter1Results(validation, form, ageGroup) {
     return `<tr class="${resRowCls(ok)}">
       <td class="res-name">
         ${r.gubun ? `<span class="res-item-no">${esc(r.gubun)}</span>` : ''}${esc(r.ingr)}
-        ${u ? `<span class="res-unit">(${esc(u)})</span>` : ''}
       </td>
+      <td class="res-num">${esc(perUnitNum(r))}${r.convNote ? `<br><span style="color:var(--graphite);font-size:9.5px;">${esc(r.convNote)}</span>` : ''}</td>
       <td class="res-num res-c-std">${fmtV(r.critMin)}</td>
       <td class="res-num res-c-std">${fmtV(r.critMax)}${r.ageNote ? `<br><span style="color:var(--graphite);font-size:9.5px;">${esc(r.ageNote)}</span>` : ''}</td>
-      <td class="res-num res-c-prod">${esc(perUnitNum(r))}${r.convNote ? `<br><span style="color:var(--graphite);font-size:9.5px;">${esc(r.convNote)}</span>` : ''}</td>
       <td class="res-num res-c-prod">${fmtV(r.dailyMin)}</td>
       <td class="res-num res-c-prod">${fmtV(r.dailyMax)}</td>
       <td class="res-verdict">${resVerdictCell(ok, r.reason)}</td>
@@ -4048,7 +4223,7 @@ function renderChapter1Results(validation, form, ageGroup) {
   }).join('');
 
   const sumRows = sumResults.length > 0 ? `
-    <tr class="res-grp"><td colspan="8">동일 항목 합산 검증</td></tr>
+    <tr class="res-grp"><td colspan="7">동일 항목 합산 검증</td></tr>
     ${sumResults.map(r => `<tr class="${resRowCls(r.ok)}">
         <td class="res-name" colspan="3">
           <span class="res-item-no">${esc(r.key)}</span>${(r.ingredients ?? []).map(esc).join(', ')}
@@ -4092,16 +4267,16 @@ function renderChapter1Results(validation, form, ageGroup) {
       <thead>
         <tr class="res-h1">
           <th rowspan="2" style="text-align:left;min-width:150px;">성분명</th>
+          <th rowspan="2" style="min-width:72px;">1${esc(unitWord)}당<br><span style="font-weight:400;color:var(--graphite);">배합량</span></th>
           <th colspan="2" class="res-g-std">표제기 기준 (1일)</th>
-          <th colspan="3" class="res-g-prod">제품 함량</th>
+          <th colspan="2" class="res-g-prod">제품 1일 함량</th>
           <th rowspan="2" style="min-width:62px;">판정</th>
         </tr>
         <tr class="res-h2">
           <th class="res-g-std">최소</th>
           <th class="res-g-std">최대</th>
-          <th class="res-g-prod">1${esc(unitWord)}당</th>
-          <th class="res-g-prod">1일 최소</th>
-          <th class="res-g-prod">1일 최대</th>
+          <th class="res-g-prod">최소</th>
+          <th class="res-g-prod">최대</th>
         </tr>
       </thead>
       <tbody>
@@ -4158,7 +4333,7 @@ function renderChapter2Results(validation, form, ageGroup) {
     const ac = r.actual  ?? {};
     return `<tr class="${resRowCls(r.ok)}">
       <td style="text-align:center;font-size:10px;color:var(--stone);">${esc(r.gubun || '—')}</td>
-      <td class="res-name">${esc(r.ingr)} <span class="res-unit">(mg)</span></td>
+      <td class="res-name">${esc(r.ingr)}</td>
       <td class="res-num res-c-std">${fmt(al.min1dose)}</td>
       <td class="res-num res-c-std">${fmt(al.max1dose)}</td>
       <td class="res-num res-c-std">${fmt(al.min1d)}</td>
@@ -4267,10 +4442,10 @@ function mkResultRow7(ts, ok, label, dose1, dailyMin, dailyMax, critMin, critMax
   // 단위는 성분명 옆에 한 번만 — 셀마다 반복하지 않는다
   const fmt = v => v != null ? (+v).toLocaleString('ko-KR', { maximumFractionDigits: 3 }) : '—';
   return `<tr class="${resRowCls(ok)}">
-    <td class="res-name">${esc(label)}${unit ? ` <span class="res-unit">(${esc(unit)})</span>` : ''}</td>
+    <td class="res-name">${esc(label)}</td>
+    <td class="res-num">${fmt(dose1)}</td>
     <td class="res-num res-c-std">${fmt(critMin)}</td>
     <td class="res-num res-c-std">${fmt(critMax)}</td>
-    <td class="res-num res-c-prod">${fmt(dose1)}</td>
     <td class="res-num res-c-prod">${fmt(dailyMin)}</td>
     <td class="res-num res-c-prod">${fmt(dailyMax)}</td>
     <td class="res-verdict">${resVerdictCell(ok, reason)}</td>
@@ -4301,16 +4476,16 @@ function mkResultBlock7(allOk, form, ageGroup, freqMin, freqMax, amtMax, coeff, 
       <thead>
         <tr class="res-h1">
           <th rowspan="2" style="text-align:left;min-width:150px;">성분명 / 항목</th>
+          <th rowspan="2" style="min-width:72px;">1${esc(dosageUnit)}당<br><span style="font-weight:400;color:var(--graphite);">배합량</span></th>
           <th colspan="2" class="res-g-std">표제기 기준 (1일)</th>
-          <th colspan="3" class="res-g-prod">제품 함량</th>
+          <th colspan="2" class="res-g-prod">제품 1일 함량</th>
           <th rowspan="2" style="min-width:62px;">판정</th>
         </tr>
         <tr class="res-h2">
           <th class="res-g-std">하한</th>
           <th class="res-g-std">최대</th>
-          <th class="res-g-prod">1${esc(dosageUnit)}당</th>
-          <th class="res-g-prod">1일 최소</th>
-          <th class="res-g-prod">1일 최대</th>
+          <th class="res-g-prod">최소</th>
+          <th class="res-g-prod">최대</th>
         </tr>
       </thead>
       <tbody>${bodyRows}</tbody>
@@ -4360,12 +4535,12 @@ function renderChapter7Results(v, form, ageGroup) {
 function mkResultRow9(ts, ok, label, dose1, dailyMin, dailyMax, dose1Max, critMin, critMax, unit, reason) {
   const fmt = v => v != null ? (+v).toLocaleString('ko-KR', { maximumFractionDigits: 3 }) : '—';
   return `<tr class="${resRowCls(ok)}">
-    <td class="res-name">${esc(label)}${unit ? ` <span class="res-unit">(${esc(unit)})</span>` : ''}</td>
+    <td class="res-name">${esc(label)}</td>
+    <td class="res-num">${fmt(dose1)}</td>
     <td class="res-num res-c-std">—</td>
     <td class="res-num res-c-std">${fmt(dose1Max)}</td>
     <td class="res-num res-c-std">${fmt(critMin)}</td>
     <td class="res-num res-c-std">${fmt(critMax)}</td>
-    <td class="res-num res-c-prod">${fmt(dose1)}</td>
     <td class="res-num res-c-prod">${fmt(dailyMin)}</td>
     <td class="res-num res-c-prod">${fmt(dailyMax)}</td>
     <td class="res-verdict">${resVerdictCell(ok, reason)}</td>
@@ -4398,8 +4573,9 @@ function mkResultBlock9(allOk, form, ageGroup, freqMin, freqMax, amtMax, coeff, 
       <thead>
         <tr class="res-h1">
           <th rowspan="2" style="text-align:left;min-width:150px;">성분명 / 항목</th>
+          <th rowspan="2" style="min-width:72px;">1${esc(dosageUnit)}당<br><span style="font-weight:400;color:var(--graphite);">배합량</span></th>
           <th colspan="4" class="res-g-std">표제기 기준</th>
-          <th colspan="3" class="res-g-prod">제품 함량</th>
+          <th colspan="2" class="res-g-prod">제품 1일 함량</th>
           <th rowspan="2" style="min-width:62px;">판정</th>
         </tr>
         <tr class="res-h2">
@@ -4407,7 +4583,6 @@ function mkResultBlock9(allOk, form, ageGroup, freqMin, freqMax, amtMax, coeff, 
           <th class="res-g-std">1회 최대</th>
           <th class="res-g-std">1일 하한</th>
           <th class="res-g-std">1일 최대</th>
-          <th class="res-g-prod">1${esc(dosageUnit)}당</th>
           <th class="res-g-prod">1일 최소</th>
           <th class="res-g-prod">1일 최대</th>
         </tr>
@@ -4785,17 +4960,40 @@ function captureProductState() {
 async function saveProduct() {
   const state = captureProductState();
   if (!state) return;
-  const existing = _productCache.find(p => p.name === state.name && p.chapter === state.chapter);
-  if (existing) {
-    if (!confirm(`"${state.name}" 제품이 이미 저장되어 있습니다.\n덮어쓰겠습니까?`)) return;
-    state.id = existing.id;
+
+  const sameName = _productCache.filter(p => p.name === state.name);
+  const exact    = sameName.find(p => p.chapter === state.chapter);
+  const otherCh  = sameName.filter(p => p.chapter !== state.chapter);
+
+  if (exact) {
+    const when = exact.savedAt ? `\n마지막 저장: ${fmtSavedAt(exact.savedAt)}` : '';
+    if (!confirm(`"${state.name}" (${state.chapter})이(가) 이미 저장되어 있습니다.${when}\n\n덮어쓰겠습니까?`)) return;
+    state.id = exact.id;
+  } else if (otherCh.length) {
+    // 같은 이름이 다른 장으로 저장돼 있으면, 모르고 두 개를 쌓지 않도록 알린다
+    const list = otherCh.map(p => `· ${p.chapter}${p.savedAt ? ` (${fmtSavedAt(p.savedAt)})` : ''}`).join('\n');
+    if (!confirm(`"${state.name}"이(가) 다른 장으로 이미 저장되어 있습니다.\n${list}\n\n`
+               + `이번 것은 ${state.chapter}(으)로 따로 저장됩니다. 계속할까요?`)) return;
   }
+
+  state.savedAt = new Date().toISOString();
   try {
     await _fsdb.collection(PRODUCTS_COL).doc(state.id).set(state);
-    alert(`"${state.name}" 저장 완료`);
+    setStatus(`"${state.name}" 저장 완료 (${fmtSavedAt(state.savedAt)})`, 'ok');
   } catch(e) {
-    alert('저장 실패: ' + e.message);
+    // 저장에 실패해도 입력한 내용은 화면에 그대로 남는다 — 다시 누르면 된다
+    setStatus(`저장 실패: ${e.message} — 입력 내용은 그대로 있습니다. 잠시 후 다시 눌러 주세요.`, 'error');
   }
+}
+
+/* 저장 시각을 짧게 — "2026-08-28 14:30" */
+function fmtSavedAt(iso) {
+  try {
+    const d = new Date(iso);
+    if (isNaN(+d)) return '';
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  } catch(e) { return ''; }
 }
 
 function filterProductList(query) {
@@ -5043,17 +5241,29 @@ document.addEventListener('DOMContentLoaded', () => {
       const parsed = JSON.parse(saved);
       if (parsed.length > _BUILTIN_PRODUCT_DB.length) {
         _excelDB = parsed;
-        const el = $('excel-db-status');
-        if (el) el.textContent = `✓ ${_excelDB.length}개 제품 (업데이트된 목록)`;
       }
     }
   } catch(e) {}
-  // 내장 DB 상태 표시
-  const statusEl2 = $('excel-db-status');
-  if (statusEl2 && !statusEl2.textContent) {
-    statusEl2.textContent = `✓ ${_excelDB.length}개 제품 내장 (2026.05.27 기준)`;
-  }
+  showExcelSource();
 });
+
+/* 지금 어느 허가목록을 쓰고 있는지 항상 보이게 한다.
+   업로드한 엑셀은 이 브라우저에만 저장되므로, 다른 컴퓨터나
+   브라우저 데이터를 지운 뒤에는 내장 목록으로 돌아간다. */
+function showExcelSource() {
+  const el = $('excel-db-status');
+  if (!el) return;
+  let meta = null;
+  try { meta = JSON.parse(localStorage.getItem('excelProductDBMeta') || 'null'); } catch(e) {}
+  if (meta && meta.name) {
+    el.innerHTML = `허가목록 <b style="color:var(--charcoal);">${esc(meta.name)}</b>`
+      + ` · ${_excelDB.length}개 · ${esc(meta.at || '')} 업로드`
+      + ` <span style="color:var(--ash);">(이 브라우저에만 저장됨)</span>`;
+  } else {
+    el.innerHTML = `허가목록 <b style="color:var(--charcoal);">내장 목록</b>`
+      + ` · ${_excelDB.length}개 · 2026.05.27 기준`;
+  }
+}
 
 // ════════════════════════════════════════════════════════════════════
 // 허가목록 엑셀 DB
@@ -5080,7 +5290,14 @@ function loadExcelDB(input) {
         const ingr = String(row[13] || '').trim();
         if (name) _excelDB.push({ name, ingr });
       }
-      try { localStorage.setItem('excelProductDB', JSON.stringify(_excelDB)); } catch(e2) {}
+      try {
+        localStorage.setItem('excelProductDB', JSON.stringify(_excelDB));
+        localStorage.setItem('excelProductDBMeta', JSON.stringify({
+          name: file.name,
+          at: fmtSavedAt(new Date().toISOString()),
+        }));
+      } catch(e2) {}
+      showExcelSource();
       if (statusEl) statusEl.textContent = `✓ ${_excelDB.length}개 제품 로드 완료 · ${file.name}`;
     } catch(err) {
       if (statusEl) statusEl.textContent = '로드 실패: ' + err.message;
