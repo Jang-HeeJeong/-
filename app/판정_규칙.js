@@ -2904,6 +2904,7 @@ function runValidation() {
   if (precResult) html += renderPrecautions(precResult);
 
   body.innerHTML = html || '<div class="empty-state"><span>결과 없음</span></div>';
+  if (typeof collapseResultTables === 'function') collapseResultTables(body);
   setStatus(anyFail ? '❌ 부적합 항목 있음' : '✅ 검토 완료 — 적합', anyFail ? 'error' : 'ok');
 }
 

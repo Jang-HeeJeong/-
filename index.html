@@ -117,11 +117,23 @@
     #start-hint .sh-step b { font-size:12px; font-weight: 600; color: var(--obsidian); }
     #start-hint .sh-step p { margin: 3px 0 0; font-size:11px; color: var(--stone); line-height: 1.6; }
 
-    /* 입력 단계를 눈으로 나눈다 — 용법용량 / 배합 성분 */
-    .input-step {
-      margin-bottom: 4px; padding-bottom: 14px;
-      border-bottom: 1px solid var(--hairline);
+    /* 입력 단계를 각각 제 상자에 담는다 — 용법용량 / 배합 성분 */
+    .step-box {
+      border-radius: var(--r);
+      box-shadow: var(--ring2);
+      background: var(--white);
+      padding: 12px 13px 13px;
+      margin-bottom: 12px;
     }
+    .step-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; margin-bottom: 10px;
+    }
+    .step-title {
+      font-size: 15px; font-weight: 600; color: var(--obsidian);
+      letter-spacing: -.01em;
+    }
+    .step-head .btn { padding: 3px 11px; font-size: 12px; height: 28px; }
     /* 용법용량 — 배합량을 넣는 동안 "1일 몇 회 기준이었지?"를 계속 봐야 하므로
        패널 위에 붙여 두되, 제 테두리를 가진 상자로 둔다. */
     .dose-box {
@@ -305,15 +317,12 @@
     .mx-table thead th.mx-th-prod { background: var(--prod-head) !important; color: var(--prod-head-fg) !important; }
     .mx-table thead tr.mx-hdr2 th.mx-th-std  { background: var(--std-head2)  !important; color: var(--std-head2-fg)  !important; }
     .mx-table thead tr.mx-hdr2 th.mx-th-prod { background: var(--prod-head2) !important; color: var(--prod-head2-fg) !important; }
-    /* 무리가 바뀌는 자리에만 세로선 한 줄 — 결과표와 같은 규칙 */
+    /* 세로 실선은 쓰지 않는다.
+       장마다 열 순서가 달라(제1장은 배합량이 앞, 제2장은 기준이 앞)
+       머리글과 본문에서 선이 어긋난 자리에 그어졌다.
+       기준/제품 구분은 배경 명암이 이어서 맡는다. */
     .mx-table th.mx-th-std, .mx-table th.mx-th-prod,
     .mx-table td.mx-std, .mx-table td.mx-prod { border-left: none; }
-    .mx-table tr.mx-hdr1 th.mx-th-std,
-    .mx-table tr.mx-hdr1 th.mx-th-prod            { border-left: 2px solid var(--std-rule); }
-    .mx-table tr.mx-hdr2 th:first-child           { border-left: 2px solid var(--std-rule); }
-    .mx-table tr.mx-hdr2 th.mx-th-std + th.mx-th-prod { border-left: 2px solid var(--std-rule); }
-    .mx-table td:not(.mx-std) + td.mx-std          { border-left: 2px solid var(--std-rule); }
-    .mx-table td.mx-std + td.mx-prod               { border-left: 2px solid var(--std-rule); }
     /* 작업자가 채우는 열 — 머리글에도 같은 노랑 */
     .mx-table thead th.mx-th-input { background: #fdf3c4 !important; color: #6b5410 !important; box-shadow: none; }
     .mx-table tbody td {
@@ -384,6 +393,14 @@
     }
     .fill-zone.is-filled { background: transparent; box-shadow: none; padding-left: 0; padding-right: 0; }
     .need.is-done { display: none; }
+
+    /* 부적합 사유 — 왜 걸렸는지 판정 칸 아래 한 줄로.
+       예전에는 오른쪽 결과표에만 있어서, 왼쪽만 보면 이유를 알 수 없었다. */
+    .mx-why {
+      display: block; margin-top: 3px;
+      font-size: 11px; font-weight: 500; color: var(--red);
+      white-space: normal; line-height: 1.45; text-align: center;
+    }
 
     /* 값 확인 — 못 쓰는 배합량이 든 행 */
     .mx-bad {
@@ -525,6 +542,30 @@
     /* ══════════ 결과 패널 (검토 결과) ══════════ */
 
     /* 결과 요약 카드 — 판정의 전제 조건을 한눈에 */
+    /* 문구를 써도 되는지 알려주는 한 줄 */
+    .res-gate {
+      border-radius: var(--r); padding: 9px 13px; margin-bottom: 12px;
+      font-size: 13px; font-weight: 600; letter-spacing: -.01em;
+    }
+    .res-gate.ok   { background: var(--green-bg); color: var(--green); box-shadow: 0 0 0 1px #cfe6d4; }
+    .res-gate.fail { background: var(--red-bg);   color: var(--red);   box-shadow: 0 0 0 1px #f2c9c5; }
+
+    /* 확인이 필요한 항목 — 걸린 행만 사유와 함께 (적합이면 나오지 않는다) */
+    .res-flags {
+      background: var(--white); box-shadow: var(--ring2);
+      border-radius: var(--r); padding: 11px 13px; margin-bottom: 12px;
+    }
+    .res-flags-title {
+      font-size: 12px; font-weight: 600; color: var(--red); margin-bottom: 8px;
+    }
+    .res-flag {
+      display: flex; gap: 9px; padding: 5px 0; font-size: 13px; line-height: 1.5;
+      border-top: 1px solid #f3f3f3;
+    }
+    .res-flag:first-of-type { border-top: none; }
+    .res-flag .rf-name { flex: 0 0 40%; font-weight: 600; color: var(--obsidian); }
+    .res-flag .rf-why  { flex: 1; color: var(--red); }
+
     .res-card {
       box-shadow: var(--ring2); border-radius: var(--r); background: var(--white);
       margin-bottom: 12px; overflow: hidden;
@@ -722,22 +763,6 @@
 
 
 
-      <!-- 기본 정보 2열 -->
-      <div class="form-row">
-        <div class="form-group">
-          <label>적용 기준 <span class="need">✎ 선택</span></label>
-          <select id="sel-chapter" class="need-input" disabled>
-            <option value="">— 로드 중 —</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>제형 <span class="need">✎ 선택</span></label>
-          <select id="sel-dosage-form" class="need-input" disabled>
-            <option value="">— 장 선택 후 —</option>
-          </select>
-        </div>
-      </div>
-
       <!-- 제품명 + 저장/불러오기 -->
       <div id="fg-product-name">
 
@@ -782,17 +807,39 @@
         <input type="text" id="excel-product-search" style="display:none;">
       </div>
 
-      <!-- 연령별 용법용량 -->
-      <div id="fg-dosage-section" class="input-step" style="display:none;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <span class="section-title" style="margin-bottom:0;">용법용량 <span class="need">✎ 선택</span></span>
-          <button id="btn-add-dosage" class="btn btn-add" style="padding:3px 10px; font-size:13px;">+ 연령 추가</button>
+      <!-- 기본 정보 2열 -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>적용 기준 <span class="need">✎ 선택</span></label>
+          <select id="sel-chapter" class="need-input" disabled>
+            <option value="">— 로드 중 —</option>
+          </select>
         </div>
-        <div id="dosage-rows-container"></div>
+        <div class="form-group">
+          <label>제형 <span class="need">✎ 선택</span></label>
+          <select id="sel-dosage-form" class="need-input" disabled>
+            <option value="">— 장 선택 후 —</option>
+          </select>
+        </div>
+      </div>
+
+
+      <!-- 연령별 용법용량 (제1·2·3·7·9장은 아래 성분 상자 안에서 그린다) -->
+      <div id="fg-dosage-section" style="display:none;">
+        <div class="step-box">
+          <div class="step-head">
+            <span class="step-title">용법용량 <span class="need">✎ 선택</span></span>
+            <button id="btn-add-dosage" class="btn btn-add">+ 연령 추가</button>
+          </div>
+          <div id="dosage-rows-container"></div>
+        </div>
       </div>
 
       <!-- 성분 섹션 -->
-      <div class="section-title" data-sec="ingr" style="margin-top:18px;display:none;">배합 성분 <span class="need">✎ 입력</span></div>
+      <div class="step-box" data-sec="ingr" style="display:none;">
+        <div class="step-head">
+          <span class="step-title">배합 성분 <span class="need">✎ 입력</span></span>
+        </div>
 
       <!-- ch1: 기존 드롭다운 방식 -->
       <div id="ingr-classic-wrap">
@@ -814,6 +861,9 @@
         </div>
         <div class="btn-row">
           <button class="btn btn-add" id="btn-add-row" disabled>+ 성분 추가</button>
+          <button class="btn btn-add" id="btn-add-excipient" type="button"
+                  onclick="toggleExcipientPanel()"
+                  title="첨가제를 넣으면 사용상 주의사항이 추가됩니다">+ 첨가제 추가</button>
         </div>
       </div>
 
@@ -866,11 +916,8 @@
 
       <!-- 첨가제 섹션 -->
       <div id="fg-excipient" style="display:none;">
-      <div class="btn-row" style="margin-top:14px;">
-        <button class="btn btn-add" id="btn-add-excipient" type="button"
-                onclick="toggleExcipientPanel()"
-                title="첨가제를 넣으면 사용상 주의사항이 추가됩니다">+ 첨가제 추가</button>
-      </div>
+      </div><!-- /배합 성분 상자 -->
+
       <div id="excipient-panel" style="display:none;margin-top:8px;">
       <div class="excipient-add-row">
         <select id="excipient-select" onchange="addExcipient()">
@@ -911,14 +958,14 @@
     <!-- 하단 고정 액션바: 실시간 요약 + 저장 + 검토 실행 -->
     <div class="panel-footer" id="action-bar" style="display:none;">
       <div id="live-summary"><span>성분 배합량을 입력하면 실시간으로 집계됩니다</span></div>
-      <button class="btn btn-primary" id="btn-validate" disabled>검토 실행</button>
+      <button class="btn btn-primary" id="btn-validate" disabled>효능·주의사항 자동생성</button>
     </div>
   </section>
 
   <!-- ═══════════ 결과부 ═══════════ -->
   <section class="panel" id="panel-results">
     <div class="panel-header">
-      <span class="ph-label">결과</span>
+      <span class="ph-label">자동 생성 문구</span>
       <button id="btn-toggle-results" type="button" onclick="toggleResultsPanel()"
               title="결과 패널 접기/펼치기">▶</button>
     </div>
@@ -932,7 +979,7 @@
           <line x1="9" y1="12" x2="15" y2="12"/>
           <line x1="9" y1="16" x2="13" y2="16"/>
         </svg>
-        <span>성분을 입력하고 <b>검토 실행</b>을 누르세요</span>
+        <span>성분을 입력하고 <b>효능·주의사항 자동생성</b>을 누르세요</span>
       </div>
     </div>
 
@@ -1475,7 +1522,7 @@ function onChapterChange(key) {
   $('fg-product-name').style.display  = ch ? '' : 'none';
   // 아직 장을 고르지 않았으면 성분표·첨가제·액션바를 감추고 안내만 보여준다
   { const hint = $('start-hint'); if (hint) hint.style.display = ch ? 'none' : ''; }
-  { const st = document.querySelector('.section-title[data-sec="ingr"]'); if (st) st.style.display = ch ? '' : 'none'; }
+  { const st = document.querySelector('[data-sec="ingr"]'); if (st) st.style.display = ch ? '' : 'none'; }
   { const ex = $('fg-excipient');  if (ex) ex.style.display = ch ? '' : 'none'; }
   { const ab = $('action-bar');    if (ab) ab.style.display = ch ? '' : 'none'; }
   { const sb = $('save-bar');      if (sb) sb.style.display = ch ? '' : 'none'; }
@@ -2285,7 +2332,7 @@ function renderCh1Integrated() {
         <th rowspan="2" class="mx-th-unit">단위</th>
         <th colspan="2" class="mx-th-std">표제기 기준 (1일)</th>
         <th colspan="2" class="mx-th-prod">제품 1일 함량</th>
-        <th rowspan="2" style="min-width:62px;">판정</th>
+        <th rowspan="2" style="min-width:112px;">판정</th>
       </tr>
       <tr class="mx-hdr2">
         <th class="mx-th-std">최소</th><th class="mx-th-std">최대</th>
@@ -2518,9 +2565,10 @@ function renderCh1Integrated() {
         okHtml = '<span class="mx-ok">적합</span>';
       } else if (vr?.elevHint) {
         const yr = Math.round(vr.elevHint.threshMonths / 12);
-        okHtml = `<span class="mx-fail">부적합</span><br><span style="font-size:11px;color:var(--stone);white-space:nowrap;">${yr}세 이상이면 적합</span>`;
+        okHtml = `<span class="mx-fail">부적합</span><span class="mx-why" style="color:var(--stone);">${yr}세 이상이면 적합</span>`;
       } else {
-        okHtml = '<span class="mx-fail">부적합</span>';
+        okHtml = '<span class="mx-fail">부적합</span>'
+               + (vr?.reason ? `<span class="mx-why">${esc(vr.reason)}</span>` : '');
       }
       const rowCls = isActive ? 'mx-row mx-active' : 'mx-row';
       const canRemove = isFirst && !row.isMain;
@@ -3038,15 +3086,19 @@ function updateCh1BlockAmts(drId) {
     set('critMin', critMin != null ? `${fmtN(critMin)}${unitSpan}` : '—');
     set('critMax', critMax != null ? `${fmtN(critMax)}${unitSpan}` : '—');
     let okHtml;
-    if (ok === null) {
+    if (typeof doseIsBad === 'function' && doseIsBad(row.dose)) {
+      okHtml = '<span class="mx-bad">값 확인</span>';
+    } else if (ok === null) {
       okHtml = '<span class="mx-na">미입력</span>';
     } else if (ok) {
       okHtml = '<span class="mx-ok">적합</span>';
     } else if (vr?.elevHint) {
       const yr = Math.round(vr.elevHint.threshMonths / 12);
-      okHtml = `<span class="mx-fail">부적합</span><br><span style="font-size:11px;color:var(--stone);white-space:nowrap;">${yr}세 이상이면 적합</span>`;
+      okHtml = `<span class="mx-fail">부적합</span><span class="mx-why" style="color:var(--stone);">${yr}세 이상이면 적합</span>`;
     } else {
-      okHtml = '<span class="mx-fail">부적합</span>';
+      // 왜 걸렸는지를 같이 보여준다 — 예전에는 오른쪽 결과표에만 있었다
+      okHtml = '<span class="mx-fail">부적합</span>'
+             + (vr?.reason && vr.reason !== '부적합' ? `<span class="mx-why">${esc(vr.reason)}</span>` : '');
     }
     set('ok', okHtml);
     // 비고 셀 업데이트
@@ -3153,7 +3205,7 @@ function renderCh2Integrated() {
         <th colspan="${stdColspan}" class="mx-th-std">표제기 기준 (mg)</th>
         <th rowspan="2" class="mx-th-input" style="min-width:58px;">단위당<br>함량(mg) ✎</th>
         <th colspan="4" class="mx-th-prod">제품 함량 (mg)</th>
-        <th rowspan="2" style="min-width:62px;">판정</th>
+        <th rowspan="2" style="min-width:112px;">판정</th>
       </tr>
       <tr class="mx-hdr2">
         ${hasStd1dose ? '<th class="mx-th-std">1회최소</th><th class="mx-th-std">1회최대</th>' : ''}
@@ -3260,7 +3312,9 @@ function renderCh2Integrated() {
       }
       const okHtml = mxRowHasBadDose(row) ? '<span class="mx-bad">값 확인</span>'
                    : ok===null ? '<span class="mx-na">미입력</span>'
-                   : ok ? '<span class="mx-ok">적합</span>' : '<span class="mx-fail">부적합</span>';
+                   : ok ? '<span class="mx-ok">적합</span>'
+                   : '<span class="mx-fail">부적합</span>'
+                     + (vr?.reason ? `<span class="mx-why">${esc(vr.reason)}</span>` : '');
       const rowCls = isActive ? 'mx-row mx-active' : 'mx-row';
       const canRemove = isFirst && !row.isMain && row.isShown;
       const nameCell = row.isCustom
@@ -3478,12 +3532,12 @@ function updateCh2BlockAmts(drId) {
     const dose = (row.dose!==''&&!isNaN(+row.dose)&&+row.dose>0) ? +row.dose : null;
 
     let act1min=null,act1max=null,act1dmin=null,act1dmax=null,ok=null;
+    const vr = vMap.get(row.ingr);   // 판정 문구에서 사유를 꺼내 쓴다
     if (dose !== null) {
       act1min  = +(dose*amtMin).toFixed(4);
       act1max  = +(dose*amtMax).toFixed(4);
       act1dmin = +(dose*amtMin*freqMin).toFixed(4);
       act1dmax = +(dose*amtMax*freqMax).toFixed(4);
-      const vr = vMap.get(row.ingr);
       if (vr) { ok = vr.ok===true?true:vr.ok===false?false:null; }
       else {
         // validateChapter2 미적용 성분: 연령계수 반영된 기준값으로 적합 여부 판단
@@ -3500,7 +3554,12 @@ function updateCh2BlockAmts(drId) {
     set('act1max', fmtN(act1max));
     set('act1dmin', fmtN(act1dmin));
     set('act1dmax', fmtN(act1dmax));
-    const okHtml = ok===null?'<span class="mx-na">미입력</span>':ok?'<span class="mx-ok">적합</span>':'<span class="mx-fail">부적합</span>';
+    const okHtml = (typeof doseIsBad === 'function' && doseIsBad(row.dose))
+                 ? '<span class="mx-bad">값 확인</span>'
+                 : ok===null ? '<span class="mx-na">미입력</span>'
+                 : ok ? '<span class="mx-ok">적합</span>'
+                 : '<span class="mx-fail">부적합</span>'
+                   + (vr?.reason && vr.reason !== '부적합' ? `<span class="mx-why">${esc(vr.reason)}</span>` : '');
     set('ok', okHtml);
     tr.className = dose!==null ? 'mx-row mx-active' : 'mx-row';
   });
@@ -4207,12 +4266,10 @@ function resHeaderCard(allOk, metaItems) {
     .filter(m => m && m.value != null && m.value !== '')
     .map(m => `<span class="res-meta-item">${esc(m.label)} <b>${m.raw ? m.value : esc(m.value)}</b></span>`)
     .join('');
-  return `<div class="res-card">
-    <div class="res-card-top ${allOk ? 'ok' : 'fail'}">
-      <span style="font-size:20px;">${allOk ? '✅' : '❌'}</span>
-      <span class="res-verdict-big">전체 판정: ${allOk ? '적합' : '부적합'}</span>
-    </div>
-    ${chips ? `<div class="res-meta">${chips}</div>` : ''}
+  return `<div class="res-gate ${allOk ? 'ok' : 'fail'}">
+    <span class="res-gate-msg">${allOk
+      ? '기준에 맞습니다 — 아래 문구를 그대로 쓰실 수 있습니다.'
+      : '기준을 벗어난 항목이 있습니다 — 확인 후 사용하세요.'}</span>
   </div>`;
 }
 /* 복사 버튼 (효능효과·주의사항 공용) — 블록 제목 우측에 배치 */
@@ -5468,6 +5525,29 @@ function searchUnified(query) {
   }
   resultsEl.innerHTML = html;
   resultsEl.style.display = '';
+}
+
+/* 오른쪽 패널은 "옮겨 적을 문구"를 담는 곳이다.
+   성분별 기준·함량·판정은 왼쪽 입력 표가 실시간으로 보여주므로 여기서는 뺀다.
+   대신 걸린 항목만 사유와 함께 모아 둔다 — 47행을 훑지 않아도 되게. */
+function collapseResultTables(root) {
+  const flags = [];
+  for (const tr of root.querySelectorAll('.res-table tbody tr.res-fail, .res-table tbody tr.res-na')) {
+    const name = tr.querySelector('.res-name')?.textContent.replace(/\s+/g, ' ').trim();
+    const why  = tr.querySelector('.v-reason')?.textContent.trim()
+              || tr.querySelector('.res-verdict')?.textContent.replace(/^(부적합|확인불가)/, '').trim();
+    if (name) flags.push({ name, why: why || '기준을 벗어났습니다' });
+  }
+  for (const el of root.querySelectorAll('.res-wrap')) el.remove();
+
+  if (!flags.length) return;
+  const box = document.createElement('div');
+  box.className = 'res-flags';
+  box.innerHTML = `<div class="res-flags-title">확인이 필요한 항목 ${flags.length}건</div>`
+    + flags.map(f => `<div class="res-flag"><span class="rf-name">${esc(f.name)}</span>`
+                   + `<span class="rf-why">${esc(f.why)}</span></div>`).join('');
+  const gate = root.querySelector('.res-gate');
+  if (gate) gate.after(box); else root.prepend(box);
 }
 
 /* 성분명 정규화: 공백·대소문자 무시 + "(비타민A로서)" 같은 괄호 주석 제거 */

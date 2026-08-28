@@ -217,7 +217,8 @@ function flowSnapshot(win) {
     notice: noticeVisible ? noticeEl.textContent.replace(/\s+/g, ' ').trim() : '',
     badCount: win.eval('(typeof badDoseRows === "function" ? badDoseRows().length : -1)'),
     validateDisabled: !!d.getElementById('btn-validate').disabled,
-    resultShown: (d.getElementById('results-body').innerText || '').includes('전체 판정'),
+    // 문구가 실제로 만들어졌는지 — 오른쪽 패널에 판정 배너가 뜨면 생성된 것
+    resultShown: !!d.querySelector('#results-body .res-gate'),
   };
 }
 
