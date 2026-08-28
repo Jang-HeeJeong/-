@@ -2528,13 +2528,13 @@ function renderPrecautions(sections) {
     let prevSub = null;
     const rows = sec.items.filter(it => !(it.text && it.text.includes('<삭제>'))).map((it) => {
       const subHdr = (it.sub && it.sub !== prevSub)
-        ? `<tr><td style="padding:4px 0 2px;font-size:10px;font-weight:700;color:#666;letter-spacing:0.04em;">${esc(it.sub)}</td></tr>`
+        ? `<tr><td style="padding:4px 0 2px;font-size:11px;font-weight:700;color:#666;letter-spacing:0.04em;">${esc(it.sub)}</td></tr>`
         : '';
       prevSub = it.sub;
       const cleanText = applyEasyTerms(removeEditorial(it.text).replace(STRIP_COND, '').trim());
       const extraStyle = it.isDirective ? 'background:#FFF3E0;' : '';
       const badge = it.isDirective
-        ? `<span style="font-size:9px;color:#E65100;margin-left:5px;font-style:italic;white-space:nowrap;">[변경지시]</span>`
+        ? `<span style="font-size:11px;color:#E65100;margin-left:5px;font-style:italic;white-space:nowrap;">[변경지시]</span>`
         : '';
       if (it.isMapping || it.indent) {
         return `${subHdr}<tr><td style="${tsIndent}${extraStyle}">${esc(cleanText).replace(/\n/g,'<br>')}${badge}</td></tr>`;
@@ -2555,7 +2555,7 @@ function renderPrecautions(sections) {
       <span class="res-sec-title">[사용상의 주의사항]</span>
       ${resCopyBtn('__precCopyText')}
     </div>
-    <details class="fold" open>
+    <details class="fold">
       <summary>전체 5개 항목 보기</summary>
       <div class="fold-body">${sectHtml}</div>
     </details>
@@ -2742,11 +2742,11 @@ function renderCriteriaSection(chapterKey, validations, allDosageRows) {
       const mark  = st.na ? '—' : (st.ok ? 'O' : 'X');
       const color = st.na ? '#aaa' : (st.ok ? '#2e7d32' : '#c62828');
       const bg    = resRowBg(st.na ? null : st.ok);
-      const reasonHtml = (!st.na && !st.ok && st.reason) ? `<br><span style="color:#c62828;font-size:10px;">↳ ${esc(st.reason)}</span>` : '';
+      const reasonHtml = (!st.na && !st.ok && st.reason) ? `<br><span style="color:#c62828;font-size:11px;">↳ ${esc(st.reason)}</span>` : '';
       return `<tr style="background:${bg};">
         <td style="${td}text-align:center;white-space:nowrap;color:#666;">${esc(num)}</td>
         <td style="${td}">${esc(label)}${reasonHtml}</td>
-        <td style="${td}text-align:center;font-weight:700;font-size:14px;color:${color};">${mark}</td>
+        <td style="${td}text-align:center;font-weight:700;font-size:13px;color:${color};">${mark}</td>
       </tr>`;
     };
 

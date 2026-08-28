@@ -13,7 +13,7 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-size: 14px;
+      font-size:13px;
       /* 색·서체는 app/디자인.css 가 정한다 */
       height: 100vh;
       display: flex;
@@ -32,13 +32,13 @@
       gap: 10px;
       flex-shrink: 0;
     }
-    header h1 { font-size: 15px; font-weight: 600; letter-spacing: -.01em; color: var(--obsidian); }
-    header small { font-size: 11.5px; color: var(--graphite); }
+    header h1 { font-size:15px; font-weight: 600; letter-spacing: -.01em; color: var(--obsidian); }
+    header small { font-size:11px; color: var(--graphite); }
 
     /* ── Status bar ── */
     #status-bar {
       padding: 5px 22px;
-      font-size: 12px;
+      font-size:12px;
       font-weight: 600;
       background: var(--white);
       box-shadow: 0 1px 0 var(--hairline);
@@ -74,11 +74,11 @@
       margin-bottom: 14px;
     }
     .form-group label {
-      display: block; font-size: 12px; font-weight: 600;
+      display: block; font-size:12px; font-weight: 600;
       color: var(--obsidian); margin-bottom: 5px;
     }
     select, input[type="number"] {
-      width: 100%; padding: 5px 8px; font-size: 13px; height: 30px;
+      width: 100%; padding: 5px 8px; font-size:13px; height: 30px;
     }
 
     /* ── Section divider ── */
@@ -92,7 +92,7 @@
 
     /* 비고 — 성분명 아래 작은 줄 */
     .mx-note {
-      font-size: 10px; color: var(--stone); font-weight: 400;
+      font-size:11px; color: var(--stone); font-weight: 400;
       white-space: normal; line-height: 1.5; margin-top: 1px;
     }
 
@@ -102,7 +102,7 @@
       background: var(--paper); box-shadow: var(--ring2); border-radius: var(--r);
     }
     #start-hint .sh-title {
-      font-size: 13px; font-weight: 600; color: var(--obsidian);
+      font-size:13px; font-weight: 600; color: var(--obsidian);
       letter-spacing: -.01em; margin-bottom: 12px;
     }
     #start-hint .sh-steps { display: flex; gap: 22px; flex-wrap: wrap; }
@@ -111,37 +111,52 @@
     #start-hint .sh-num {
       flex: 0 0 19px; height: 19px; border-radius: 50%;
       background: var(--white); color: var(--stone); box-shadow: var(--ring2);
-      font-size: 11px; font-weight: 600;
+      font-size:11px; font-weight: 600;
       display: inline-flex; align-items: center; justify-content: center;
     }
-    #start-hint .sh-step b { font-size: 12.5px; font-weight: 600; color: var(--obsidian); }
-    #start-hint .sh-step p { margin: 3px 0 0; font-size: 11.5px; color: var(--stone); line-height: 1.6; }
+    #start-hint .sh-step b { font-size:12px; font-weight: 600; color: var(--obsidian); }
+    #start-hint .sh-step p { margin: 3px 0 0; font-size:11px; color: var(--stone); line-height: 1.6; }
 
     /* 입력 단계를 눈으로 나눈다 — 용법용량 / 배합 성분 */
     .input-step {
       margin-bottom: 4px; padding-bottom: 14px;
       border-bottom: 1px solid var(--hairline);
     }
-    /* 배합량을 넣는 동안 "1일 몇 회 기준이었지?"를 계속 볼 수 있어야 한다.
-       용법용량 줄을 패널 위에 붙여 둔다. */
-    .dosage-sticky {
+    /* 용법용량 — 배합량을 넣는 동안 "1일 몇 회 기준이었지?"를 계속 봐야 하므로
+       패널 위에 붙여 두되, 제 테두리를 가진 상자로 둔다. */
+    .dose-box {
       position: sticky; top: 0; z-index: 20;
-      background: var(--white);
-      margin: 0 -14px; padding: 8px 14px 10px;
-      box-shadow: 0 1px 0 var(--hairline);
+      background: var(--input-zone);
+      border-radius: var(--r);
+      box-shadow: 0 0 0 1px #e6d79a;
+      padding: 9px 11px 10px;
+      margin-bottom: 10px;
     }
-    .dosage-sticky.is-stuck { box-shadow: 0 1px 0 var(--hairline), 0 6px 12px -8px rgba(0,0,0,.18); }
+    .dose-box-label {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 12px; font-weight: 600; color: #7a6114;
+      margin-bottom: 7px;
+    }
+    .dose-box-label .dose-badge {
+      background: var(--white); box-shadow: var(--ring2);
+      border-radius: 3px; padding: 1px 7px;
+      font-size: 11px; font-weight: 600; color: var(--charcoal);
+    }
+    .dose-box-label .spacer { flex: 1; }
+    .dose-row {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
 
     /* 검색으로 고른 제품 표시 */
     #picked-product { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
     .picked-chip {
       display: inline-flex; align-items: center; gap: 8px;
       background: var(--white); box-shadow: var(--ring2); border-radius: var(--r);
-      padding: 4px 8px 4px 11px; font-size: 13px; font-weight: 600; color: var(--obsidian);
+      padding: 4px 8px 4px 11px; font-size:13px; font-weight: 600; color: var(--obsidian);
     }
     .picked-chip button {
       background: none; border: none; cursor: pointer;
-      color: var(--graphite); font-size: 13px; line-height: 1; padding: 2px 3px;
+      color: var(--graphite); font-size:13px; line-height: 1; padding: 2px 3px;
     }
     .picked-chip button:hover { color: var(--red); }
 
@@ -157,11 +172,11 @@
     /* ── 제품 검색 / 제품명 줄 ── */
     #fg-product-name { margin-bottom: 12px; }
     .fld-label {
-      font-size: 12px; font-weight: 600; color: var(--obsidian);
+      font-size:12px; font-weight: 600; color: var(--obsidian);
       white-space: nowrap; flex: 0 0 62px;
     }
     .fld-input {
-      flex: 1; padding: 5px 9px; height: 30px; font-size: 13px;
+      flex: 1; padding: 5px 9px; height: 30px; font-size:13px;
       font-family: inherit; box-sizing: border-box;
       border: none; border-radius: var(--r);
       background: var(--white); color: var(--obsidian);
@@ -196,13 +211,13 @@
       width: 100%;
       table-layout: fixed;
       border-collapse: collapse;
-      font-size: 13px;
+      font-size:13px;
     }
     .ingr-table thead th {
       background: var(--paper);
       padding: 6px;
       text-align: left;
-      font-size: 11px;
+      font-size:11px;
       font-weight: 600;
       color: var(--stone);
       border-bottom: 1px solid var(--hairline);
@@ -216,7 +231,7 @@
     .ingr-table select,
     .ingr-table input[type="number"] {
       padding: 4px 5px;
-      font-size: 13px;
+      font-size:13px;
       border-radius: 3px;
     }
 
@@ -234,7 +249,7 @@
       padding: 16px 10px;
       text-align: center;
       color: #bbb;
-      font-size: 14px;
+      font-size:13px;
     }
 
     .btn-del {
@@ -242,7 +257,7 @@
       margin: 0 auto;
       background: none;
       border: none;
-      font-size: 17px;
+      font-size:15px;
       line-height: 1;
       color: #ccc;
       cursor: pointer;
@@ -261,7 +276,7 @@
     table.mx-table {
       min-width: 700px;
       border-collapse: collapse;
-      font-size: 12px;
+      font-size:12px;
       white-space: nowrap;
     }
     /* 머리글은 밝은 바탕이 기본.
@@ -311,11 +326,11 @@
     .mx-table td.mx-std, .mx-table td.mx-prod,
     .mx-table th.mx-th-std, .mx-table th.mx-th-prod { min-width: 72px; }
     .mx-table tbody td.mx-name { text-align: left; white-space: nowrap; min-width: 150px; }
-    .mx-table tbody td.mx-gubun-cell { text-align: center; font-size: 11px; color: #555; }
+    .mx-table tbody td.mx-gubun-cell { text-align: center; font-size:11px; color: #555; }
     .mx-table tbody tr.mx-group-hdr td {
       background: #f0f0f0;
       font-weight: 500;
-      font-size: 10.5px;
+      font-size:11px;
       color: var(--charcoal);
       border-top: 1px solid var(--ash);
       padding: 4px 8px;
@@ -338,18 +353,18 @@
       width: 100%; min-width: 54px; box-sizing: border-box;
       padding: 2px 2px 2px 5px; height: 24px;
       border: none; box-shadow: var(--ring2); border-radius: 4px;
-      font-size: 11px; background: var(--white);
+      font-size:11px; background: var(--white);
     }
     /* 단위 표시(읽기 전용) 셀 */
     .mx-table td.mx-unit-cell.is-static {
       text-align: center;
-      font-size: 11px;
+      font-size:11px;
       color: #666;
       white-space: nowrap;
     }
     input.mx-dose-input {
       width: 72px; text-align: right; padding: 2px 7px; height: 26px;
-      border: none; border-radius: 4px; font-size: 12px; font-weight: 500;
+      border: none; border-radius: 4px; font-size:12px; font-weight: 500;
       background: var(--input-bg); box-shadow: 0 0 0 1px var(--input-line);
     }
     input.mx-dose-input:focus {
@@ -373,7 +388,7 @@
     /* 값 확인 — 못 쓰는 배합량이 든 행 */
     .mx-bad {
       display: inline-block; border-radius: 4px; padding: 2px 8px;
-      font-size: 11px; font-weight: 600; letter-spacing: -.01em;
+      font-size:11px; font-weight: 600; letter-spacing: -.01em;
       background: var(--red); color: #fff;
     }
     input.mx-dose-input.is-bad {
@@ -382,7 +397,7 @@
       color: var(--red); font-weight: 600;
     }
     .mx-remove-btn {
-      background: none; border: none; cursor: pointer; color: #999; font-size: 14px; padding: 0 2px; line-height: 1;
+      background: none; border: none; cursor: pointer; color: #999; font-size:13px; padding: 0 2px; line-height: 1;
     }
     .mx-remove-btn:hover { color: #c62828; }
     .mx-custom-name {
@@ -390,12 +405,12 @@
       padding: 2px 4px;
       border: 1px solid #b0bcd8;
       border-radius: 3px;
-      font-size: 12px;
+      font-size:12px;
     }
 
     /* ── Buttons ── */
     .btn-row { display: flex; gap: 8px; }
-    .btn { padding: 7px 14px; font-size: 13px; height: 32px; }
+    .btn { padding: 7px 14px; font-size:13px; height: 32px; }
     .btn-primary { flex: 1; }
 
     /* ── Empty state (results) ── */
@@ -407,7 +422,7 @@
       height: 100%;
       color: #ccc;
       gap: 10px;
-      font-size: 15px;
+      font-size:15px;
       user-select: none;
     }
     .empty-state b { color: #aaa; }
@@ -428,7 +443,7 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      font-size: 12.5px;
+      font-size:12px;
       color: var(--graphite);
       white-space: nowrap;
       overflow: hidden;
@@ -438,7 +453,7 @@
     #live-summary .ls-fail { color: var(--red); font-weight: 600; }
     #live-summary .ls-chip {
       display: inline-flex; align-items: center; gap: 4px;
-      padding: 2px 9px; border-radius: 4px; font-size: 12px; font-weight: 500;
+      padding: 2px 9px; border-radius: 4px; font-size:12px; font-weight: 500;
     }
     #live-summary .ls-chip.ok   { background: var(--green-bg); color: var(--green); box-shadow: 0 0 0 1px #cfe6d4; }
     #live-summary .ls-chip.fail { background: var(--red); color: #fff; font-weight: 600; }
@@ -446,7 +461,7 @@
     #live-summary .ls-jump {
       background: none; border: none; box-shadow: var(--ring2);
       border-radius: 4px; padding: 2px 9px; cursor: pointer;
-      font-family: inherit; font-size: 12px; color: var(--charcoal);
+      font-family: inherit; font-size:12px; color: var(--charcoal);
       display: inline-flex; align-items: center; gap: 5px;
     }
     #live-summary .ls-jump:hover { background: var(--white); color: var(--obsidian); }
@@ -460,7 +475,7 @@
       display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
       margin-bottom: 8px; padding: 6px 10px;
       background: var(--paper); border: none; box-shadow: var(--ring2);
-      border-radius: var(--r); font-size: 12px; color: var(--stone);
+      border-radius: var(--r); font-size:12px; color: var(--stone);
     }
     .ingr-toolbar label {
       display: inline-flex; align-items: center; gap: 5px;
@@ -471,14 +486,14 @@
     .ingr-toolbar .tb-spacer { flex: 1; }
     .ingr-toolbar .tb-link {
       background: none; border: none; color: var(--charcoal); cursor: pointer;
-      font-size: 12px; font-family: inherit; padding: 2px 4px; text-decoration: underline;
+      font-size:12px; font-family: inherit; padding: 2px 4px; text-decoration: underline;
     }
     .ingr-toolbar .tb-link:hover { color: var(--obsidian); }
 
     /* 그룹 헤더 접기 */
     .mx-table tbody tr.mx-group-hdr td { cursor: pointer; user-select: none; }
     .mx-table tbody tr.mx-group-hdr td:hover { background: #e7e7e7; }
-    .mx-group-caret { display: inline-block; width: 11px; font-size: 9px; color: var(--graphite); }
+    .mx-group-caret { display: inline-block; width: 11px; font-size:11px; color: var(--graphite); }
 
     /* 입력된 행 강조 */
     .mx-table tbody tr.mx-row.mx-active td.mx-gubun-cell { box-shadow: inset 3px 0 0 var(--obsidian); }
@@ -489,7 +504,7 @@
     }
     #btn-toggle-results {
       background: none; border: none; box-shadow: var(--ring2); border-radius: 4px;
-      color: var(--stone); cursor: pointer; font-size: 11px; padding: 1px 7px; line-height: 1.6;
+      color: var(--stone); cursor: pointer; font-size:11px; padding: 1px 7px; line-height: 1.6;
       font-family: inherit;
     }
     #btn-toggle-results:hover { background: var(--paper); color: var(--obsidian); }
@@ -518,7 +533,7 @@
       display: flex; align-items: center; gap: 10px;
       padding: 11px 14px; border-bottom: 1px solid var(--hairline);
     }
-    .res-card-top .res-verdict-big { font-weight: 600; font-size: 15px; letter-spacing: -.01em; }
+    .res-card-top .res-verdict-big { font-weight: 600; font-size:15px; letter-spacing: -.01em; }
     .res-card-top.ok   { background: var(--green-bg); }
     .res-card-top.fail { background: var(--red-bg); }
     .res-card-top.ok   .res-verdict-big { color: var(--green); }
@@ -529,9 +544,9 @@
     .res-meta-item {
       display: inline-flex; align-items: baseline; gap: 5px;
       background: var(--paper); border: none; box-shadow: var(--ring2); border-radius: 4px;
-      padding: 3px 9px; font-size: 11px; color: var(--stone); white-space: nowrap;
+      padding: 3px 9px; font-size:11px; color: var(--stone); white-space: nowrap;
     }
-    .res-meta-item b { color: var(--obsidian); font-size: 11.5px; font-weight: 600; }
+    .res-meta-item b { color: var(--obsidian); font-size:11px; font-weight: 600; }
 
     /* 결과 표 */
     .res-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 12px; }
@@ -572,11 +587,11 @@
     .res-table td.res-c-std + td.res-c-prod           { border-left: 2px solid var(--std-rule); }
     .res-table td.res-name   { text-align: left; }
     .res-table td.res-name .res-item-no {
-      display: inline-block; font-size: 9.5px; color: var(--stone);
+      display: inline-block; font-size:11px; color: var(--stone);
       background: var(--paper); box-shadow: var(--ring2);
       border-radius: 3px; padding: 1px 5px; margin-right: 5px;
     }
-    .res-table td.res-name .res-unit { color: var(--graphite); font-size: 10px; font-weight: 400; }
+    .res-table td.res-name .res-unit { color: var(--graphite); font-size:11px; font-weight: 400; }
     .res-num {
       text-align: right; white-space: nowrap;
       font-variant-numeric: tabular-nums; font-feature-settings: "tnum";
@@ -587,28 +602,28 @@
     .res-table tbody tr.res-na   > td { background: var(--paper); }
     .res-table tbody tr.res-grp td {
       background: #f0f0f0; font-weight: 500; color: var(--charcoal);
-      letter-spacing: 0.05em; font-size: 10px;
+      letter-spacing: 0.05em; font-size:11px;
       border-top: 1px solid var(--ash);
     }
 
     /* 판정 칩 — 부적합만 강조, 적합은 조용하게 */
     .res-verdict { text-align: center; white-space: nowrap; }
     /* .v-ok / .v-fail / .v-na 모양은 app/디자인.css 의 판정 칩을 쓴다 */
-    .res-verdict .v-reason { display: block; margin-top: 2px; font-size: 9.5px; color: var(--red); font-weight: 400; white-space: normal; }
+    .res-verdict .v-reason { display: block; margin-top: 2px; font-size:11px; color: var(--red); font-weight: 400; white-space: normal; }
 
     /* 기재가능 효능효과 — 숫자 표에서 분리한 목록 */
     .res-eff-list { margin: 0 0 12px; padding: 9px 12px; background: var(--white); box-shadow: var(--ring2); border-radius: var(--r); }
     .res-eff-list > .res-sec-title { margin-bottom: 7px; }
-    .res-eff-item { display: flex; gap: 8px; padding: 4px 0; font-size: 11px; line-height: 1.6; border-top: 1px solid #f3f3f3; }
+    .res-eff-item { display: flex; gap: 8px; padding: 4px 0; font-size:11px; line-height: 1.6; border-top: 1px solid #f3f3f3; }
     .res-eff-item:first-of-type { border-top: none; }
     .res-eff-name { flex: 0 0 150px; color: var(--obsidian); font-weight: 600; }
     .res-eff-body { flex: 1; min-width: 0; }
     .res-eff-body .eff-ok   { color: var(--green); }
     .res-eff-body .eff-no   { color: var(--smoke); text-decoration: line-through; }
-    .res-eff-body .eff-why  { color: var(--red); font-size: 10px; }
+    .res-eff-body .eff-why  { color: var(--red); font-size:11px; }
     .res-eff-body .eff-none { color: var(--smoke); }
     .res-eff-badge {
-      display: inline-block; font-size: 9px; color: var(--stone); background: var(--paper);
+      display: inline-block; font-size:11px; color: var(--stone); background: var(--paper);
       box-shadow: var(--ring2); border-radius: 10px; padding: 1px 6px; margin-left: 4px; white-space: nowrap;
     }
 
@@ -618,10 +633,10 @@
       display: flex; align-items: center; gap: 8px;
       margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--hairline);
     }
-    .res-sec-title { font-size: 12px; font-weight: 600; color: var(--obsidian); letter-spacing: -.01em; }
+    .res-sec-title { font-size:12px; font-weight: 600; color: var(--obsidian); letter-spacing: -.01em; }
     .res-doc-head .res-sec-title { flex: 1; min-width: 0; }
     .btn-copy {
-      flex: 0 0 auto; font-size: 11px; padding: 4px 12px; border: none;
+      flex: 0 0 auto; font-size:11px; padding: 4px 12px; border: none;
       box-shadow: var(--ring2); border-radius: 4px; background: var(--white);
       color: var(--charcoal); cursor: pointer;
       font-weight: 500; font-family: inherit; white-space: nowrap;
@@ -640,7 +655,7 @@
     }
     details.fold > summary::-webkit-details-marker { display: none; }
     details.fold > summary::before {
-      content: '▸'; font-size: 9px; color: var(--graphite);
+      content: '▸'; font-size:11px; color: var(--graphite);
       transition: transform .12s;
     }
     details.fold[open] > summary::before { transform: rotate(90deg); }
@@ -651,7 +666,7 @@
       background: var(--paper); border: none; box-shadow: var(--ring2); border-radius: 4px;
       padding: 10px 14px; min-height: 40px;
       font-family: var(--sans);
-      font-size: 12px; line-height: 1.85; color: var(--obsidian);
+      font-size:12px; line-height: 1.85; color: var(--obsidian);
       word-break: break-word; font-variant-numeric: tabular-nums;
     }
 
@@ -747,7 +762,7 @@
           <div id="unified-results"
                style="display:none;position:absolute;z-index:200;left:0;right:0;top:100%;margin-top:3px;max-height:220px;overflow-y:auto;border-radius:var(--r);background:var(--white);box-shadow:0 0 0 1px var(--hairline), 0 8px 24px rgba(0,0,0,0.10);"></div>
         </div>
-        <div id="excel-db-status" style="font-size:10px;color:var(--graphite);margin-top:3px;min-height:13px;"></div>
+        <div id="excel-db-status" style="font-size:11px;color:var(--graphite);margin-top:3px;min-height:13px;"></div>
 
         <!-- 제품명은 결과 화면의 저장 줄에 있다. 여기서는 고른 제품만 보여준다. -->
         <div id="picked-product" style="display:none;">
@@ -851,9 +866,12 @@
 
       <!-- 첨가제 섹션 -->
       <div id="fg-excipient" style="display:none;">
-      <details class="fold" style="margin-top:14px;">
-        <summary>기타 첨가제 <span style="font-weight:400;color:var(--graphite);">(사용상 주의사항 추가 적용)</span></summary>
-        <div class="fold-body">
+      <div class="btn-row" style="margin-top:14px;">
+        <button class="btn btn-add" id="btn-add-excipient" type="button"
+                onclick="toggleExcipientPanel()"
+                title="첨가제를 넣으면 사용상 주의사항이 추가됩니다">+ 첨가제 추가</button>
+      </div>
+      <div id="excipient-panel" style="display:none;margin-top:8px;">
       <div class="excipient-add-row">
         <select id="excipient-select" onchange="addExcipient()">
           <option value="">-- 첨가제 선택 --</option>
@@ -884,9 +902,8 @@
           </optgroup>
         </select>
       </div>
-      <div class="excipient-tags" id="excipient-tags"></div>
-        </div>
-      </details>
+      </div>
+      <div class="excipient-tags" id="excipient-tags" style="margin-top:8px;"></div>
       </div>
 
     </div>
@@ -1200,6 +1217,16 @@ function showPickedProduct(name) {
   if (name) { el.textContent = name; box.style.display = ''; }
   else { el.textContent = ''; box.style.display = 'none'; }
 }
+/* 첨가제는 자주 쓰지 않으므로 접어 둔다. 이미 고른 것이 있으면 펴 둔다. */
+function toggleExcipientPanel(force) {
+  const p = document.getElementById('excipient-panel');
+  if (!p) return;
+  const open = force != null ? force : p.style.display === 'none';
+  p.style.display = open ? '' : 'none';
+  const b = document.getElementById('btn-add-excipient');
+  if (b) b.textContent = open ? '− 첨가제 닫기' : '+ 첨가제 추가';
+}
+
 function clearPickedProduct() {
   const hidden = document.getElementById('product-name');
   if (hidden) hidden.value = '';
@@ -1333,7 +1360,7 @@ function doseFieldVal(v) {
 /* 기준값 셀의 단위 표기: 입력 단위와 같으면 생략, 다르면 주황색으로 강조 */
 function stdUnitSuffix(stdUnit, rowUnit) {
   if (!stdUnit || stdUnit === rowUnit) return '';
-  return `<br><span style="color:#e65100;font-size:9px;font-weight:600;">${esc(stdUnit)}</span>`;
+  return `<br><span style="color:#e65100;font-size:11px;font-weight:600;">${esc(stdUnit)}</span>`;
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -1736,7 +1763,7 @@ function buildCh1RefPanel() {
     h += `<tr>${tds(r['연령구분'])}${td(r['추어블정'])}${td(r['정캅셀환제'])}${td(r['기타'])}</tr>`;
   }
   h += `</tbody></table>`;
-  if (vitBigo) h += `<div style="font-size:10.5px;color:#555;margin-bottom:10px;">* ${esc(vitBigo)}</div>`;
+  if (vitBigo) h += `<div style="font-size:11px;color:#555;margin-bottom:10px;">* ${esc(vitBigo)}</div>`;
 
   // ② 미네랄 어린이 연령별 최대복용량
   const minCols = ['만6세이상_만12세미만','만36개월이상_만6세미만','만12개월이상_만36개월미만'];
@@ -1755,7 +1782,7 @@ function buildCh1RefPanel() {
     h += `${td('기준')}</tr>`;
   }
   h += `</tbody></table>`;
-  if (minBigo) h += `<div style="font-size:10.5px;color:#555;margin-bottom:10px;">* ${esc(minBigo)}</div>`;
+  if (minBigo) h += `<div style="font-size:11px;color:#555;margin-bottom:10px;">* ${esc(minBigo)}</div>`;
 
   // ③ 성분별 특수 연령 제한
   const specials = [
@@ -2081,7 +2108,7 @@ function renderCh1Integrated() {
 
     let h = `<div class="age-ms" data-id="${dr.id}" style="position:relative;display:inline-block;">`;
     h += `<button type="button" class="age-ms-btn need-input" data-id="${dr.id}" style="${btnStyle}">`;
-    h += `<span class="age-ms-label">${esc(labelText)}</span><span style="color:var(--graphite);font-size:10px;">▼</span></button>`;
+    h += `<span class="age-ms-label">${esc(labelText)}</span><span style="color:var(--graphite);font-size:11px;">▼</span></button>`;
     h += `<div class="age-ms-panel" style="display:none;position:absolute;z-index:1000;left:0;top:100%;margin-top:3px;background:var(--white);border:none;border-radius:var(--r);padding:4px 0;min-width:320px;box-shadow:0 0 0 1px var(--hairline), 0 8px 24px rgba(0,0,0,0.10);max-height:280px;overflow-y:auto;">`;
 
     // ① 동적 연령: 특수 성분 + 한도 초과 시 자동 추가 합산
@@ -2090,14 +2117,14 @@ function renderCh1Integrated() {
     const allDynamicKeys  = [...new Set([...dynamicKeys, ...elevKeys])];
 
     if (allDynamicKeys.length) {
-      h += `<div style="font-size:10.5px;color:var(--stone);padding:5px 12px;background:var(--paper);border-bottom:1px solid var(--hairline);font-weight:600;">특수 성분 포함 시 연령</div>`;
+      h += `<div style="font-size:11px;color:var(--stone);padding:5px 12px;background:var(--paper);border-bottom:1px solid var(--hairline);font-weight:600;">특수 성분 포함 시 연령</div>`;
       for (const key of allDynamicKeys) {
         const chk      = selSet.has(key);
         const lbl      = DYNAMIC_AGE_DISPLAY[key] ?? key;
         const isElev   = elevKeys.includes(key); // 한도 초과로 자동 추가된 항목
         const bgColor  = isElev ? 'var(--input-zone)' : (chk ? 'var(--paper)' : '');
         const prefix   = isElev ? '💡 ' : '';
-        const suffix   = isElev ? `<span style="font-size:10px;color:#8a6d1a;margin-left:4px;">선택 시 가능</span>` : '';
+        const suffix   = isElev ? `<span style="font-size:11px;color:#8a6d1a;margin-left:4px;">선택 시 가능</span>` : '';
         h += `<label style="display:flex;align-items:center;gap:8px;padding:5px 12px;cursor:pointer;background:${bgColor};font-size:12px;">`;
         h += `<input type="checkbox" class="js-ch1-age-cb" data-id="${dr.id}" data-age="${esc(key)}"${chk?' checked':''}>`;
         h += `<span><b>${prefix}${esc(lbl)}</b>${suffix}</span></label>`;
@@ -2124,7 +2151,7 @@ function renderCh1Integrated() {
     // ③ 특수 성분으로 차단된 항목
     if (specialBlocked.length) {
       const blockNote = blockedRules.map(r => r.match).join(', ');
-      h += `<div style="font-size:10.5px;color:#c62828;padding:4px 12px;border-top:1px solid #eee;margin-top:2px;">⛔ ${esc(blockNote)} 포함 시 사용 불가</div>`;
+      h += `<div style="font-size:11px;color:#c62828;padding:4px 12px;border-top:1px solid #eee;margin-top:2px;">⛔ ${esc(blockNote)} 포함 시 사용 불가</div>`;
       for (const ag of specialBlocked) {
         h += `<label style="display:flex;align-items:center;gap:8px;padding:4px 12px;cursor:not-allowed;color:#ccc;font-size:12px;">`;
         h += `<input type="checkbox" disabled><span>${esc(getAgeLabelText(ag))}</span></label>`;
@@ -2133,7 +2160,7 @@ function renderCh1Integrated() {
 
     // ④ 제형으로 차단된 항목
     if (formBlocked.length) {
-      h += `<div style="font-size:10.5px;color:var(--graphite);padding:4px 12px;border-top:1px solid #eee;margin-top:2px;">⛔ ${esc(currentForm)} 사용 불가</div>`;
+      h += `<div style="font-size:11px;color:var(--graphite);padding:4px 12px;border-top:1px solid #eee;margin-top:2px;">⛔ ${esc(currentForm)} 사용 불가</div>`;
       for (const ag of formBlocked) {
         h += `<label style="display:flex;align-items:center;gap:8px;padding:4px 12px;cursor:not-allowed;color:#ccc;font-size:12px;">`;
         h += `<input type="checkbox" disabled><span>${esc(getAgeLabelText(ag))}</span></label>`;
@@ -2178,7 +2205,7 @@ function renderCh1Integrated() {
       if (!m) return `×${raw}`;
       const base = m[1].trim(), vAD = m[2]?.trim();
       return vAD
-        ? `×${base}&nbsp;<span style="color:var(--graphite);font-size:10.5px;">(비타민A·D 함유 시 ×${vAD})</span>`
+        ? `×${base}&nbsp;<span style="color:var(--graphite);font-size:11px;">(비타민A·D 함유 시 ×${vAD})</span>`
         : `×${base}`;
     }
 
@@ -2214,7 +2241,7 @@ function renderCh1Integrated() {
 
     const coeffStr = isAdult ? '×1 (성인 기준)' : fmtCoeff(rawCoeff);
 
-    let h = `<div style="margin:0 0 7px;padding:8px 12px;background:var(--paper);border:1px solid #b3c3e0;border-radius:5px;font-size:11.5px;line-height:1.8;">`;
+    let h = `<div style="margin:0 0 7px;padding:8px 12px;background:var(--paper);border:1px solid #b3c3e0;border-radius:5px;font-size:11px;line-height:1.8;">`;
     h += `<div style="font-weight:700;color:var(--obsidian);margin-bottom:4px;font-size:11px;">📋 적용 기준 &nbsp;—&nbsp; ${esc(CH1_AGE_DISPLAY[ageKey] ?? ageKey)}</div>`;
     h += `<div style="display:flex;flex-wrap:wrap;gap:16px;">`;
     if (coeffStr) h += `<span><b>비타민 계수</b>&nbsp;${coeffStr}</span>`;
@@ -2318,7 +2345,7 @@ function renderCh1Integrated() {
         const caret = collapsed ? '▶' : '▼';
         rows += `<tr class="mx-group-hdr"><td colspan="10" data-sec="${esc(section)}" onclick="toggleCh1Section('${esc(section)}')" title="클릭하여 접기/펼치기">`
              +  `<span class="mx-group-caret">${caret}</span>${esc(section)}`
-             +  `<span class="grp-count" style="font-weight:400;color:#6b8ec4;margin-left:8px;font-size:10px;">${st.filled}/${st.total} 입력</span>`
+             +  `<span class="grp-count" style="font-weight:400;color:#6b8ec4;margin-left:8px;font-size:11px;">${st.filled}/${st.total} 입력</span>`
              +  `</td></tr>`;
       }
       if (ch1Collapsed.has(section)) continue;
@@ -2350,14 +2377,14 @@ function renderCh1Integrated() {
             .map(n => `<option value="${esc(n)}"${n===salt.saltName?' selected':''}>${esc(n)}</option>`).join('');
           rows += `<tr class="mx-row mg-salt-row" data-mg-parent="${row.id}" data-salt-id="${salt.id}">`;
           rows += `<td class="mx-gubun-cell"><button class="js-mg-salt-del" data-row-id="${row.id}" data-salt-id="${salt.id}" style="background:none;border:none;color:var(--ash);font-size:13px;cursor:pointer;padding:1px 4px;" title="이 염 삭제">×</button></td>`;
-          rows += `<td style="font-size:9px;color:var(--graphite);text-align:center;padding:0;">└</td>`;
+          rows += `<td style="font-size:11px;color:var(--graphite);text-align:center;padding:0;">└</td>`;
           rows += `<td style="padding:2px 4px;"><select class="js-mg-salt-name" data-row-id="${row.id}" data-salt-id="${salt.id}" style="width:100%;max-width:175px;padding:2px 4px;border:1px solid #b0bcd8;border-radius:3px;font-size:11px;background:#f8f9fc;">${saltSelectOpts}</select></td>`;
           rows += `<td class="mx-dose-cell-input" style="text-align:center;padding:2px 3px;"><input type="number" class="js-mg-salt-dose mx-dose-input" data-row-id="${row.id}" data-salt-id="${salt.id}" value="${esc(String(salt.saltDose))}" min="0" step="0.001" placeholder="0"></td>`;
           rows += `<td style="text-align:center;color:#666;font-size:11px;padding:2px 2px;">`;
           rows += `mg`;
           if (!isDirect) {
             // 직접입력이 아닐 때만 MgAs 체크박스 표시
-            rows += `<br><label style="font-size:10px;color:${useAsMg?'#2255aa':'#999'};cursor:pointer;white-space:nowrap;"><input type="checkbox" class="js-mg-as-check" data-row-id="${row.id}" data-salt-id="${salt.id}"${useAsMg?' checked':''} style="vertical-align:middle;margin-right:2px;">Mg으로서</label>`;
+            rows += `<br><label style="font-size:11px;color:${useAsMg?'#2255aa':'#999'};cursor:pointer;white-space:nowrap;"><input type="checkbox" class="js-mg-as-check" data-row-id="${row.id}" data-salt-id="${salt.id}"${useAsMg?' checked':''} style="vertical-align:middle;margin-right:2px;">Mg으로서</label>`;
           }
           rows += `</td>`;
           if (useAsMg) {
@@ -2394,12 +2421,12 @@ function renderCh1Integrated() {
         const canRemoveMg = isFirst && !row.isMain;
         rows += `<tr class="mx-row mx-active mg-subtotal-row" data-id="${row.id}">`;
         rows += `<td class="mx-gubun-cell">${canRemoveMg?`<button class="mx-remove-btn" data-id="${row.id}" title="제거">×</button>`:''}</td>`;
-        rows += `<td class="mx-name" style="font-size:11px;white-space:nowrap;padding:3px 5px;">${esc(row.항목)}</td>`;
-        rows += `<td style="font-size:11px;font-weight:600;color:var(--obsidian);padding:3px 5px;white-space:nowrap;">합계 (마그네슘으로서)&nbsp;<button class="js-mg-mode-toggle" data-row-id="${row.id}" title="직접 입력 모드로 전환" style="font-size:9px;padding:1px 5px;background:none;border:1px solid var(--hairline);border-radius:3px;color:var(--graphite);cursor:pointer;">직접입력</button></td>`;
+        rows += `<td class="mx-name" style="white-space:nowrap;padding:4px 6px;">${esc(row.항목)}</td>`;
+        rows += `<td style="font-size:11px;font-weight:600;color:var(--obsidian);padding:3px 5px;white-space:nowrap;">합계 (마그네슘으로서)&nbsp;<button class="js-mg-mode-toggle" data-row-id="${row.id}" title="직접 입력 모드로 전환" style="font-size:11px;padding:1px 5px;background:none;border:1px solid var(--hairline);border-radius:3px;color:var(--graphite);cursor:pointer;">직접입력</button></td>`;
         rows += `<td style="text-align:center;font-size:12px;font-weight:600;padding:3px;">${mgIsActive ? fmtN(+totalMgAs.toFixed(4)) : '<span style="color:#ccc;">—</span>'}</td>`;
         rows += `<td style="text-align:center;color:#666;font-size:11px;padding:3px 4px;">mg</td>`;
         rows += `<td class="mx-std" data-col="critMin">—</td>`;
-        rows += `<td class="mx-std" data-col="critMax">${fmtN(mgCritMax)}<br><span style="color:var(--graphite);font-size:9px;">mg</span></td>`;
+        rows += `<td class="mx-std" data-col="critMax">${fmtN(mgCritMax)}<br><span style="color:var(--graphite);font-size:11px;">mg</span></td>`;
         rows += `<td class="mx-prod" data-col="actDMin">${fmtN(mgActDMin)}</td>`;
         rows += `<td class="mx-prod" data-col="actDMax">${fmtN(mgActDMax)}</td>`;
         rows += `<td data-col="ok" style="text-align:center;">${mgOkHtml}</td>`;
@@ -2491,7 +2518,7 @@ function renderCh1Integrated() {
         okHtml = '<span class="mx-ok">적합</span>';
       } else if (vr?.elevHint) {
         const yr = Math.round(vr.elevHint.threshMonths / 12);
-        okHtml = `<span class="mx-fail">부적합</span><br><span style="font-size:9px;color:var(--stone);white-space:nowrap;">${yr}세 이상이면 적합</span>`;
+        okHtml = `<span class="mx-fail">부적합</span><br><span style="font-size:11px;color:var(--stone);white-space:nowrap;">${yr}세 이상이면 적합</span>`;
       } else {
         okHtml = '<span class="mx-fail">부적합</span>';
       }
@@ -2529,22 +2556,22 @@ function renderCh1Integrated() {
 
       rows += `<tr class="${rowCls}" data-id="${row.id}">`;
       rows += `<td class="mx-gubun-cell">${canRemove?`<button class="mx-remove-btn" data-id="${row.id}" title="제거">×</button>`:''}</td>`;
-      rows += `<td class="mx-name" style="font-size:11px;white-space:nowrap;padding:3px 5px;">${esc(row.항목)}</td>`;
+      rows += `<td class="mx-name" style="white-space:nowrap;padding:4px 6px;">${esc(row.항목)}</td>`;
       // 성분명: 첫 블록만 드롭다운
       if (isFirst) {
         if ('mgSaltMode' in row) {
           // 마그네슘 행: 성분명 고정 + 복합염 전환 버튼
           rows += `<td style="padding:2px 4px;"><span style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">`;
           rows += `<span style="font-size:11px;color:#333;">${esc(row.ingr)}</span>`;
-          rows += `<button class="js-mg-mode-toggle" data-row-id="${row.id}" style="font-size:10px;padding:2px 7px;background:#eef2fb;border:1px solid #7a9fd4;border-radius:3px;color:#3366aa;cursor:pointer;white-space:nowrap;">🧪 복합염 입력</button>`;
+          rows += `<button class="js-mg-mode-toggle" data-row-id="${row.id}" style="font-size:11px;padding:2px 7px;background:#eef2fb;border:1px solid #7a9fd4;border-radius:3px;color:#3366aa;cursor:pointer;white-space:nowrap;">🧪 복합염 입력</button>`;
           rows += `</span></td>`;
         } else {
-          rows += `<td style="padding:2px 4px;"><select class="js-ch1-ingr" data-id="${row.id}" style="width:100%;max-width:175px;padding:2px 4px;border:none;box-shadow:var(--ring2);border-radius:4px;font-size:11px;background:var(--white);">
+          rows += `<td style="padding:2px 4px;"><select class="js-ch1-ingr" data-id="${row.id}" style="width:100%;max-width:175px;padding:3px 5px;border:none;box-shadow:var(--ring2);border-radius:4px;font-size:var(--t-md);background:var(--white);">
             ${row.ingrNames.map(n=>`<option value="${esc(n)}"${n===row.ingr?' selected':''}>${esc(n)}</option>`).join('')}
           </select>${noteLine}</td>`;
         }
       } else {
-        rows += `<td style="font-size:11px;padding:3px 5px;color:var(--charcoal);">${esc(row.ingr)}${noteLine}</td>`;
+        rows += `<td style="padding:4px 6px;color:var(--charcoal);">${esc(row.ingr)}${noteLine}</td>`;
       }
       // 배합량
       if (isFirst) {
@@ -2581,7 +2608,7 @@ function renderCh1Integrated() {
   html += `<span class="tb-count">그룹 제목을 클릭하면 접힙니다</span>`;
   html += `</div>`;
   html += `<div style="margin-bottom:8px;">`;
-  html += `<button id="ch1-ref-toggle" onclick="toggleCh1RefPanel()" style="background:var(--white);border:none;box-shadow:var(--ring2);border-radius:var(--r);padding:6px 12px;font-size:11.5px;color:var(--charcoal);cursor:pointer;width:100%;text-align:left;font-family:inherit;">📋 제1장 전체 연령·성분 기준표 보기 ▼</button>`;
+  html += `<button id="ch1-ref-toggle" onclick="toggleCh1RefPanel()" style="background:var(--white);border:none;box-shadow:var(--ring2);border-radius:var(--r);padding:6px 12px;font-size:11px;color:var(--charcoal);cursor:pointer;width:100%;text-align:left;font-family:inherit;">📋 제1장 전체 연령·성분 기준표 보기 ▼</button>`;
   html += `<div id="ch1-ref-panel" style="display:none;margin-top:6px;">${buildCh1RefPanel()}</div>`;
   html += `</div>`;
   for (let di = 0; di < dosageRows.length; di++) {
@@ -2590,9 +2617,15 @@ function renderCh1Integrated() {
     const labelColor  = 'var(--charcoal)';
     const badge       = isFirst ? '기본 연령' : '추가 연령';
 
-    html += `<div class="ch2-block" data-dr-id="${dr.id}" style="box-shadow:var(--ring2);border-radius:var(--r);padding:9px 11px;margin-bottom:10px;background:var(--white);">`;
-    html += `<div class="fill-zone dosage-sticky" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:7px;">`;
-    html += `<span style="font-size:10.5px;font-weight:600;color:${labelColor};white-space:nowrap;">${badge}</span>`;
+    html += `<div class="ch2-block" data-dr-id="${dr.id}">`;
+    html += `<div class="dose-box">`;
+    html += `<div class="dose-box-label">용법용량 <span class="dose-badge">${badge}</span>`;
+    if (!isFirst) {
+      html += `<span class="spacer"></span><button class="js-ch1-del" data-id="${dr.id}" title="이 연령 삭제"
+        style="background:none;border:none;color:var(--graphite);font-size:13px;cursor:pointer;padding:2px 6px;line-height:1;">✕</button>`;
+    }
+    html += `</div>`;
+    html += `<div class="dose-row">`;
     html += buildAgeMultiSelect(dr);
     html += `<span style="color:var(--charcoal);font-size:12px;font-weight:600;white-space:nowrap;">1일</span>`;
     if (freqRange.locked) {
@@ -2608,14 +2641,11 @@ function renderCh1Integrated() {
     html += `<span style="color:var(--ash);">~</span>`;
     html += `<select class="js-ch1-amt-max need-input" data-id="${dr.id}" style="${ss}width:44px;">${amtOpts(dr.amtMax)}</select>`;
     html += `<span style="font-weight:600;color:${labelColor};">${esc(unitDisp)}</span>`;
-    if (!isFirst) {
-      html += `<button class="js-ch1-del" data-id="${dr.id}" style="margin-left:auto;background:none;border:none;color:var(--graphite);font-size:14px;cursor:pointer;padding:2px 6px;line-height:1;" title="이 연령 삭제">✕</button>`;
-    }
-    html += `</div>`;
+    html += `</div></div>`;
     html += buildAgeSelectHint();
     if (dr.specialAgeWarning) {
-      html += `<div style="margin-bottom:6px;padding:8px 12px;background:#fdecea;border:1px solid #ef9a9a;border-radius:5px;font-size:11.5px;color:#b71c1c;display:flex;align-items:flex-start;gap:8px;">`;
-      html += `<span style="font-size:16px;line-height:1;">⚠</span>`;
+      html += `<div style="margin-bottom:6px;padding:8px 12px;background:#fdecea;border:1px solid #ef9a9a;border-radius:5px;font-size:11px;color:#b71c1c;display:flex;align-items:flex-start;gap:8px;">`;
+      html += `<span style="font-size:15px;line-height:1;">⚠</span>`;
       html += `<div><div style="font-weight:700;margin-bottom:2px;">성분 추가로 인해 연령 설정이 초기화되었습니다</div>`;
       html += `<div style="color:#c62828;">${esc(dr.specialAgeWarning)}</div>`;
       html += `<div style="margin-top:4px;color:#555;font-size:11px;">위 드롭다운에서 <b>적합한 연령을 다시 선택</b>해 주세요.</div></div>`;
@@ -2933,7 +2963,7 @@ function updateCh1BlockAmts(drId) {
       const set = (col, val) => { const td = tr.querySelector(`[data-col="${col}"]`); if (td) td.innerHTML = val; };
       set('actDMin', fmtN(mgActDMin));
       set('actDMax', fmtN(mgActDMax));
-      set('critMax', mgCritMax != null ? `${fmtN(mgCritMax)}<br><span style="color:var(--graphite);font-size:9px;">mg</span>` : '—');
+      set('critMax', mgCritMax != null ? `${fmtN(mgCritMax)}<br><span style="color:var(--graphite);font-size:11px;">mg</span>` : '—');
       let mgOkHtml;
       if (mgOk === null) mgOkHtml = '<span class="mx-na">미입력</span>';
       else if (mgOk) mgOkHtml = '<span class="mx-ok">적합</span>';
@@ -3014,7 +3044,7 @@ function updateCh1BlockAmts(drId) {
       okHtml = '<span class="mx-ok">적합</span>';
     } else if (vr?.elevHint) {
       const yr = Math.round(vr.elevHint.threshMonths / 12);
-      okHtml = `<span class="mx-fail">부적합</span><br><span style="font-size:9px;color:var(--stone);white-space:nowrap;">${yr}세 이상이면 적합</span>`;
+      okHtml = `<span class="mx-fail">부적합</span><br><span style="font-size:11px;color:var(--stone);white-space:nowrap;">${yr}세 이상이면 적합</span>`;
     } else {
       okHtml = '<span class="mx-fail">부적합</span>';
     }
@@ -3193,7 +3223,7 @@ function renderCh2Integrated() {
         const caret = mxCollapsed.has(row.gubun) ? '▶' : '▼';
         rows += `<tr class="mx-group-hdr"><td colspan="${totalCols}" data-sec="${esc(row.gubun)}" onclick="toggleMxSection('${esc(row.gubun).replace(/'/g, "\'")}')" title="클릭하여 접기/펼치기">`
              +  `<span class="mx-group-caret">${caret}</span>${esc(row.gubun)}`
-             +  `<span class="grp-count" style="font-weight:400;color:#6b8ec4;margin-left:8px;font-size:10px;">${st.filled}/${st.total} 입력</span>`
+             +  `<span class="grp-count" style="font-weight:400;color:#6b8ec4;margin-left:8px;font-size:11px;">${st.filled}/${st.total} 입력</span>`
              +  `</td></tr>`;
       }
       if (mxCollapsed.has(row.gubun)) continue;
@@ -3271,11 +3301,17 @@ function renderCh2Integrated() {
     const labelColor  = 'var(--charcoal)';
     const badge       = isFirst ? '기본 연령' : '추가 연령';
 
-    html += `<div class="ch2-block" data-dr-id="${dr.id}" style="box-shadow:var(--ring2);border-radius:var(--r);padding:9px 11px;margin-bottom:10px;background:var(--white);">`;
+    html += `<div class="ch2-block" data-dr-id="${dr.id}">`;
 
-    /* 헤더: 연령/복용량 선택 */
-    html += `<div class="fill-zone dosage-sticky" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:7px;">`;
-    html += `<span style="font-size:10.5px;font-weight:600;color:${labelColor};white-space:nowrap;">${badge}</span>`;
+    /* 용법용량 상자: 연령/복용량 선택 */
+    html += `<div class="dose-box">`;
+    html += `<div class="dose-box-label">용법용량 <span class="dose-badge">${badge}</span>`;
+    if (!isFirst) {
+      html += `<span class="spacer"></span><button class="js-ch2-del" data-id="${dr.id}" title="이 연령 삭제"
+        style="background:none;border:none;color:var(--graphite);font-size:13px;cursor:pointer;padding:2px 6px;line-height:1;">✕</button>`;
+    }
+    html += `</div>`;
+    html += `<div class="dose-row">`;
     html += `<select class="js-ch2-age need-input" data-id="${dr.id}" style="${ss}min-width:190px;">${buildAgeOpts(dr.age)}</select>`;
     html += `<span style="color:var(--charcoal);font-size:12px;font-weight:600;white-space:nowrap;">1일</span>`;
     if (freqRange.locked) {
@@ -3291,10 +3327,7 @@ function renderCh2Integrated() {
     html += `<span style="color:var(--ash);">~</span>`;
     html += `<select class="js-ch2-amt-max need-input" data-id="${dr.id}" style="${ss}width:44px;">${amtOpts(dr.amtMax)}</select>`;
     html += `<span style="font-weight:600;color:${labelColor};">${esc(unitDisp)}</span>`;
-    if (!isFirst) {
-      html += `<button class="js-ch2-del" data-id="${dr.id}" style="margin-left:auto;background:none;border:none;color:var(--graphite);font-size:14px;cursor:pointer;padding:2px 6px;line-height:1;" title="이 연령 삭제">✕</button>`;
-    }
-    html += `</div>`;
+    html += `</div></div>`;
 
     /* 매트릭스 테이블 */
     html += `<div class="mx-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">`;
@@ -4013,16 +4046,16 @@ function renderDosageRows() {
     const unitDisp = dosageUnit || '정';
     return `<div class="dosage-row" data-id="${dr.id}"
       style="border:1px solid var(--hairline); border-radius:4px; padding:7px 10px; margin-bottom:5px; background:${isFirst?'var(--paper)':'#fff'};">
-      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:14px;">
+      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:13px;">
         <span style="color:#777; font-size:12px; font-weight:700; letter-spacing:0.04em; white-space:nowrap;">연령</span>
         <select class="js-dosage-age" data-id="${dr.id}" style="${ss} min-width:195px;">
           ${buildAgeOpts(dr.age)}
         </select>
         <button class="js-del-dosage" data-id="${dr.id}"
-          style="margin-left:auto; background:none; border:none; color:#999; font-size:14px; cursor:pointer; padding:2px 5px; line-height:1; ${isFirst?'visibility:hidden;':''}"
+          style="margin-left:auto; background:none; border:none; color:#999; font-size:13px; cursor:pointer; padding:2px 5px; line-height:1; ${isFirst?'visibility:hidden;':''}"
           title="삭제">✕</button>
       </div>
-      <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap; font-size:14px; margin-top:6px;">
+      <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap; font-size:13px; margin-top:6px;">
         <span style="color:var(--charcoal); font-size:12px; font-weight:600;">1일</span>
         ${freqRange.locked
           ? `<span style="${ss} display:inline-block; background:var(--paper); box-shadow:var(--ring2); color:var(--charcoal); padding:3px 10px; border-radius:4px;">${dr.freqMin}회 고정</span>`
@@ -4176,7 +4209,7 @@ function resHeaderCard(allOk, metaItems) {
     .join('');
   return `<div class="res-card">
     <div class="res-card-top ${allOk ? 'ok' : 'fail'}">
-      <span style="font-size:19px;">${allOk ? '✅' : '❌'}</span>
+      <span style="font-size:20px;">${allOk ? '✅' : '❌'}</span>
       <span class="res-verdict-big">전체 판정: ${allOk ? '적합' : '부적합'}</span>
     </div>
     ${chips ? `<div class="res-meta">${chips}</div>` : ''}
@@ -4274,7 +4307,7 @@ function renderChapter1Results(validation, form, ageGroup) {
         ${r.gubun ? `<span class="res-item-no">${esc(r.gubun)}</span>` : ''}${esc(r.ingr)}
       </td>
       <td class="res-num res-c-std">${fmtV(r.critMin)}</td>
-      <td class="res-num res-c-std">${fmtV(r.critMax)}${r.ageNote ? `<br><span style="color:var(--graphite);font-size:9.5px;">${esc(r.ageNote)}</span>` : ''}</td>
+      <td class="res-num res-c-std">${fmtV(r.critMax)}${r.ageNote ? `<br><span style="color:var(--graphite);font-size:11px;">${esc(r.ageNote)}</span>` : ''}</td>
       <td class="res-num res-c-prod">${fmtV(r.dailyMin)}</td>
       <td class="res-num res-c-prod">${fmtV(r.dailyMax)}</td>
       <td class="res-verdict">${resVerdictCell(ok, r.reason)}</td>
@@ -4287,7 +4320,7 @@ function renderChapter1Results(validation, form, ageGroup) {
         <td class="res-name" colspan="3">
           <span class="res-item-no">${esc(r.key)}</span>${(r.ingredients ?? []).map(esc).join(', ')}
         </td>
-        <td colspan="4" style="font-size:10.5px;color:var(--stone);">${esc(r.reason)}</td>
+        <td colspan="4" style="font-size:11px;color:var(--stone);">${esc(r.reason)}</td>
         <td class="res-verdict">${resVerdictCell(r.ok, '')}</td>
       </tr>`).join('')}` : '';
 
@@ -4371,7 +4404,7 @@ function renderChapter2Results(validation, form, ageGroup) {
 
   const fmt = v => v != null ? (+v).toLocaleString('ko-KR', { maximumFractionDigits: 2 }) : '—';
 
-  const th   = 'padding:4px 5px;border:1px solid #cdd5e0;font-size:10px;text-align:center;';
+  const th   = 'padding:4px 5px;border:1px solid #cdd5e0;font-size:11px;text-align:center;';
   const thB  = `${th}background:#dce8f5;`;   // 표제기 기준 헤더
   const thG  = `${th}background:#e8f5e9;`;   // 실제 배합 헤더
   const thH  = `${th}background:#f0f4fa;`;   // 기본 헤더
@@ -4390,7 +4423,7 @@ function renderChapter2Results(validation, form, ageGroup) {
     const al = r.allowed ?? {};
     const ac = r.actual  ?? {};
     return `<tr class="${resRowCls(r.ok)}">
-      <td style="text-align:center;font-size:10px;color:var(--stone);">${esc(r.gubun || '—')}</td>
+      <td style="text-align:center;font-size:11px;color:var(--stone);">${esc(r.gubun || '—')}</td>
       <td class="res-name">${esc(r.ingr)}</td>
       <td class="res-num res-c-std">${fmt(al.min1dose)}</td>
       <td class="res-num res-c-std">${fmt(al.max1dose)}</td>
@@ -4468,7 +4501,7 @@ function mkResultRow(ts, ok, label, input, range, reason) {
 }
 
 function mkDivRow(ts, label) {
-  return `<tr><td colspan="5" style="${ts}background:#f0f4fa;font-size:10px;font-weight:700;color:#555;letter-spacing:0.06em;">${label}</td></tr>`;
+  return `<tr><td colspan="5" style="${ts}background:#f0f4fa;font-size:11px;font-weight:700;color:#555;letter-spacing:0.06em;">${label}</td></tr>`;
 }
 
 function mkResultBlock(allOk, form, ageGroup, freqMin, freqMax, amtMax, coeff, extra, bodyRows) {
@@ -4512,7 +4545,7 @@ function mkResultRow7(ts, ok, label, dose1, dailyMin, dailyMax, critMin, critMax
 function mkRuleRow7(ts, ok, key, reason) {
   return `<tr class="${resRowCls(ok)}">
     <td class="res-name">${esc(key)}</td>
-    <td colspan="6" style="font-size:10.5px;color:var(--stone);">${esc(reason)}</td>
+    <td colspan="6" style="font-size:11px;color:var(--stone);">${esc(reason)}</td>
     <td class="res-verdict">${resVerdictCell(ok, '')}</td>
   </tr>`;
 }
@@ -4609,7 +4642,7 @@ function mkDivRow9(ts, label) {
 function mkRuleRow9(ts, ok, key, reason) {
   return `<tr class="${resRowCls(ok)}">
     <td class="res-name">${esc(key)}</td>
-    <td colspan="7" style="font-size:10.5px;color:var(--stone);">${esc(reason)}</td>
+    <td colspan="7" style="font-size:11px;color:var(--stone);">${esc(reason)}</td>
     <td class="res-verdict">${resVerdictCell(ok, '')}</td>
   </tr>`;
 }
@@ -4705,7 +4738,7 @@ function renderEfficacy(result) {
   }
   function badgeHtml(txt) {
     if (!txt) return '';
-    return `<span style="margin-left:5px;font-size:9px;color:#1565c0;background:#e3f2fd;border:1px solid #90caf9;border-radius:10px;padding:1px 6px;white-space:nowrap;">${esc(txt)}</span>`;
+    return `<span style="margin-left:5px;font-size:11px;color:#1565c0;background:#e3f2fd;border:1px solid #90caf9;border-radius:10px;padding:1px 6px;white-space:nowrap;">${esc(txt)}</span>`;
   }
 
   // ok=true만 필터
@@ -4935,7 +4968,7 @@ function escAndStyleCond(raw) {
   let last = 0, m;
   while ((m = COND_RE.exec(raw)) !== null) {
     parts.push(esc(raw.slice(last, m.index)));
-    parts.push(`<span style="color:var(--graphite);font-size:10px;">(${esc(m[1])})</span>`);
+    parts.push(`<span style="color:var(--graphite);font-size:11px;">(${esc(m[1])})</span>`);
     last = m.index + m[0].length;
   }
   parts.push(esc(raw.slice(last)));
@@ -5396,7 +5429,7 @@ function searchUnified(query) {
 
   let html = '';
   if (excelMatches.length) {
-    html += `<div style="padding:3px 9px;font-size:10px;font-weight:700;color:var(--graphite);letter-spacing:0.05em;background:#f8fafc;border-bottom:1px solid var(--hairline);">허가목록</div>`;
+    html += `<div style="padding:3px 9px;font-size:11px;font-weight:700;color:var(--graphite);letter-spacing:0.05em;background:#f8fafc;border-bottom:1px solid var(--hairline);">허가목록</div>`;
     html += excelMatches.map(p => {
       const idx      = _excelDB.indexOf(p);
       const saved    = savedByName[p.name.toLowerCase()];
@@ -5409,8 +5442,8 @@ function searchUnified(query) {
                      onmouseenter="this.style.background='#dcfce7'" onmouseleave="this.style.background='#f0fdf4'"
                      onmousedown="loadProduct('${saved.id}');var r=$('unified-results');if(r)r.style.display='none';">
           <span style="flex:1;font-size:12px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name)}</span>
-          <span style="font-size:10px;color:#15803d;font-weight:700;white-space:nowrap;">저장됨</span>
-          <span style="font-size:10px;color:var(--graphite);white-space:nowrap;">${chLabel} · ${date}</span>
+          <span style="font-size:11px;color:#15803d;font-weight:700;white-space:nowrap;">저장됨</span>
+          <span style="font-size:11px;color:var(--graphite);white-space:nowrap;">${chLabel} · ${date}</span>
           <button class="btn btn-add" onmousedown="event.stopPropagation();deleteProduct('${saved.id}')" style="padding:2px 6px;font-size:11px;color:#c62828;border-color:#e8b4b0;" title="삭제">×</button>
         </div>`;
       }
@@ -5420,7 +5453,7 @@ function searchUnified(query) {
     }).join('');
   }
   if (savedOnlyMatches.length) {
-    html += `<div style="padding:3px 9px;font-size:10px;font-weight:700;color:var(--graphite);letter-spacing:0.05em;background:#f8fafc;border-bottom:1px solid var(--hairline);${excelMatches.length?'border-top:1px solid var(--hairline);':''}">저장된 제품</div>`;
+    html += `<div style="padding:3px 9px;font-size:11px;font-weight:700;color:var(--graphite);letter-spacing:0.05em;background:#f8fafc;border-bottom:1px solid var(--hairline);${excelMatches.length?'border-top:1px solid var(--hairline);':''}">저장된 제품</div>`;
     html += savedOnlyMatches.map(p => {
       const date    = new Date(p.savedAt).toLocaleDateString('ko-KR', { month:'2-digit', day:'2-digit' });
       const chLabel = (p.chapter || '').replace(/제(\d+)장_.*/, '$1장');
@@ -5428,7 +5461,7 @@ function searchUnified(query) {
                    onmouseenter="this.style.background='#f0fdf4'" onmouseleave="this.style.background=''"
                    onmousedown="loadProduct('${p.id}');var r=$('unified-results');if(r)r.style.display='none';">
         <span style="flex:1;font-size:12px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name)}</span>
-        <span style="font-size:10px;color:var(--graphite);white-space:nowrap;">${chLabel} · ${date}</span>
+        <span style="font-size:11px;color:var(--graphite);white-space:nowrap;">${chLabel} · ${date}</span>
         <button class="btn btn-add" onmousedown="event.stopPropagation();deleteProduct('${p.id}')" style="padding:2px 6px;font-size:11px;color:#c62828;border-color:#e8b4b0;" title="삭제">×</button>
       </div>`;
     }).join('');

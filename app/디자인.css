@@ -133,14 +133,14 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; marg
 
 /* 섹션 제목 — 한글에는 대문자 변환이 통하지 않으므로 크기·굵기로 세운다 */
 .eyebrow, .section-title, .panel-header {
-  font-size: 12.5px; font-weight: 600; letter-spacing: -.01em;
+  font-size:12px; font-weight: 600; letter-spacing: -.01em;
   color: var(--obsidian); text-transform: none;
 }
 .section-title::after { border-top-color: var(--hairline); }
 
 /* 채워야 하는 곳 표시 */
 .need {
-  font-size: 10.5px; font-weight: 500; color: #8a6d1a; letter-spacing: 0;
+  font-size:11px; font-weight: 500; color: #8a6d1a; letter-spacing: 0;
   background: var(--input-bg); border-radius: 3px; padding: 1px 6px; margin-left: 6px;
 }
 .fill-zone {
@@ -162,13 +162,13 @@ select.need-input:disabled, button.need-input:disabled {
 /* ── 판정 (적합 / 부적합 / 미입력) ── */
 .v-ok, .v-fail, .v-na, .mx-ok, .mx-fail, .mx-na {
   display: inline-block; border-radius: 4px; padding: 2px 8px;
-  font-size: 11px; font-weight: 500; letter-spacing: -.01em;
+  font-size:11px; font-weight: 500; letter-spacing: -.01em;
 }
 .v-ok,   .mx-ok   { background: var(--green-bg); color: var(--green); box-shadow: 0 0 0 1px #cfe6d4; }
 .v-fail, .mx-fail { background: var(--red); color: #fff; font-weight: 600; }
 .v-na,   .mx-na   { background: var(--paper); color: var(--graphite); box-shadow: var(--ring2); }
 .v-why {
-  display: block; font-size: 10px; color: var(--red);
+  display: block; font-size:11px; color: var(--red);
   white-space: normal; margin-top: 2px; font-weight: 500;
 }
 
