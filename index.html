@@ -198,14 +198,17 @@
       font-size:12px; font-weight: 600; color: var(--obsidian);
       white-space: nowrap; flex: 0 0 62px;
     }
+    /* 제품 검색은 "안 채우면 못 넘어가는 칸"이 아니라 빠른 길이다.
+       노랑은 반드시 채워야 하는 곳에만 남기고, 여기는 테두리를 또렷하게 한다. */
     .fld-input {
-      flex: 1; padding: 5px 9px; height: 30px; font-size:13px;
+      flex: 1; padding: 6px 10px; height: 34px; font-size:13px;
       font-family: inherit; box-sizing: border-box;
       border: none; border-radius: var(--r);
       background: var(--white); color: var(--obsidian);
-      box-shadow: var(--ring2); outline: none;
+      box-shadow: 0 0 0 1px var(--ash); outline: none;
     }
-    .fld-input:focus { box-shadow: 0 0 0 1px var(--obsidian); }
+    .fld-input:focus { box-shadow: 0 0 0 2px var(--obsidian); }
+    .fld-input::placeholder { color: var(--graphite); }
 
     /* ── Excipient tags ── */
     .excipient-add-row { display:flex; gap:6px; margin-bottom:6px; }
