@@ -2924,35 +2924,35 @@ function runValidation() {
                      amtMin: dr.amtMin,   amtMax: dr.amtMax, unit: dosageUnit };
 
     if (currentKey === '제1장_비타민미네랄') {
-      html += renderAgeHeader(dr);
+      if (validDosageRows.length > 1) html += renderAgeHeader(dr);
       const v = validateChapter1(DB['제1장_비타민미네랄']['표'], form, dr.age, activeRows, dosage);
       if (!v.itemResults.every(r => r.ok !== false) || !v.sumResults.every(r => r.ok !== false))
         anyFail = true;
       html += renderChapter1Results(v, form, dr.age);
       validations.push(v);
     } else if (currentKey === '제2장_해열진통제') {
-      html += renderAgeHeader(dr);
+      if (validDosageRows.length > 1) html += renderAgeHeader(dr);
       const v = validateChapter2(DB['제2장_해열진통제']['표'], form, dr.age, activeRows, dosage);
       if (!v.itemResults.every(r => r.ok !== false) || !v.ruleErrors.every(r => r.ok !== false))
         anyFail = true;
       html += renderChapter2Results(v, form, dr.age);
       validations.push(v);
     } else if (currentKey === '제3장_감기약') {
-      html += renderAgeHeader(dr);
+      if (validDosageRows.length > 1) html += renderAgeHeader(dr);
       const v = validateChapter3(DB['제3장_감기약']['표'], form, dr.age, activeRows, dosage);
       if (!v.itemResults.every(r => r.ok !== false) || !v.ruleErrors.every(r => r.ok !== false))
         anyFail = true;
       html += renderChapter3Results(v, form, dr.age);
       validations.push(v);
     } else if (currentKey === '제7장_진해거담제') {
-      html += renderAgeHeader(dr);
+      if (validDosageRows.length > 1) html += renderAgeHeader(dr);
       const v = validateChapter7(DB['제7장_진해거담제']['표'], form, dr.age, activeRows, dosage);
       if (!v.itemResults.every(r => r.ok !== false) || !v.ruleErrors.every(r => r.ok !== false))
         anyFail = true;
       html += renderChapter7Results(v, form, dr.age);
       validations.push(v);
     } else if (currentKey === '제9장_비염용경구제') {
-      html += renderAgeHeader(dr);
+      if (validDosageRows.length > 1) html += renderAgeHeader(dr);
       const v = validateChapter9(DB['제9장_비염용경구제']['표'], form, dr.age, activeRows, dosage);
       if (!v.itemResults.every(r => r.ok !== false) || !v.ruleErrors.every(r => r.ok !== false))
         anyFail = true;

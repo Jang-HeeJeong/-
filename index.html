@@ -147,6 +147,14 @@
       margin-bottom: 10px;
     }
     .dose-box-label { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+    /* 허가목록에는 용법용량이 없어 기본값이 들어간다 — 고칠 때까지만 보인다 */
+    .dose-hint {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 8px; padding: 6px 9px;
+      background: var(--white); box-shadow: var(--ring2); border-radius: 4px;
+      font-size:11px; color: var(--stone); line-height: 1.5;
+    }
+    .dose-hint b { color: var(--obsidian); font-weight: 600; }
     .dose-box-label .dose-badge {
       background: var(--white); box-shadow: var(--ring2);
       border-radius: 3px; padding: 1px 7px;
@@ -1042,6 +1050,7 @@ let dosageRowIdSeq = 0;
 // selectedExcipients 선언은 app/판정_규칙.js 로 이동
 
 // ── UI 상태 ──
+let doseIsDefault      = false;      // 제품을 불러왔는데 용법용량은 아직 기본값
 let ch1OnlyFilled      = true;       // 기본 켜짐 — 채운 성분만 표시 (없으면 자동으로 전체)
 const ch1Collapsed     = new Set();  // 접힌 그룹(비타민/미네랄/기타성분/생약)
 let mxOnlyFilled       = true;       // ch2/3/7/9 매트릭스용 동일 필터
@@ -1311,6 +1320,14 @@ function markFilled(el, filled, bad) {
 }
 
 /* 용법용량·연령처럼 "고르면 끝"인 칸의 노랑을 정리한다 */
+/* 용법용량을 손대면 안내를 내린다 */
+function clearDoseDefaultFlag() {
+  if (!doseIsDefault) return;
+  doseIsDefault = false;
+  const wrap = activeIngrWrap();
+  if (wrap) for (const el of wrap.querySelectorAll('.dose-hint')) el.remove();
+}
+
 function refreshFillMarks() {
   for (const el of document.querySelectorAll('.need-input')) {
     const done = el.tagName === 'BUTTON'
@@ -2716,7 +2733,12 @@ function renderCh1Integrated() {
     html += `<span style="color:var(--ash);">~</span>`;
     html += `<select class="js-ch1-amt-max need-input" data-id="${dr.id}" style="${ss}width:44px;">${amtOpts(dr.amtMax)}</select>`;
     html += `<span style="font-weight:600;color:${labelColor};">${esc(unitDisp)}</span>`;
-    html += `</div></div>`;
+    html += `</div>`;
+    if (isFirst && doseIsDefault) {
+      html += `<div class="dose-hint">허가목록에는 용법용량이 없습니다 —`
+            + ` 지금은 <b>기본값</b>이니 이 제품의 실제 용법으로 고쳐 주세요.</div>`;
+    }
+    html += `</div>`;
     html += buildAgeSelectHint();
     if (dr.specialAgeWarning) {
       html += `<div style="margin-bottom:6px;padding:8px 12px;background:#fdecea;border:1px solid #ef9a9a;border-radius:5px;font-size:11px;color:#b71c1c;display:flex;align-items:flex-start;gap:8px;">`;
@@ -2764,6 +2786,7 @@ function renderCh1Integrated() {
 
   // 체크박스 변경 → dr.age / dr.ageExtra 갱신, 레이블 즉시 업데이트
   wrap.querySelectorAll('.js-ch1-age-cb').forEach(cb => cb.addEventListener('change', e => {
+    clearDoseDefaultFlag();
     const drId = +e.target.dataset.id;
     const dr = dosageRows.find(r => r.id === drId);
     if (!dr) return;
@@ -2800,18 +2823,22 @@ function renderCh1Integrated() {
     renderCh1Integrated();
   }));
   wrap.querySelectorAll('.js-ch1-freq-min').forEach(el => el.addEventListener('change', e => {
+    clearDoseDefaultFlag();
     const dr = dosageRows.find(r => r.id === +e.target.dataset.id);
     if (dr) { dr.freqMin = parseInt(e.target.value)||1; updateCh1BlockAmts(dr.id); }
   }));
   wrap.querySelectorAll('.js-ch1-freq-max').forEach(el => el.addEventListener('change', e => {
+    clearDoseDefaultFlag();
     const dr = dosageRows.find(r => r.id === +e.target.dataset.id);
     if (dr) { dr.freqMax = parseInt(e.target.value)||1; updateCh1BlockAmts(dr.id); }
   }));
   wrap.querySelectorAll('.js-ch1-amt-min').forEach(el => el.addEventListener('change', e => {
+    clearDoseDefaultFlag();
     const dr = dosageRows.find(r => r.id === +e.target.dataset.id);
     if (dr) { dr.amtMin = parseInt(e.target.value)||1; updateCh1BlockAmts(dr.id); }
   }));
   wrap.querySelectorAll('.js-ch1-amt-max').forEach(el => el.addEventListener('change', e => {
+    clearDoseDefaultFlag();
     const dr = dosageRows.find(r => r.id === +e.target.dataset.id);
     if (dr) { dr.amtMax = parseInt(e.target.value)||1; updateCh1BlockAmts(dr.id); }
   }));
@@ -3412,7 +3439,12 @@ function renderCh2Integrated() {
     html += `<span style="color:var(--ash);">~</span>`;
     html += `<select class="js-ch2-amt-max need-input" data-id="${dr.id}" style="${ss}width:44px;">${amtOpts(dr.amtMax)}</select>`;
     html += `<span style="font-weight:600;color:${labelColor};">${esc(unitDisp)}</span>`;
-    html += `</div></div>`;
+    html += `</div>`;
+    if (isFirst && doseIsDefault) {
+      html += `<div class="dose-hint">허가목록에는 용법용량이 없습니다 —`
+            + ` 지금은 <b>기본값</b>이니 이 제품의 실제 용법으로 고쳐 주세요.</div>`;
+    }
+    html += `</div>`;
 
     /* 매트릭스 테이블 */
     html += `<div class="ingr-sub"><div class="ingr-sub-title">배합 성분 <span class="need">✎ 입력</span></div>`;
@@ -3446,6 +3478,7 @@ function renderCh2Integrated() {
   /* ── 이벤트 바인딩 ── */
   // 연령 변경
   wrap.querySelectorAll('.js-ch2-age').forEach(el => el.addEventListener('change', e => {
+    clearDoseDefaultFlag();
     const dr = dosageRows.find(r => r.id === +e.target.dataset.id);
     if (dr) { dr.age = e.target.value; checkDisabledAgeWarning(); renderCh2Integrated(); }
   }));
@@ -3458,18 +3491,22 @@ function renderCh2Integrated() {
   }));
   // 복용 횟수/용량 변경 → 해당 블록 함량만 재계산
   wrap.querySelectorAll('.js-ch2-freq-min').forEach(el => el.addEventListener('change', e => {
+    clearDoseDefaultFlag();
     const dr = dosageRows.find(r => r.id === +e.target.dataset.id);
     if (dr) { dr.freqMin = parseInt(e.target.value)||1; updateCh2BlockAmts(dr.id); }
   }));
   wrap.querySelectorAll('.js-ch2-freq-max').forEach(el => el.addEventListener('change', e => {
+    clearDoseDefaultFlag();
     const dr = dosageRows.find(r => r.id === +e.target.dataset.id);
     if (dr) { dr.freqMax = parseInt(e.target.value)||1; updateCh2BlockAmts(dr.id); }
   }));
   wrap.querySelectorAll('.js-ch2-amt-min').forEach(el => el.addEventListener('change', e => {
+    clearDoseDefaultFlag();
     const dr = dosageRows.find(r => r.id === +e.target.dataset.id);
     if (dr) { dr.amtMin = parseInt(e.target.value)||1; updateCh2BlockAmts(dr.id); }
   }));
   wrap.querySelectorAll('.js-ch2-amt-max').forEach(el => el.addEventListener('change', e => {
+    clearDoseDefaultFlag();
     const dr = dosageRows.find(r => r.id === +e.target.dataset.id);
     if (dr) { dr.amtMax = parseInt(e.target.value)||1; updateCh2BlockAmts(dr.id); }
   }));
@@ -5630,6 +5667,10 @@ function _showExcelIngrNotice(lines) {
 function selectExcelProduct(idx) {
   const item = _excelDB[idx];
   if (!item) return;
+
+  // 허가목록에는 성분만 있고 용법용량은 없다.
+  // 고치기 전까지 "기본값"이라고 알려 준다.
+  doseIsDefault = true;
 
   // 제품명 입력
   const pn = $('product-name');
