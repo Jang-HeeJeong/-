@@ -299,7 +299,6 @@
     /* ── 성분 매트릭스 테이블 (ch2/3/7/9) ── */
     .mx-wrap {
       border-radius: var(--r);
-      box-shadow: var(--ring2);
       overflow-x: auto;
       margin-bottom: 8px;
       -webkit-overflow-scrolling: touch;
@@ -774,7 +773,7 @@
         <!-- ① 통합 검색 (허가목록 + 저장 DB) — 불러오기가 먼저 -->
         <div style="position:relative;margin-bottom:8px;">
           <div style="display:flex; gap:5px; align-items:center;">
-            <span class="fld-label">제품 검색 <span class="opt">🔍 찾기</span></span>
+            <span class="fld-label">제품 검색</span>
             <input type="text" id="unified-search"
                    placeholder="허가목록 + 저장 제품 검색…"
                    class="fld-input"
@@ -792,7 +791,7 @@
           <div id="unified-results"
                style="display:none;position:absolute;z-index:200;left:0;right:0;top:100%;margin-top:3px;max-height:220px;overflow-y:auto;border-radius:var(--r);background:var(--white);box-shadow:0 0 0 1px var(--hairline), 0 8px 24px rgba(0,0,0,0.10);"></div>
         </div>
-        <div id="excel-db-status" style="font-size:11px;color:var(--graphite);margin-top:3px;min-height:13px;"></div>
+        <div id="excel-db-status" style="display:none;font-size:11px;color:var(--graphite);margin-top:4px;"></div>
 
         <!-- 제품명은 결과 화면의 저장 줄에 있다. 여기서는 고른 제품만 보여준다. -->
         <div id="picked-product" style="display:none;">
@@ -5426,12 +5425,14 @@ function showExcelSource() {
   let meta = null;
   try { meta = JSON.parse(localStorage.getItem('excelProductDBMeta') || 'null'); } catch(e) {}
   if (meta && meta.name) {
+    el.style.display = '';
     el.innerHTML = `허가목록 <b style="color:var(--charcoal);">${esc(meta.name)}</b>`
       + ` · ${_excelDB.length}개 · ${esc(meta.at || '')} 업로드`
       + ` <span style="color:var(--ash);">(이 브라우저에만 저장됨)</span>`;
   } else {
-    el.innerHTML = `허가목록 <b style="color:var(--charcoal);">내장 목록</b>`
-      + ` · ${_excelDB.length}개 · 2026.05.27 기준`;
+    // 내장 목록을 그대로 쓰는 평소 상태 — 굳이 알릴 것이 없으므로 감춘다
+    el.style.display = 'none';
+    el.innerHTML = '';
   }
 }
 
