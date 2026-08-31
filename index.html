@@ -96,25 +96,24 @@
     }
 
     /* 첫 화면 안내 — 장을 고르기 전에는 빈 표 대신 이것을 보여준다 */
+    /* 첫 화면 안내 — 한 줄. 고르기 전 화면을 차지하지 않게 */
     #start-hint {
-      margin: 0 0 16px; padding: 16px 18px;
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      margin: 0 0 12px; padding: 9px 12px;
       background: var(--paper); box-shadow: var(--ring2); border-radius: var(--r);
     }
     #start-hint .sh-title {
-      font-size:13px; font-weight: 600; color: var(--obsidian);
-      letter-spacing: -.01em; margin-bottom: 12px;
+      font-size:12px; font-weight: 600; color: var(--obsidian); letter-spacing: -.01em;
     }
-    #start-hint .sh-steps { display: flex; gap: 22px; flex-wrap: wrap; }
-    #start-hint .sh-step { display: flex; gap: 9px; align-items: flex-start; flex: 1 1 240px; }
-    /* 번호는 안내일 뿐이니 조용하게 */
+    #start-hint .sh-step { display: inline-flex; align-items: center; gap: 7px; }
     #start-hint .sh-num {
-      flex: 0 0 19px; height: 19px; border-radius: 50%;
+      width: 17px; height: 17px; border-radius: 50%;
       background: var(--white); color: var(--stone); box-shadow: var(--ring2);
       font-size:11px; font-weight: 600;
       display: inline-flex; align-items: center; justify-content: center;
     }
     #start-hint .sh-step b { font-size:12px; font-weight: 600; color: var(--obsidian); }
-    #start-hint .sh-step p { margin: 3px 0 0; font-size:11px; color: var(--stone); line-height: 1.6; }
+    #start-hint .sh-step i { font-style: normal; font-size:11px; color: var(--graphite); }
 
     /* 연령 블록 안의 배합 성분 — 용법용량 상자와 나란한 제 상자 */
     .ingr-sub {
@@ -182,6 +181,15 @@
 
     /* ── 제품 검색 / 제품명 줄 ── */
     #fg-product-name { margin-bottom: 12px; }
+    /* 해도 되고 안 해도 되는 곳 — need 배지와 모양은 같고 색만 조용하게.
+       검색은 안 해도 되므로 노랑(= 반드시 채울 곳)을 쓰지 않는다. */
+    .opt {
+      font-size:11px; font-weight: 500; color: var(--stone); letter-spacing: 0;
+      background: var(--paper); box-shadow: var(--ring2);
+      border-radius: 3px; padding: 1px 6px; margin-left: 6px;
+      white-space: nowrap;
+    }
+
     /* 입력 단계 라벨은 하나의 규격으로 —
        제품 검색 · 적용 기준 · 제형 · 용법용량 · 배합 성분은 모두 같은 줄의 일이다.
        예전에는 배합 성분만 15px, 용법용량만 갈색이라 따로 놀았다. */
@@ -193,7 +201,7 @@
       font-size:12px; font-weight: 600; color: var(--obsidian);
       letter-spacing: -.01em;
     }
-    .fld-label { white-space: nowrap; flex: 0 0 62px; }
+    .fld-label { white-space: nowrap; flex: 0 0 auto; min-width: 62px; }
     /* 제품 검색은 "안 채우면 못 넘어가는 칸"이 아니라 빠른 길이다.
        노랑은 반드시 채워야 하는 곳에만 남기고, 여기는 테두리를 또렷하게 한다. */
     /* input[type=text] 규칙(0,1,1)이 .fld-input(0,1,0)을 이기므로 태그를 붙인다 */
@@ -753,23 +761,9 @@
 
       <!-- 아직 아무것도 안 골랐을 때: 무엇부터 할지 먼저 알려준다 -->
       <div id="start-hint">
-        <div class="sh-title">어디부터 시작할까요?</div>
-        <div class="sh-steps">
-          <div class="sh-step">
-            <span class="sh-num">1</span>
-            <div>
-              <b>제품명으로 검색</b>
-              <p>허가목록에서 찾아 장·제형·성분을 한 번에 채웁니다. 대부분 이 방법이 빠릅니다.</p>
-            </div>
-          </div>
-          <div class="sh-step">
-            <span class="sh-num">2</span>
-            <div>
-              <b>적용 기준을 직접 선택</b>
-              <p>아래에서 장과 제형을 고르면 해당 장의 배합 성분표가 나타납니다.</p>
-            </div>
-          </div>
-        </div>
+        <span class="sh-title">어디부터 시작할까요?</span>
+        <span class="sh-step"><span class="sh-num">1</span><b>제품명으로 검색</b><i>빠른 길</i></span>
+        <span class="sh-step"><span class="sh-num">2</span><b>적용 기준 직접 선택</b><i>신규 배합</i></span>
       </div>
 
 
@@ -780,7 +774,7 @@
         <!-- ① 통합 검색 (허가목록 + 저장 DB) — 불러오기가 먼저 -->
         <div style="position:relative;margin-bottom:8px;">
           <div style="display:flex; gap:5px; align-items:center;">
-            <span class="fld-label">제품 검색</span>
+            <span class="fld-label">제품 검색 <span class="opt">🔍 찾기</span></span>
             <input type="text" id="unified-search"
                    placeholder="허가목록 + 저장 제품 검색…"
                    class="fld-input"
@@ -2685,8 +2679,10 @@ function renderCh1Integrated() {
 
     html += `<div class="ch2-block" data-dr-id="${dr.id}">`;
     html += `<div class="dose-box">`;
-    html += `<div class="dose-box-label">용법용량 <span class="dose-badge">${badge}</span>`;
-    html += `<span class="need">✎ 선택</span><span class="spacer"></span>`;
+    html += `<div class="dose-box-label">용법용량`;
+    html += `<span class="need">✎ 선택</span>`;
+    if (!isFirst) html += `<span class="dose-badge">추가 연령</span>`;
+    html += `<span class="spacer"></span>`;
     if (!isFirst) {
       html += `<button class="js-ch1-del" data-id="${dr.id}" title="이 연령 삭제"
         style="background:none;border:none;color:var(--graphite);font-size:13px;cursor:pointer;padding:2px 6px;line-height:1;">✕</button>`;
@@ -3379,8 +3375,10 @@ function renderCh2Integrated() {
 
     /* 용법용량 상자: 연령/복용량 선택 */
     html += `<div class="dose-box">`;
-    html += `<div class="dose-box-label">용법용량 <span class="dose-badge">${badge}</span>`;
-    html += `<span class="need">✎ 선택</span><span class="spacer"></span>`;
+    html += `<div class="dose-box-label">용법용량`;
+    html += `<span class="need">✎ 선택</span>`;
+    if (!isFirst) html += `<span class="dose-badge">추가 연령</span>`;
+    html += `<span class="spacer"></span>`;
     if (!isFirst) {
       html += `<button class="js-ch2-del" data-id="${dr.id}" title="이 연령 삭제"
         style="background:none;border:none;color:var(--graphite);font-size:13px;cursor:pointer;padding:2px 6px;line-height:1;">✕</button>`;
