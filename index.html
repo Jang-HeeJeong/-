@@ -73,7 +73,7 @@
       gap: 10px;
       margin-bottom: 14px;
     }
-    .form-group label { display: block; margin-bottom: 5px; }
+    .form-group > label { display: block; margin-bottom: 5px; }
     select, input[type="number"] {
       width: 100%; padding: 5px 8px; font-size:13px; height: 30px;
     }
@@ -181,6 +181,15 @@
 
     /* ── 제품 검색 / 제품명 줄 ── */
     #fg-product-name { margin-bottom: 12px; }
+    /* 제품 검색과 적용 기준은 둘 중 하나만 하면 된다 */
+    .or-split {
+      display: flex; align-items: center; gap: 10px;
+      margin: 14px 0 12px; color: var(--graphite); font-size:11px;
+    }
+    .or-split::before, .or-split::after {
+      content: ''; flex: 1; border-top: 1px solid var(--hairline);
+    }
+
     /* 해도 되고 안 해도 되는 곳 — need 배지와 모양은 같고 색만 조용하게.
        검색은 안 해도 되므로 노랑(= 반드시 채울 곳)을 쓰지 않는다. */
     .opt {
@@ -194,7 +203,7 @@
        제품 검색 · 적용 기준 · 제형 · 용법용량 · 배합 성분은 모두 같은 줄의 일이다.
        예전에는 배합 성분만 15px, 용법용량만 갈색이라 따로 놀았다. */
     .fld-label,
-    .form-group label,
+    .form-group > label,
     .dose-box-label,
     .ingr-sub-title,
     .step-title {
@@ -299,6 +308,7 @@
     /* ── 성분 매트릭스 테이블 (ch2/3/7/9) ── */
     .mx-wrap {
       border-radius: var(--r);
+      box-shadow: var(--ring2);
       overflow-x: auto;
       margin-bottom: 8px;
       -webkit-overflow-scrolling: touch;
@@ -771,9 +781,9 @@
       <div id="fg-product-name">
 
         <!-- ① 통합 검색 (허가목록 + 저장 DB) — 불러오기가 먼저 -->
-        <div style="position:relative;margin-bottom:8px;">
+        <div class="form-group" style="position:relative;margin-bottom:8px;">
+          <label>제품 검색 <span class="need">✎ 입력</span></label>
           <div style="display:flex; gap:5px; align-items:center;">
-            <span class="fld-label">제품 검색</span>
             <input type="text" id="unified-search"
                    placeholder="허가목록 + 저장 제품 검색…"
                    class="fld-input"
@@ -810,6 +820,9 @@
         <div id="excel-results" style="display:none;"></div>
         <input type="text" id="excel-product-search" style="display:none;">
       </div>
+
+      <!-- 둘 중 하나만 하면 된다 -->
+      <div class="or-split"><span>또는</span></div>
 
       <!-- 기본 정보 2열 -->
       <div class="form-row">
