@@ -1289,6 +1289,39 @@ function _normIngrName(s) {
   return String(s ?? '').replace(/\([^)]*\)/g, '').replace(/\s/g, '').toLowerCase();
 }
 
+/* 비타민 묶음 이름 ↔ 실제 성분명
+   제2·3·7·9장 표에는 "비타민B2 및 그 유도체와 염류" 같은 묶음 이름만 있는데,
+   허가목록의 제품은 "리보플라빈"처럼 실제 성분명을 쓴다.
+   두 이름은 글자가 하나도 겹치지 않아 그냥 두면 매칭이 안 된다.
+
+   묶음에 무엇이 들어가는지는 제1장 표1(비타민)에 이미 다 적혀 있으므로
+   손으로 목록을 만들지 않고 거기서 뽑아 쓴다. 개정으로 성분이 늘어도 따라온다. */
+let _vitGroupCache = null;
+function _vitaminGroupMembers(groupName) {
+  if (!/비타민\s*[A-Z]?\s*\d*/i.test(groupName)) return [];
+
+  if (!_vitGroupCache) {
+    _vitGroupCache = new Map();   // '비타민b2' → ['리보플라빈', ...]
+    const t1 = (typeof DB !== 'undefined')
+      ? DB?.['제1장_비타민미네랄']?.['표']?.['표1_비타민'] : null;
+    for (const row of (Array.isArray(t1) ? t1 : [])) {
+      // 항목이 "Ⅴ(비타민B2)" 꼴이므로 괄호 안의 비타민 이름을 꺼낸다
+      const m = String(row['항목'] ?? '').match(/\(([^)]*비타민[^)]*)\)/);
+      if (!m) continue;
+      const key = m[1].replace(/\s/g, '').toLowerCase();
+      const names = Array.isArray(row['성분명']) ? row['성분명'] : [row['성분명']];
+      const list = _vitGroupCache.get(key) ?? [];
+      for (const n of names) if (n) list.push(n);
+      _vitGroupCache.set(key, list);
+    }
+  }
+
+  // "비타민B2 및 그 유도체와 염류" → "비타민B2"
+  const g = String(groupName).match(/비타민\s*[A-Za-z]?\s*\d*/i);
+  if (!g) return [];
+  return _vitGroupCache.get(g[0].replace(/\s/g, '').toLowerCase()) ?? [];
+}
+
 function _ingrAliases(name) {
   const raw = String(name ?? '');
   const out = new Set();
@@ -1300,6 +1333,13 @@ function _ingrAliases(name) {
   push(raw.replace(/[()]/g, ''));                            // 괄호 기호만 제거
   for (const m of raw.matchAll(/\(([^)]*)\)/g)) push(m[1]);   // 괄호 안 별칭
   push(raw);
+  // "비타민B2 및 그 유도체와 염류"라면 리보플라빈 등도 같은 이름으로 친다
+  if (/유도체|염류/.test(raw)) {
+    for (const member of _vitaminGroupMembers(raw)) {
+      push(member);
+      push(String(member).replace(/\([^)]*\)/g, ''));
+    }
+  }
   return [...out];
 }
 
@@ -1431,11 +1471,41 @@ function inferFormFromName(name, forms) {
   return null;
 }
 
+/* 허가목록의 단위 표기는 품목마다 제각각이다.
+   같은 밀리그램인데 "mg"으로 적은 품목도 있고 "밀리그램"으로 적은 품목도 있다.
+   한글 표기를 못 읽으면 성분명에 단위가 붙은 채로 남아
+   배합 성분표에 하나도 반영되지 않는다 (캐롤비 계열이 이 경우였다). */
+const _UNIT_ALIAS = {
+  '밀리그램': 'mg', '미리그램': 'mg', '밀리그람': 'mg', '㎎': 'mg',
+  '그램': 'g', '그람': 'g',
+  '마이크로그램': 'μg', '㎍': 'μg', 'mcg': 'μg', 'ug': 'μg',
+  '국제단위': 'IU', '아이유': 'IU',
+  '밀리리터': 'mL', '㎖': 'mL', 'ml': 'mL',
+};
+function _normUnit(u) {
+  if (!u) return 'mg';
+  const t = String(u).trim();
+  if (_UNIT_ALIAS[t]) return _UNIT_ALIAS[t];
+  if (_UNIT_ALIAS[t.toLowerCase()]) return _UNIT_ALIAS[t.toLowerCase()];
+  if (/^mg$/i.test(t)) return 'mg';
+  if (/^g$/i.test(t))  return 'g';
+  if (/^iu$/i.test(t)) return 'IU';
+  return t;
+}
+
+/* 긴 표기부터 맞춰야 "밀리그램"이 "그램"으로 잘리지 않는다 */
+const _UNIT_PATTERN = [
+  '마이크로그램', '밀리그램', '미리그램', '밀리그람', '밀리리터',
+  '국제단위', '아이유', '그램', '그람',
+  'mcg', 'ug', 'mg', 'mL', 'ml', 'IU', 'μg', '㎍', '㎎', '㎖', '%', 'g',
+].join('|');
+const _INGR_RE = new RegExp('^(.+?)\\s*([\\d.]+)\\s*(' + _UNIT_PATTERN + ')?$', 'i');
+
 function _parseExcelIngredients(ingrStr) {
   const parts = ingrStr.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
   return parts.map(part => {
-    const m = part.match(/^(.+?)\s*([\d.]+)\s*(mg|g|㎍|μg|IU|mL|ml|%|mcg)?$/i);
-    if (m) return { name: m[1].trim(), dose: m[2], unit: m[3] || 'mg' };
+    const m = part.match(_INGR_RE);
+    if (m) return { name: m[1].trim(), dose: m[2], unit: _normUnit(m[3]) };
     return { name: part, dose: '', unit: 'mg' };
   });
 }

@@ -117,6 +117,17 @@
     #start-hint .sh-step b { font-size:12px; font-weight: 600; color: var(--obsidian); }
     #start-hint .sh-step p { margin: 3px 0 0; font-size:11px; color: var(--stone); line-height: 1.6; }
 
+    /* 연령 블록 안의 배합 성분 — 용법용량 상자와 나란한 제 상자 */
+    .ingr-sub {
+      border-radius: var(--r); box-shadow: var(--ring2);
+      background: var(--white); padding: 11px 12px 12px;
+    }
+    .ingr-sub-title {
+      font-size: 15px; font-weight: 600; color: var(--obsidian);
+      letter-spacing: -.01em; margin-bottom: 9px;
+    }
+    .ch2-block { margin-bottom: 14px; }
+
     /* 입력 단계를 각각 제 상자에 담는다 — 용법용량 / 배합 성분 */
     .step-box {
       border-radius: var(--r);
@@ -835,7 +846,11 @@
         </div>
       </div>
 
-      <!-- 성분 섹션 -->
+      <!-- 통합 뷰(제1·2·3·7·9장): 연령마다 [용법용량] + [배합 성분]이 한 벌 -->
+      <div id="ch1-integrated-wrap" style="display:none;"></div>
+      <div id="ch2-integrated-wrap" style="display:none;"></div>
+
+      <!-- 성분 섹션 (통합 뷰를 쓰지 않는 장) -->
       <div class="step-box" data-sec="ingr" style="display:none;">
         <div class="step-head">
           <span class="step-title">배합 성분 <span class="need">✎ 입력</span></span>
@@ -861,17 +876,8 @@
         </div>
         <div class="btn-row">
           <button class="btn btn-add" id="btn-add-row" disabled>+ 성분 추가</button>
-          <button class="btn btn-add" id="btn-add-excipient" type="button"
-                  onclick="toggleExcipientPanel()"
-                  title="첨가제를 넣으면 사용상 주의사항이 추가됩니다">+ 첨가제 추가</button>
         </div>
       </div>
-
-      <!-- ch1 통합 뷰: 비타민/미네랄 기준 실시간 표시 -->
-      <div id="ch1-integrated-wrap" style="display:none;"></div>
-
-      <!-- ch2 통합 뷰: 연령별 헤더 + 매트릭스 (ch2 전용) -->
-      <div id="ch2-integrated-wrap" style="display:none;"></div>
 
       <!-- ch2/3/7/9: 매트릭스 테이블 -->
       <div id="ingr-matrix-wrap" style="display:none;">
@@ -918,6 +924,11 @@
       <div id="fg-excipient" style="display:none;">
       </div><!-- /배합 성분 상자 -->
 
+      <div class="btn-row" id="excipient-row" style="display:none;margin-top:2px;">
+        <button class="btn btn-add" id="btn-add-excipient" type="button"
+                onclick="toggleExcipientPanel()"
+                title="첨가제를 넣으면 사용상 주의사항이 추가됩니다">+ 첨가제 추가</button>
+      </div>
       <div id="excipient-panel" style="display:none;margin-top:8px;">
       <div class="excipient-add-row">
         <select id="excipient-select" onchange="addExcipient()">
@@ -1522,8 +1533,15 @@ function onChapterChange(key) {
   $('fg-product-name').style.display  = ch ? '' : 'none';
   // 아직 장을 고르지 않았으면 성분표·첨가제·액션바를 감추고 안내만 보여준다
   { const hint = $('start-hint'); if (hint) hint.style.display = ch ? 'none' : ''; }
-  { const st = document.querySelector('[data-sec="ingr"]'); if (st) st.style.display = ch ? '' : 'none'; }
+  {
+    // 통합 뷰 장은 연령 블록 안에 용법용량·성분표를 함께 그린다.
+    // 위쪽 빈 상자를 띄우면 같은 제목이 두 번 나와 헷갈린다.
+    const integrated = ch && (isCh1Now || isCh2Now || mxEarly);
+    const st = document.querySelector('[data-sec="ingr"]');
+    if (st) st.style.display = (ch && !integrated) ? '' : 'none';
+  }
   { const ex = $('fg-excipient');  if (ex) ex.style.display = ch ? '' : 'none'; }
+  { const er = $('excipient-row');  if (er) er.style.display = ch ? '' : 'none'; }
   { const ab = $('action-bar');    if (ab) ab.style.display = ch ? '' : 'none'; }
   { const sb = $('save-bar');      if (sb) sb.style.display = ch ? '' : 'none'; }
   if (typeof refreshFillMarks === 'function') refreshFillMarks();
@@ -2700,11 +2718,12 @@ function renderCh1Integrated() {
       html += `<button onclick="this.closest('.ch2-block').querySelector('.age-ms-btn').click();this.parentElement.remove();" style="margin-left:auto;background:none;border:1px solid #ef9a9a;border-radius:3px;color:#b71c1c;cursor:pointer;padding:2px 8px;font-size:11px;white-space:nowrap;">연령 선택 →</button>`;
       html += `</div>`;
     }
+    html += `<div class="ingr-sub"><div class="ingr-sub-title">배합 성분 <span class="need">✎ 입력</span></div>`;
     html += `<div class="mx-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">`;
     html += `<table class="mx-table" style="min-width:620px;">`;
     html += tblHdr;
     html += `<tbody>${buildTableRows(dr, isFirst)}</tbody>`;
-    html += `</table></div>`;
+    html += `</table></div></div>`;   // 표 / mx-wrap / ingr-sub
     html += `</div>`;
   }
 
@@ -3384,12 +3403,13 @@ function renderCh2Integrated() {
     html += `</div></div>`;
 
     /* 매트릭스 테이블 */
+    html += `<div class="ingr-sub"><div class="ingr-sub-title">배합 성분 <span class="need">✎ 입력</span></div>`;
     html += `<div class="mx-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">`;
     html += `<table class="mx-table" style="min-width:700px;">`;
     html += tblHdr;
     const { rows: builtRows, failRules: builtFailRules } = buildRows(dr, isFirst);
     html += `<tbody>${builtRows}</tbody>`;
-    html += `</table></div>`;
+    html += `</table></div></div>`;   // 표 / mx-wrap / ingr-sub
     // 안정 ID 부여: updateCh2BlockAmts에서도 이 요소를 찾아 갱신함
     html += `<div id="ch2-fail-rules-${dr.id}">${buildRuleViolHtml(builtFailRules)}</div>`;
     html += `</div>`;
