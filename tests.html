@@ -219,6 +219,18 @@ function flowSnapshot(win) {
     validateDisabled: !!d.getElementById('btn-validate').disabled,
     // 문구가 실제로 만들어졌는지 — 오른쪽 패널에 판정 배너가 뜨면 생성된 것
     resultShown: !!d.querySelector('#results-body .res-gate'),
+    // 자동생성 문구 — 접힌 details를 펴고 전체 텍스트를 그대로 담아 둔다
+    precText: (() => {
+      const doc = [...d.querySelectorAll('#results-body .res-doc')].find(x => /사용상의 주의사항/.test(x.textContent));
+      if (!doc) return '';
+      const details = doc.querySelector('details.fold');
+      if (details) details.setAttribute('open', '');
+      return doc.innerText;
+    })(),
+    effText: [...d.querySelectorAll('#results-body .res-doc')].find(x => /효능효과/.test(x.textContent))
+      ?.querySelector('.res-doc-body')?.innerText ?? '',
+    doseText: [...d.querySelectorAll('#results-body .res-doc')].find(x => /용법용량/.test(x.textContent))
+      ?.querySelector('.res-doc-body')?.innerText ?? '',
   };
 }
 
@@ -275,6 +287,16 @@ function flowCheck(expect, snap) {
       if (!snap.notice.includes(want)) diffs.push({ path: '안내 문구', was: `"${want}" 포함`, now: snap.notice || '(없음)' });
     } else if (k === 'noticeHasNot') {
       if (snap.notice.includes(want)) diffs.push({ path: '안내 문구', was: `"${want}" 없어야`, now: snap.notice });
+    } else if (k === 'precTextHas') {
+      for (const s of want) if (!snap.precText.includes(s))
+        diffs.push({ path: `주의사항 포함: ${s}`, was: '있어야 함', now: '없음' });
+    } else if (k === 'precTextHasNot') {
+      for (const s of want) if (snap.precText.includes(s))
+        diffs.push({ path: `주의사항 없어야: ${s}`, was: '없어야 함', now: '남아 있음' });
+    } else if (k === 'effTextHas') {
+      if (!snap.effText.includes(want)) diffs.push({ path: '효능효과 문구', was: `"${want}" 포함`, now: snap.effText || '(없음)' });
+    } else if (k === 'doseTextHas') {
+      if (!snap.doseText.includes(want)) diffs.push({ path: '용법용량 문구', was: `"${want}" 포함`, now: snap.doseText || '(없음)' });
     } else if (!eq(want, snap[k])) {
       diffs.push({ path: k, was: want, now: snap[k] });
     }

@@ -4861,6 +4861,77 @@ function renderChapter9Results(v, form, ageGroup) {
 /* 성분행의 1일 최대 배합량을 refUnit 단위로 계산 */
 
 
+/* ══════════ 용법용량 자동생성 문구 (우선 제3장만) ══════════
+   표제기 원문 그대로: "1일 3회 식후 30분에 복용하는 것을 원칙으로 한다."
+   연령마다 배합량이 달라 실제 제품은 연령대별로 줄을 나눠 쓰는데,
+   같은 용법(1일 횟수·1회 분량)을 쓰는 인접 연령대는 실제 라벨처럼 한 줄로 묶는다.
+   예) "만 8세 이상~만 11세 미만"과 "만 11세 이상~만 15세 미만"이 둘 다 1캡슐이면
+       "만 8세 이상 - 만 15세 미만, 1일 3회, 1회 1캡슐 식후 30분에 복용" 한 줄로. */
+function renderDosageDoc(chapterKey, validDosageRows, form) {
+  if (chapterKey !== '제3장_감기약') return '';           // 다른 장은 장마다 기재 방식이 달라 추후 확장
+  if (!validDosageRows || !validDosageRows.length) return '';
+
+  const ageGroups = chaptersMap[chapterKey]?.ageGroups ?? [];
+  const idxOf = age => ageGroups.indexOf(age);
+  const unitDisp = dosageUnit || '정';
+
+  // ageGroups는 나이 많은 순(성인이 0번)이므로 그 순서로 정렬해야 "인접"을 판단할 수 있다
+  const rows = [...validDosageRows]
+    .filter(dr => idxOf(dr.age) >= 0)
+    .sort((a, b) => idxOf(a.age) - idxOf(b.age));
+  if (!rows.length) return '';
+
+  const sameDose = (a, b) => a.freqMin===b.freqMin && a.freqMax===b.freqMax
+                           && a.amtMin===b.amtMin  && a.amtMax===b.amtMax;
+
+  const groups = [];
+  for (const dr of rows) {
+    const last = groups[groups.length - 1];
+    const lastDr = last ? last[last.length - 1] : null;
+    if (last && idxOf(dr.age) === idxOf(lastDr.age) + 1 && sameDose(dr, last[0])) {
+      last.push(dr);
+    } else {
+      groups.push([dr]);
+    }
+  }
+
+  // "만 X세 이상" 과 "만 X세 이상 - 만 Y세 미만" 에서 하한·상한 문구를 각각 떼어낸다
+  const boundParts = label => {
+    const m = (label || '').match(/^(만\s*\d+\s*(?:개월|세)\s*이상)(?:\s*-\s*(만\s*\d+\s*(?:개월|세)\s*미만))?/);
+    return m ? { lower: m[1], upper: m[2] || '' } : { lower: label || '', upper: '' };
+  };
+
+  const lines = groups.map(g => {
+    const oldest   = g[0];               // 그룹 내 가장 연령대 높음 (idx 가장 작음)
+    const youngest = g[g.length - 1];    // 그룹 내 가장 연령대 낮음
+    const oldParts   = boundParts(displayAgeLabel(oldest.age, chapterKey, form));
+    const youngParts = boundParts(displayAgeLabel(youngest.age, chapterKey, form));
+
+    let ageText;
+    if (g.length === 1) {
+      ageText = oldParts.lower + (oldParts.upper ? ' - ' + oldParts.upper : '');
+      if (oldest.age === ageGroups[0]) ageText += ' 및 성인';   // 최상단(성인 포함) 구간만
+    } else {
+      ageText = youngParts.lower + (oldParts.upper ? ' - ' + oldParts.upper : '');
+    }
+
+    const freqTxt = oldest.freqMin === oldest.freqMax ? `${oldest.freqMax}회` : `${oldest.freqMin}~${oldest.freqMax}회`;
+    const amtTxt  = oldest.amtMin  === oldest.amtMax  ? `${oldest.amtMax}${unitDisp}` : `${oldest.amtMin}~${oldest.amtMax}${unitDisp}`;
+
+    return `${ageText}, 1일 ${freqTxt}, 1회 ${amtTxt} 식후 30분에 복용`;
+  });
+
+  window.__doseCopyText = lines.join('\n');
+
+  return `<div class="res-doc">
+    <div class="res-doc-head">
+      <span class="res-sec-title">[용법용량]</span>
+      ${resCopyBtn('__doseCopyText')}
+    </div>
+    <div class="res-doc-body">${lines.map(esc).join('<br>')}</div>
+  </div>`;
+}
+
 function renderEfficacy(result) {
   if (!result) return '';
   const { items, basicText, basicItems, finalTexts } = result;

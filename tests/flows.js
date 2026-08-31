@@ -110,4 +110,20 @@ window.FLOW_CASES = [
       { setDose: { 3: 5, 4: -30 }, expect: { filled: 2 } },
     ],
   },
+  {
+    id: 'flow-ch3-acetaminophen-not-aspirin-class',
+    desc: '아세트아미노펜은 아스피린류가 아니다 — 위통·난청 등 살리실산 부작용이 잘못 나오면 안 됨 (캐롤비콜드)',
+    steps: [
+      { pick: '캐롤비콜드연질캡슐', expect: { chapter: '제3장_감기약' } },
+      { runValidation: true, expect: {
+          // "제증상" 쉬운말 치환 — 뒤에 괄호가 바로 이어져도 바뀌어야 한다
+          effTextHas: '감기의 여러 증상',
+          // 아스피린류·이부프로펜류(위통·소화관출혈·위부불쾌감·난청·이명)는
+          // 아세트아미노펜만으로는 해당하지 않는다
+          precTextHasNot: ['난청', '이명'],
+          // 항히스타민제(클로르페니라민)는 실제로 있으니 그쪽 증상은 남아야 한다
+          precTextHas: ['목마름(지속적이거나 심한)'],
+        } },
+    ],
+  },
 ];

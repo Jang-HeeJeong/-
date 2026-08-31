@@ -1629,7 +1629,10 @@ function generateEfficacy(chapterKey, form, activeRows, dosage) {
     if (okPhlegm) symptoms.push('가래');
     symptoms.push('오한(춥고 떨리는 증상)', '발열', '두통', '관절통', '근육통');
 
-    const finalText = `감기의 제증상(${symptoms.join(', ')})의 완화`;
+    // "제증상"은 쉬운말 목록에 있지만(제증상→여러 증상), 바로 뒤에 실제 증상
+    // 목록이 괄호로 이어져서 applyEasyTerms의 "괄호 앞에서는 안 바꾼다" 규칙에
+    // 걸려 안 바뀐다. 여기서만 직접 쉬운말로 써서 "감기의 여러 증상(콧물, ...)"이 되게 한다.
+    const finalText = `감기의 여러 증상(${symptoms.join(', ')})의 완화`;
 
     // 조건부 항목 검토 결과 (결과 화면 표시용)
     const items = [
@@ -2196,7 +2199,11 @@ function applyEasyTerms(text) {
 /* ══════════ 6) 생성기 보조 ══════════ */
 
 const _PREC_CLASS_KW = {
-  '아스피린류':       ['아스피린','아스피린알루미늄','아세트아미노펜','에텐자미드','살리실산나트륨'],
+  // 아세트아미노펜(파라세타몰)은 살리실산 계열이 아니다 — 위통·소화관출혈·
+  // 위부불쾌감·난청·이명 같은 살리실산/NSAID 특유의 부작용이 없는데도
+  // 이 목록에 있으면 함께 걸려서 근거 없이 표시된다 (푸루콜드 사례로 확인).
+  // "아스피린류" 태그는 이 5개 부작용에만 쓰이므로 실제 살리실산 계열만 남긴다.
+  '아스피린류':       ['아스피린','아스피린알루미늄','에텐자미드','살리실산나트륨'],
   '이부프로펜류':     ['이부프로펜'],
   '항히스타민제':     ['디펜히드라민','클로르페니라민','프로메타진','메퀴타진','알리메마진','트리프롤리딘','카르비녹사민','세티리진','로라타딘','아크리바스틴','멕타진','이프로헵타딘'],
   '디펜히드라민':     ['디펜히드라민'],
@@ -2979,6 +2986,7 @@ function runValidation() {
                       amtMin: refDr.amtMin,   amtMax: refDr.amtMax };
   const effResult  = generateEfficacy(currentKey, form, activeRows, refDosage);
   const precResult = generatePrecautions(currentKey, form, activeRows, selectedExcipients, dosageRows);
+  if (typeof renderDosageDoc === 'function') html += renderDosageDoc(currentKey, validDosageRows, form);
   if (effResult)  html += renderEfficacy(effResult);
   if (precResult) html += renderPrecautions(precResult);
 
