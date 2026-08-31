@@ -64,7 +64,7 @@ window.EXPECTED = {
           "crit1Min": null,
           "crit1Max": null,
           "unit": "mg",
-          "reason": "1일 최대 초과: 2700 > 1500 mg"
+          "reason": "1일 2,700 mg — 기준 최대 1,500 mg을 넘음"
         }
       ],
       "sums": [],
@@ -86,7 +86,7 @@ window.EXPECTED = {
           "crit1Min": null,
           "crit1Max": null,
           "unit": "mg",
-          "reason": "1일 최소 미달: 10 < 50 mg"
+          "reason": "1일 10 mg — 기준 최소 50 mg에 미달"
         }
       ],
       "sums": [],
@@ -376,7 +376,7 @@ window.EXPECTED = {
           "crit1Min": null,
           "crit1Max": null,
           "unit": "μg",
-          "reason": "1일 최소 미달: 0.3 < 1 μg"
+          "reason": "1일 0.3 μg — 기준 최소 1 μg에 미달"
         }
       ],
       "sums": [],
@@ -420,7 +420,7 @@ window.EXPECTED = {
           "crit1Min": 250,
           "crit1Max": 500,
           "unit": null,
-          "reason": "1회 최대 초과: 700 > 500 mg; 1일 최대 초과: 2100(=700×3) > 1500 mg"
+          "reason": "1회 700 mg — 기준 최대 500 mg을 넘음; 1일 2,100 mg — 기준 최대 1,500 mg을 넘음 (1회 700 × 3회)"
         }
       ],
       "sums": [],
@@ -555,7 +555,7 @@ window.EXPECTED = {
           "crit1Min": null,
           "crit1Max": null,
           "unit": "mg",
-          "reason": "배합 최소 미달: 36<37.5"
+          "reason": "1일 36 mg — 기준 최소 37.5 mg에 미달"
         }
       ],
       "sums": [],
@@ -967,7 +967,7 @@ window.EXPECTED = {
           "crit1Min": null,
           "crit1Max": null,
           "unit": "mg",
-          "reason": "1회 최대 초과: 200>60mg; 1일 최대 초과: 600>180mg"
+          "reason": "1회 200 mg — 기준 최대 60 mg을 넘음; 1일 600 mg — 기준 최대 180 mg을 넘음"
         }
       ],
       "sums": [],

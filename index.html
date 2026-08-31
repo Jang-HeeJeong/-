@@ -198,6 +198,16 @@
       content: ''; flex: 1; border-top: 1px solid var(--hairline);
     }
 
+    /* 장 추론 안내 — 다른 기준 후보는 접어 둔다 */
+    #excel-ingr-ref details { margin-top: 5px; }
+    #excel-ingr-ref summary {
+      cursor: pointer; list-style: none; color: var(--charcoal);
+      font-size:11px; display: inline-flex; align-items: center; gap: 5px;
+    }
+    #excel-ingr-ref summary::-webkit-details-marker { display: none; }
+    #excel-ingr-ref summary::before { content: '▸'; font-size:11px; color: var(--graphite); }
+    #excel-ingr-ref details[open] summary::before { content: '▾'; }
+
     /* 해도 되고 안 해도 되는 곳 — need 배지와 모양은 같고 색만 조용하게.
        검색은 안 해도 되므로 노랑(= 반드시 채울 곳)을 쓰지 않는다. */
     .opt {
@@ -591,8 +601,15 @@
       background: var(--white); box-shadow: var(--ring2);
       border-radius: var(--r); padding: 11px 13px; margin-bottom: 12px;
     }
+    .res-flags {
+      box-shadow: 0 0 0 1px #f2c9c5 !important;
+    }
     .res-flags-title {
-      font-size: 12px; font-weight: 600; color: var(--red); margin-bottom: 8px;
+      font-size:12px; font-weight: 600; color: var(--red); margin-bottom: 9px;
+      display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+    }
+    .res-flags-title .rf-sub {
+      font-weight: 400; color: var(--stone); font-size:11px;
     }
     .res-flag {
       display: flex; gap: 9px; padding: 5px 0; font-size: 13px; line-height: 1.5;
@@ -1015,6 +1032,9 @@
              oninput="this.dataset.touched='1';"
              onkeydown="if(event.key==='Enter')saveProduct();">
       <button class="btn btn-add" onclick="saveProduct()" title="이 검토 내용을 제품명으로 저장">저장</button>
+      <button class="btn btn-primary" id="btn-word" onclick="generateFullWordDoc()"
+              title="원료약품·효능효과·주의사항을 담은 워드 파일을 내려받습니다"
+              style="white-space:nowrap;">⬇ 워드</button>
     </div>
   </section>
 
@@ -4335,15 +4355,14 @@ function resHeaderCard(allOk, metaItems) {
     .filter(m => m && m.value != null && m.value !== '')
     .map(m => `<span class="res-meta-item">${esc(m.label)} <b>${m.raw ? m.value : esc(m.value)}</b></span>`)
     .join('');
-  return `<div class="res-gate ${allOk ? 'ok' : 'fail'}">
-    <span class="res-gate-msg">${allOk
-      ? '기준에 맞습니다 — 아래 문구를 그대로 쓰실 수 있습니다.'
-      : '기준을 벗어난 항목이 있습니다 — 확인 후 사용하세요.'}</span>
-  </div>`;
+  // 적합일 때만 한 줄. 부적합이면 아래 "확인이 필요한 항목"이 그 말을 대신한다.
+  return allOk
+    ? `<div class="res-gate ok"><span class="res-gate-msg">기준에 맞습니다 — 아래 문구를 그대로 쓰실 수 있습니다.</span></div>`
+    : '';
 }
 /* 복사 버튼 (효능효과·주의사항 공용) — 블록 제목 우측에 배치 */
 function resCopyBtn(varName) {
-  return `<button type="button" class="btn-copy" onclick="resCopyText(this, '${varName}')">그대로 복사해서 사용하기</button>`;
+  return `<button type="button" class="btn-copy" title="문구 전체를 클립보드에 복사합니다" onclick="resCopyText(this, '${varName}')">복사</button>`;
 }
 function resCopyText(btn, varName) {
   const text = window[varName] || '';
@@ -5614,7 +5633,8 @@ function collapseResultTables(root) {
   if (!flags.length) return;
   const box = document.createElement('div');
   box.className = 'res-flags';
-  box.innerHTML = `<div class="res-flags-title">확인이 필요한 항목 ${flags.length}건</div>`
+  box.innerHTML = `<div class="res-flags-title">확인이 필요한 항목 ${flags.length}건`
+    + `<span class="rf-sub">아래 문구는 이 항목을 고친 뒤에 쓰세요</span></div>`
     + flags.map(f => `<div class="res-flag"><span class="rf-name">${esc(f.name)}</span>`
                    + `<span class="rf-why">${esc(f.why)}</span></div>`).join('');
   const gate = root.querySelector('.res-gate');
@@ -5832,7 +5852,9 @@ function selectExcelProduct(idx) {
       return `<button type="button" class="btn btn-add" style="padding:2px 8px;font-size:11px;margin:2px 3px 0 0;"
                       onclick="switchChapterForExcelProduct('${r.key}')">${esc(label)} (${r.hits}/${r.total})</button>`;
     }).join('');
-    notice.push(`<div style="margin-top:4px;color:var(--stone);">다른 기준으로 적용: ${btns}</div>`);
+    // 자동 선택이 맞는 경우가 대부분이라 다른 후보는 접어 둔다
+    notice.push(`<details><summary>다른 기준으로 적용 (${others.length}개)</summary>`
+              + `<div style="margin-top:4px;">${btns}</div></details>`);
   }
 
   _showExcelIngrNotice(notice);

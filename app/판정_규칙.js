@@ -523,9 +523,9 @@ function checkVitamin(row, vitRow, coeff, dosage, ageMinMonths = 999) {
 
   const issues = [];
   if (critMin != null && dailyMin < critMin)
-    issues.push(`1일 최소 미달: ${dailyMin} < ${critMin} ${useUnit}${ageNote}`);
+    issues.push(_reasonUnder('1일', dailyMin, critMin, useUnit, ageNote));
   if (critMax != null && dailyMax > critMax)
-    issues.push(`1일 최대 초과: ${dailyMax} > ${critMax} ${useUnit}${ageNote}`);
+    issues.push(_reasonOver('1일', dailyMax, critMax, useUnit, ageNote));
 
   // elevated hint: 현재 연령 기준으로 한도 초과 + elevated limit 존재 시 항상 표시
   let elevHint = null;
@@ -579,7 +579,7 @@ function checkMineral(row, minRow, table5Min, ageGroup, under8, dosage) {
 
   const issues = [];
   if (critMax != null && dailyMax > critMax)
-    issues.push(`1일 최대 초과: ${dailyMax} > ${critMax} ${refUnit}${ageNote}`);
+    issues.push(_reasonOver('1일', dailyMax, critMax, refUnit, ageNote));
 
   return { ...base, ok: issues.length === 0,
            perUnit: `${row.dose} ${row.unit}`, dosageUnit, convNote,
@@ -614,7 +614,7 @@ function checkTable3Ingr(row, item, idx, dosage, ageMinMonths = 999) {
 
   const issues = [];
   if (critMax != null && dailyMax > critMax)
-    issues.push(`1일 최대 초과: ${dailyMax} > ${critMax} ${refUnit}${ageNote}`);
+    issues.push(_reasonOver('1일', dailyMax, critMax, refUnit, ageNote));
 
   let elevHint = null;
   if (issues.length > 0 && elevAmt && elevThresh && !useElevated) {
@@ -650,7 +650,7 @@ function checkTable4Ingr(row, item, idx, dosage) {
 
   const issues = [];
   if (critMax != null && dailyMax > critMax)
-    issues.push(`1일 최대 초과: ${dailyMax} > ${critMax} ${refUnit}`);
+    issues.push(_reasonOver('1일', dailyMax, critMax, refUnit));
 
   return { ...base, ok: issues.length === 0,
            perUnit: `${row.dose} ${row.unit}`, dosageUnit, convNote,
@@ -858,9 +858,9 @@ function validateChapter2(tables, form, ageGroup, rows, dosage) {
       const adjMax1d = max1d != null ? +(max1d * coeff).toFixed(4) : null;
 
       if (adjMax1  != null && dose1dose > adjMax1)
-        issues.push(`1회 최대 초과: ${dose1dose} > ${adjMax1} mg`);
+        issues.push(_reasonOver('1회', dose1dose, adjMax1, 'mg'));
       if (adjMax1d != null && dose1d > adjMax1d)
-        issues.push(`1일 최대 초과: ${dose1d}(=${dose1dose}×${freq}) > ${adjMax1d} mg`);
+        issues.push(_reasonOver('1일', dose1d, adjMax1d, 'mg', ` (1회 ${_num(dose1dose)} × ${freq}회)`));
 
       // JSON 원문: "Ⅰ항 1종 → 1회 하한 1/2, Ⅰ항 2종이상 또는 Ⅲ항 → 1/5"
       if (gubun === 'Ⅰ항' && adjMax1 != null) {
@@ -889,7 +889,7 @@ function validateChapter2(tables, form, ageGroup, rows, dosage) {
       if (gubun === 'Ⅳ항') {
         const minBigo = parseMinBigo(ref['비고']);
         if (minBigo != null && dose1d < minBigo)
-          issues.push(`1일 배합 최소 미달: ${dose1d} < ${minBigo} mg`);
+          issues.push(_reasonUnder('1일', dose1d, minBigo, 'mg'));
       }
 
       // 표제기 기준 (허용 범위)
@@ -920,9 +920,9 @@ function validateChapter2(tables, form, ageGroup, rows, dosage) {
       const min1d_mg = max1d_mg != null ? +(max1d_mg / 10).toFixed(4) : null;
 
       if (max1d_mg != null && dose1d > max1d_mg)
-        issues.push(`1일 최대 초과: ${dose1d} > ${max1d_mg} mg (표2 ${isExt ? '엑스' : '분말'} 기준)`);
+        issues.push(_reasonOver('1일', dose1d, max1d_mg, 'mg', ` (표2 ${isExt ? '엑스' : '분말'} 기준)`));
       if (min1d_mg != null && dose1d < min1d_mg)
-        issues.push(`1일 최소 미달: ${dose1d} < ${min1d_mg} mg (1일 최대의 1/10)`);
+        issues.push(_reasonUnder('1일', dose1d, min1d_mg, 'mg', ' (1일 최대의 1/10)'));
 
       return {
         ingr: row.ingr, gubun: '표2 Ⅰ항',
@@ -1012,8 +1012,8 @@ function validateChapter3(tables, form, ageGroup, rows, dosage) {
         critMin = Math.max(critMin ?? 0, +(600 * coeff).toFixed(4));
       const unit = conv ? `mg ${conv}` : 'mg';
       const issues = [];
-      if (critMax!=null && dailyMax>critMax) issues.push(`1일 최대 초과: ${dailyMax}>${critMax}`);
-      if (critMin!=null && dailyMin<critMin) issues.push(`배합 최소 미달: ${dailyMin}<${critMin}`);
+      if (critMax!=null && dailyMax>critMax) issues.push(_reasonOver('1일', dailyMax, critMax, unit));
+      if (critMin!=null && dailyMin<critMin) issues.push(_reasonUnder('1일', dailyMin, critMin, unit));
       return { ...base, dose1:+raw.toFixed(4), dailyMin, dailyMax, critMin, critMax, unit,
                ok:issues.length===0, reason:issues.length===0?'적합':issues.join('; ') };
     }
@@ -1030,13 +1030,13 @@ function validateChapter3(tables, form, ageGroup, rows, dosage) {
       if (isLa) {
         const critMin=+(maxG/5).toFixed(4), critMax=+(maxG/2).toFixed(4);
         const issues = [];
-        if (dailyMin<critMin) issues.push(`라란 최소 미달: ${dailyMin}<${critMin}g (1/5)`);
-        if (dailyMax>critMax) issues.push(`라란 최대 초과: ${dailyMax}>${critMax}g (1/2)`);
+        if (dailyMin<critMin) issues.push(_reasonUnder('1일', dailyMin, critMin, 'g', ' (1일 최대의 1/5)'));
+        if (dailyMax>critMax) issues.push(_reasonOver('1일', dailyMax, critMax, 'g', ' (1일 최대의 1/2)'));
         return { ...base, dose1:+rawG.toFixed(4), dailyMin, dailyMax, critMin, critMax, unit:'g',
                  ok:issues.length===0, reason:issues.length===0?'적합':issues.join('; ') };
       } else {
         const critMax=+(maxG*coeff).toFixed(4);
-        const issue = dailyMax>critMax ? [`1일 최대 초과: ${dailyMax}>${critMax}g`] : [];
+        const issue = dailyMax>critMax ? [_reasonOver('1일', dailyMax, critMax, 'g')] : [];
         return { ...base, dose1:+rawG.toFixed(4), dailyMin, dailyMax, critMin:null, critMax, unit:'g',
                  ok:issue.length===0, reason:issue.length===0?'적합':issue[0] };
       }
@@ -1090,9 +1090,9 @@ function validateChapter7(tables, form, ageGroup, rows, dosage) {
       const critMax   = adj1d;
       const unit      = conv ? `mg ${conv}` : 'mg';
       const issues    = [];
-      if (adj1 !=null && dose1dose>adj1)  issues.push(`1회 최대 초과: ${dose1dose}>${adj1}`);
-      if (critMax!=null && dailyMax>critMax) issues.push(`1일 최대 초과: ${dailyMax}>${critMax}`);
-      if (critMin!=null && dailyMin<critMin) issues.push(`배합 최소 미달: ${dailyMin}<${critMin}`);
+      if (adj1 !=null && dose1dose>adj1)  issues.push(_reasonOver('1회', dose1dose, adj1, unit));
+      if (critMax!=null && dailyMax>critMax) issues.push(_reasonOver('1일', dailyMax, critMax, unit));
+      if (critMin!=null && dailyMin<critMin) issues.push(_reasonUnder('1일', dailyMin, critMin, unit));
       return { ...base, dose1:+raw.toFixed(4), dailyMin, dailyMax, critMin, critMax, unit,
                ok:issues.length===0, reason:issues.length===0?'적합':issues.join('; ') };
     }
@@ -1107,8 +1107,8 @@ function validateChapter7(tables, form, ageGroup, rows, dosage) {
       const critMax  = maxG!=null ? +(maxG*coeff).toFixed(4) : null;
       const critMin  = critMax!=null ? +(critMax/10).toFixed(4) : null;
       const issues   = [];
-      if (critMax!=null && dailyMax>critMax) issues.push(`1일 최대 초과: ${dailyMax}>${critMax}g`);
-      if (critMin!=null && dailyMin<critMin) issues.push(`배합 최소 미달: ${dailyMin}<${critMin}g`);
+      if (critMax!=null && dailyMax>critMax) issues.push(_reasonOver('1일', dailyMax, critMax, 'g'));
+      if (critMin!=null && dailyMin<critMin) issues.push(_reasonUnder('1일', dailyMin, critMin, 'g'));
       return { ...base, dose1:+rawG.toFixed(4), dailyMin, dailyMax, critMin, critMax, unit:'g',
                ok:issues.length===0, reason:issues.length===0?'적합':issues.join('; ') };
     }
@@ -1223,9 +1223,9 @@ function validateChapter9(tables, form, ageGroup, rows, dosage) {
       const dose1Max = +(critMax/dose1MaxFactor).toFixed(4);
       const unit     = conv ? `${refUnit} ${conv}` : refUnit;
       const issues   = [];
-      if (+raw.toFixed(4) > dose1Max) issues.push(`1회 최대 초과: ${+raw.toFixed(4)}>${dose1Max}${refUnit}`);
-      if (dailyMax>critMax) issues.push(`1일 최대 초과: ${dailyMax}>${critMax}${refUnit}`);
-      if (critMin!=null&&dailyMin<critMin) issues.push(`배합 최소 미달: ${dailyMin}<${critMin}${refUnit}`);
+      if (+raw.toFixed(4) > dose1Max) issues.push(_reasonOver('1회', +raw.toFixed(4), dose1Max, refUnit));
+      if (dailyMax>critMax) issues.push(_reasonOver('1일', dailyMax, critMax, refUnit));
+      if (critMin!=null&&dailyMin<critMin) issues.push(_reasonUnder('1일', dailyMin, critMin, refUnit));
       return { ...base, dose1:+raw.toFixed(4), dailyMin, dailyMax, dose1Max, critMin, critMax, unit,
                ok:issues.length===0, reason:issues.length===0?'적합':issues.join('; ') };
     }
@@ -1243,9 +1243,9 @@ function validateChapter9(tables, form, ageGroup, rows, dosage) {
       const critMin  = (cp?.min!=null&&maxG!=null) ? +(maxG*coeff*cp.min).toFixed(4) : null;
       const dose1Max = critMax!=null ? +(critMax/dose1MaxFactor).toFixed(4) : null;
       const issues   = [];
-      if (dose1Max!=null && +rawG.toFixed(4) > dose1Max) issues.push(`1회 최대 초과: ${+rawG.toFixed(4)}>${dose1Max}g`);
-      if (critMax!=null&&dailyMax>critMax) issues.push(`1일 최대 초과: ${dailyMax}>${critMax}g`);
-      if (critMin!=null&&dailyMin<critMin) issues.push(`배합 최소 미달: ${dailyMin}<${critMin}g`);
+      if (dose1Max!=null && +rawG.toFixed(4) > dose1Max) issues.push(_reasonOver('1회', +rawG.toFixed(4), dose1Max, 'g'));
+      if (critMax!=null&&dailyMax>critMax) issues.push(_reasonOver('1일', dailyMax, critMax, 'g'));
+      if (critMin!=null&&dailyMin<critMin) issues.push(_reasonUnder('1일', dailyMin, critMin, 'g'));
       return { ...base, dose1:+rawG.toFixed(4), dailyMin, dailyMax, dose1Max, critMin, critMax, unit:'g',
                ok:issues.length===0, reason:issues.length===0?'적합':issues.join('; ') };
     }
@@ -1500,6 +1500,21 @@ const _UNIT_PATTERN = [
   'mcg', 'ug', 'mg', 'mL', 'ml', 'IU', 'μg', '㎍', '㎎', '㎖', '%', 'g',
 ].join('|');
 const _INGR_RE = new RegExp('^(.+?)\\s*([\\d.]+)\\s*(' + _UNIT_PATTERN + ')?$', 'i');
+
+/* 부적합 사유 문구 — 숫자만 나열하면 무엇의 값인지 알 수 없다.
+   "배합 최소 미달: 540<750" 대신
+   "1일 540 mg — 기준 최소 750 mg에 미달" 처럼 풀어 쓴다. */
+function _num(v) {
+  return (v == null || isNaN(+v)) ? String(v ?? '') : (+v).toLocaleString('ko-KR', { maximumFractionDigits: 3 });
+}
+function _reasonOver(what, actual, limit, unit, note) {
+  const u = unit ? ` ${unit}` : '';
+  return `${what} ${_num(actual)}${u} — 기준 최대 ${_num(limit)}${u}을 넘음${note || ''}`;
+}
+function _reasonUnder(what, actual, limit, unit, note) {
+  const u = unit ? ` ${unit}` : '';
+  return `${what} ${_num(actual)}${u} — 기준 최소 ${_num(limit)}${u}에 미달${note || ''}`;
+}
 
 function _parseExcelIngredients(ingrStr) {
   const parts = ingrStr.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
@@ -2629,12 +2644,6 @@ function renderPrecautions(sections) {
       <summary>전체 5개 항목 보기</summary>
       <div class="fold-body">${sectHtml}</div>
     </details>
-    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--hairline);">
-      <button onclick="generateFullWordDoc()"
-        style="padding:8px 20px;background:#2e2e2e;color:#fff;border:none;border-radius:var(--r);font-size:13px;cursor:pointer;font-weight:500;font-family:inherit;">
-        ⬇ 최종 검토 워드 파일 다운로드
-      </button>
-    </div>
   </div>`;
 }
 
