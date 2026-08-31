@@ -148,7 +148,7 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; marg
   background: var(--input-zone); box-shadow: 0 0 0 1px #f2e6b8;
 }
 select.need-input, input.need-input, button.need-input {
-  background: var(--input-bg); box-shadow: 0 0 0 1px var(--input-line);
+  background: var(--input-bg); box-shadow: 0 0 0 1px #d8bc4e;
   border: none; border-radius: var(--r);
   color: var(--obsidian); font-family: var(--sans);
 }

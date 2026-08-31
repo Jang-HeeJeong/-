@@ -73,13 +73,12 @@
       gap: 10px;
       margin-bottom: 14px;
     }
-    .form-group label {
-      display: block; font-size:12px; font-weight: 600;
-      color: var(--obsidian); margin-bottom: 5px;
-    }
+    .form-group label { display: block; margin-bottom: 5px; }
     select, input[type="number"] {
       width: 100%; padding: 5px 8px; font-size:13px; height: 30px;
     }
+    /* 적용 기준·제형은 바로 위 제품 검색칸과 같은 크기로 — 첫 화면에서 나란히 보인다 */
+    .form-row select { height: 34px; padding: 6px 10px; }
 
     /* ── Section divider ── */
     .section-title {
@@ -122,10 +121,7 @@
       border-radius: var(--r); box-shadow: var(--ring2);
       background: var(--white); padding: 11px 12px 12px;
     }
-    .ingr-sub-title {
-      font-size: 15px; font-weight: 600; color: var(--obsidian);
-      letter-spacing: -.01em; margin-bottom: 9px;
-    }
+    .ingr-sub-title { margin-bottom: 9px; }
     .ch2-block { margin-bottom: 14px; }
 
     /* 입력 단계를 각각 제 상자에 담는다 — 용법용량 / 배합 성분 */
@@ -140,10 +136,6 @@
       display: flex; align-items: center; justify-content: space-between;
       gap: 8px; margin-bottom: 10px;
     }
-    .step-title {
-      font-size: 15px; font-weight: 600; color: var(--obsidian);
-      letter-spacing: -.01em;
-    }
     .step-head .btn { padding: 3px 11px; font-size: 12px; height: 28px; }
     /* 용법용량 — 배합량을 넣는 동안 "1일 몇 회 기준이었지?"를 계속 봐야 하므로
        패널 위에 붙여 두되, 제 테두리를 가진 상자로 둔다. */
@@ -155,11 +147,7 @@
       padding: 9px 11px 10px;
       margin-bottom: 10px;
     }
-    .dose-box-label {
-      display: flex; align-items: center; gap: 7px;
-      font-size: 12px; font-weight: 600; color: #7a6114;
-      margin-bottom: 7px;
-    }
+    .dose-box-label { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
     .dose-box-label .dose-badge {
       background: var(--white); box-shadow: var(--ring2);
       border-radius: 3px; padding: 1px 7px;
@@ -194,21 +182,30 @@
 
     /* ── 제품 검색 / 제품명 줄 ── */
     #fg-product-name { margin-bottom: 12px; }
-    .fld-label {
+    /* 입력 단계 라벨은 하나의 규격으로 —
+       제품 검색 · 적용 기준 · 제형 · 용법용량 · 배합 성분은 모두 같은 줄의 일이다.
+       예전에는 배합 성분만 15px, 용법용량만 갈색이라 따로 놀았다. */
+    .fld-label,
+    .form-group label,
+    .dose-box-label,
+    .ingr-sub-title,
+    .step-title {
       font-size:12px; font-weight: 600; color: var(--obsidian);
-      white-space: nowrap; flex: 0 0 62px;
+      letter-spacing: -.01em;
     }
+    .fld-label { white-space: nowrap; flex: 0 0 62px; }
     /* 제품 검색은 "안 채우면 못 넘어가는 칸"이 아니라 빠른 길이다.
        노랑은 반드시 채워야 하는 곳에만 남기고, 여기는 테두리를 또렷하게 한다. */
-    .fld-input {
+    /* input[type=text] 규칙(0,1,1)이 .fld-input(0,1,0)을 이기므로 태그를 붙인다 */
+    input.fld-input {
       flex: 1; padding: 6px 10px; height: 34px; font-size:13px;
       font-family: inherit; box-sizing: border-box;
       border: none; border-radius: var(--r);
       background: var(--white); color: var(--obsidian);
       box-shadow: 0 0 0 1px var(--ash); outline: none;
     }
-    .fld-input:focus { box-shadow: 0 0 0 2px var(--obsidian); }
-    .fld-input::placeholder { color: var(--graphite); }
+    input.fld-input:focus { box-shadow: 0 0 0 2px var(--obsidian); }
+    input.fld-input::placeholder { color: var(--graphite); }
 
     /* ── Excipient tags ── */
     .excipient-add-row { display:flex; gap:6px; margin-bottom:6px; }
@@ -2689,8 +2686,9 @@ function renderCh1Integrated() {
     html += `<div class="ch2-block" data-dr-id="${dr.id}">`;
     html += `<div class="dose-box">`;
     html += `<div class="dose-box-label">용법용량 <span class="dose-badge">${badge}</span>`;
+    html += `<span class="need">✎ 선택</span><span class="spacer"></span>`;
     if (!isFirst) {
-      html += `<span class="spacer"></span><button class="js-ch1-del" data-id="${dr.id}" title="이 연령 삭제"
+      html += `<button class="js-ch1-del" data-id="${dr.id}" title="이 연령 삭제"
         style="background:none;border:none;color:var(--graphite);font-size:13px;cursor:pointer;padding:2px 6px;line-height:1;">✕</button>`;
     }
     html += `</div>`;
@@ -3382,8 +3380,9 @@ function renderCh2Integrated() {
     /* 용법용량 상자: 연령/복용량 선택 */
     html += `<div class="dose-box">`;
     html += `<div class="dose-box-label">용법용량 <span class="dose-badge">${badge}</span>`;
+    html += `<span class="need">✎ 선택</span><span class="spacer"></span>`;
     if (!isFirst) {
-      html += `<span class="spacer"></span><button class="js-ch2-del" data-id="${dr.id}" title="이 연령 삭제"
+      html += `<button class="js-ch2-del" data-id="${dr.id}" title="이 연령 삭제"
         style="background:none;border:none;color:var(--graphite);font-size:13px;cursor:pointer;padding:2px 6px;line-height:1;">✕</button>`;
     }
     html += `</div>`;
