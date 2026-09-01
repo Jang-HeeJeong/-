@@ -3111,6 +3111,159 @@ function computeCh2KindsAmtsStatus(allVpairs) {
   return { kindsSt, amtsSt };
 }
 
+/* [사용상의 주의사항] 2열 대조표 — 좌: 표제기 원문(해당 부분 노랑), 우: 이 제품 문구.
+   제1·2·3·7·9장이 모두 같은 표를 쓴다. 예전에는 장마다 이 100여 줄이
+   변수 이름만 바꿔 복사돼 있어서, 한 곳을 고치면 다른 장은 그대로 남았다. */
+function _wordPrecautionSection(opts) {
+  const { chapterKey, form, activeRows, doseRows, precSections,
+          productName, FN, TH, TD, HL, DIM } = opts;
+
+  const CAT_LABELS = [
+    ['경고',                 '1.  경고'],
+    ['복용하지_말_것',       '2.  다음과 같은 사람은 이 약을 복용하지 말 것.'],
+    ['병용금기',             '3.  이 약을 복용하는 동안 다음의 약을 복용하지 말 것.'],
+    ['복용전_상의',          '5.  다음과 같은 사람은 이 약을 복용하기 전에 의사, 치과의사, 약사와 상의 할 것.'],
+    ['이상반응_및_즉각중지', '6.  다음과 같은 경우 이 약의 복용을 즉각 중지하고 의사, 치과의사, 약사와 상의할 것. 상담 시 가능한 한 이 첨부문서를 소지할 것.'],
+    ['소아투여',             '7.  소아에 대한 투여'],
+    ['임부수유부투여',       '임부 및 수유부에 대한 투여'],
+    ['복용시_주의',          '8.  기타 이 약의 복용 시 주의할 사항'],
+    ['저장상의_주의',        '9.  저장상의 주의사항'],
+  ];
+
+  let out = '';
+  out += `<p>&nbsp;</p><p>&nbsp;</p>`;
+  out += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[사용상의 주의사항] <span style="${FN}font-size:9pt;font-weight:normal;color:#555;">(해당 부분 하이라이트)</span></p>`;
+  out += `<table style="width:100%;border-collapse:collapse;margin-bottom:12pt;"><thead><tr>`;
+  out += `<th style="${TH}width:50%;">의약품 표준제조기준</th>`;
+  out += `<th style="${TH}width:50%;">${esc(productName)}</th>`;
+  out += `</tr></thead><tbody>`;
+
+  const prec    = DB[chapterKey]?.['사용상의_주의사항'];
+  const ctx     = prec ? buildPrecautionCtx(chapterKey, form, activeRows, doseRows) : null;
+  const fnMaps  = prec?.['각주_맵'] || {};
+  const dispMap = new Map();
+  if (precSections) {
+    precSections.forEach(sec => {
+      if (!dispMap.has(sec.cat)) dispMap.set(sec.cat, new Set());
+      sec.items.forEach(it => dispMap.get(sec.cat).add(it.origIdx));
+    });
+  }
+
+  let rSecNum = 0;
+  for (const [cat, label] of CAT_LABELS) {
+    const hasDbCat = prec && cat in prec;
+    const excInCat = (selectedExcipients || []).some(n => (EXCIPIENT_PREC_DB[n] || {})[cat]);
+    const dirInCat = (precSections || []).find(s => s.cat === cat)?.items.filter(it => it.isDirective) || [];
+    if (!hasDbCat && !excInCat && !dirInCat.length) continue;
+
+    const dispSet = dispMap.get(cat) || new Set();
+    const fnMap   = fnMaps[cat] || null;
+    let lH = `<p style="margin:0 0 4pt;font-weight:bold;font-size:10pt;">${esc(label)}</p>`;
+    const rItems = [];
+    let dNum = 0;
+
+    if (hasDbCat && cat === '이상반응_및_즉각중지' && prec['이상반응_성분매핑']) {
+      const advArr   = prec[cat];
+      const mapping  = prec['이상반응_성분매핑'];
+      const rawLines = advArr[0].split('\n').filter(l => l.trim());
+      lH += `<p style="margin:0 0 2pt;">${esc(_stripInlineMarkers(rawLines[0]))}</p>`;
+      rawLines.slice(1).forEach((line, idx) => {
+        const entry    = mapping[idx];
+        const isActive = entry ? ctx.classes.has(entry.class) : false;
+        if (isActive) {
+          lH += `<p style="margin:0;padding-left:10pt;${HL}">${_renderPrecWithInlineHL(line, ctx, HL, fnMap, true)}</p>`;
+        } else {
+          lH += `<p style="margin:0;padding-left:10pt;${DIM}">${esc(_stripInlineMarkers(line))}</p>`;
+        }
+      });
+      for (let i = 1; i < advArr.length; i++) {
+        const disp = dispSet.has(i);
+        lH += `<p style="margin:0 0 2pt;${disp ? '' : DIM}">${i}) ${esc(_stripInlineMarkers(advArr[i]))}</p>`;
+      }
+    } else if (hasDbCat) {
+      const flatItems = _flattenPrecItems(cat, prec[cat]);
+      flatItems.forEach((item, i) => {
+        const isIndent  = !!item.indent;
+        const isCircled = !!item.circled;
+        if (!isIndent && !isCircled) dNum++;
+        const disp   = dispSet.has(i);
+        const indent = isIndent ? 'padding-left:10pt;' : '';
+        const pfx    = (isIndent || isCircled) ? '' : `${dNum}) `;
+        if (disp) {
+          lH += `<p style="margin:0 0 2pt;${indent + HL}">${pfx}${_renderPrecWithInlineHL(item.text, ctx, HL, fnMap, true)}</p>`;
+        } else {
+          lH += `<p style="margin:0 0 2pt;${indent}${DIM}">${pfx}${esc(_stripInlineMarkers(item.text)).replace(/\n/g,'<br>')}</p>`;
+        }
+      });
+    }
+
+    if (dirInCat.length) {
+      lH += `<p style="font-size:9pt;color:#E65100;margin:4pt 0 2pt;font-style:italic;">[품목허가사항 변경지시]</p>`;
+      dirInCat.forEach(it => {
+        lH += `<p style="margin:0 0 1pt;background:#FFF3E0;">${it.displayNum}) ${esc(it.text)}</p>`;
+        if (it.citation) lH += `<p style="margin:0 0 4pt;padding-left:8pt;font-size:8pt;font-style:italic;color:#888;font-family:'맑은 고딕',sans-serif;">○ ${esc(it.citation)}</p>`;
+      });
+    }
+    for (const excName of (selectedExcipients || [])) {
+      const excItems = (EXCIPIENT_PREC_DB[excName] || {})[cat];
+      if (!excItems) continue;
+      lH += `<p style="font-size:9pt;color:#1565c0;margin:4pt 0 2pt;font-style:italic;">[첨가제: ${esc(excName)}]</p>`;
+      excItems.forEach(text => { lH += `<p style="margin:0 0 2pt;${HL}">${++dNum}) ${esc(text)}</p>`; });
+    }
+
+    const precSec = precSections?.find(s => s.cat === cat);
+    if (precSec) {
+      precSec.items.forEach(it => {
+        if (it.text && it.text.includes('<삭제>')) return;
+        const clean = applyEasyTerms(removeEditorial(_stripIngredientParens(it.text)));
+        if (it.indent || it.isMapping) rItems.push(`   ${clean}`);
+        else if (it.circled) rItems.push(clean);
+        else rItems.push(`${it.displayNum}) ${clean}`);
+      });
+    }
+
+    const rLabel = label.replace(/^\d+\.\s*/, '');
+    const rH = rItems.length
+      ? `<p style="margin:0 0 4pt;font-weight:bold;font-size:10pt;">${++rSecNum}. ${esc(rLabel)}</p>`
+        + rItems.map(t => `<p style="margin:0 0 2pt;">${esc(t).replace(/\n/g,'<br>')}</p>`).join('')
+      : `<span style="color:#aaa;">(해당 없음)</span>`;
+    out += `<tr><td style="${TD}">${lH}</td><td style="${TD}">${rH}</td></tr>`;
+  }
+  out += `</tbody></table>`;
+  return out;
+}
+
+/* 워드 문서 껍데기 + 내려받기 — 세 분기가 똑같이 갖고 있던 부분.
+   제1장만 워드 메모(comment)를 쓰므로 extraStyle·tail로 받는다. */
+function _wordDownload(productName, body, extraStyle, tail) {
+  const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office'`
+    + ` xmlns:w='urn:schemas-microsoft-com:office:word'`
+    + ` xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset="UTF-8"><title>${esc(productName)} 표준제조기준 검토</title>
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>90</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->
+<style>
+  @page { margin: 1.5cm 1cm; mso-page-orientation: portrait; }
+  body { font-family:'맑은 고딕',Arial,sans-serif; margin:0; font-size:9pt; }
+  p { margin:0; padding:1pt 0; line-height:1.4; }
+  table { border-collapse:collapse; width:100%; table-layout:fixed; }
+  td, th { padding:3pt 5pt; border:1px solid #aaa; word-wrap:break-word; overflow-wrap:break-word; }
+${extraStyle || ''}
+</style>
+</head><body>
+${body}
+${tail || ''}
+</body></html>`;
+  const blob = new Blob(['\ufeff' + html], { type: 'application/msword;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `${productName}_표준제조기준검토_${new Date().toISOString().slice(0,10)}.doc`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function generateFullWordDoc() {
   const rawProductName = ($('product-name')?.value || '').trim() || '(제품명)';
   const ch = chaptersMap[currentKey];
@@ -3437,146 +3590,13 @@ function generateFullWordDoc() {
     body += `<td style="${TD}">${dos2R || `<span style="color:#aaa;">(입력 없음)</span>`}</td>`;
     body += `</tr></tbody></table>`;
 
-    // (4) [사용상의 주의사항] — 2-col table, numbered labels
-    body += `<p>&nbsp;</p><p>&nbsp;</p>`;
-    body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[사용상의 주의사항] <span style="${FN}font-size:9pt;font-weight:normal;color:#555;">(해당 부분 하이라이트)</span></p>`;
-    body += `<table style="width:100%;border-collapse:collapse;margin-bottom:12pt;"><thead><tr>`;
-    body += `<th style="${TH}width:50%;">의약품 표준제조기준</th>`;
-    body += `<th style="${TH}width:50%;">${esc(productName)}</th>`;
-    body += `</tr></thead><tbody>`;
+    // [사용상의 주의사항] — 공용 함수 (모든 장이 같은 표를 쓴다)
+    body += _wordPrecautionSection({
+      chapterKey: currentKey, form, activeRows, doseRows: dosageRows, precSections,
+      productName, FN, TH, TD, HL, DIM,
+    });
 
-    const CAT_LABELS_2 = [
-      ['경고',                 '1.  경고'],
-      ['복용하지_말_것',       '2.  다음과 같은 사람은 이 약을 복용하지 말 것.'],
-      ['병용금기',             '3.  이 약을 복용하는 동안 다음의 약을 복용하지 말 것.'],
-      ['복용전_상의',          '5.  다음과 같은 사람은 이 약을 복용하기 전에 의사, 치과의사, 약사와 상의 할 것.'],
-      ['이상반응_및_즉각중지', '6.  다음과 같은 경우 이 약의 복용을 즉각 중지하고 의사, 치과의사, 약사와 상의할 것. 상담 시 가능한 한 이 첨부문서를 소지할 것.'],
-      ['소아투여',             '7.  소아에 대한 투여'],
-      ['임부수유부투여',       '임부 및 수유부에 대한 투여'],
-      ['복용시_주의',          '8.  기타 이 약의 복용 시 주의할 사항'],
-      ['저장상의_주의',        '9.  저장상의 주의사항'],
-    ];
-    const prec2    = DB[currentKey]?.['사용상의_주의사항'];
-    const ctx2     = prec2 ? buildPrecautionCtx(currentKey, form, activeRows, dosageRows) : null;
-    const fnMaps2  = prec2?.['각주_맵'] || {};   // 섹션별 인라인 각주 성분명 맵
-    const dispMap2 = new Map();
-    if (precSections) {
-      precSections.forEach(sec => {
-        if (!dispMap2.has(sec.cat)) dispMap2.set(sec.cat, new Set());
-        sec.items.forEach(it => dispMap2.get(sec.cat).add(it.origIdx));
-      });
-    }
-
-    let rSecNum = 0;
-    for (const [cat, label] of CAT_LABELS_2) {
-      const hasDbCat = prec2 && cat in prec2;
-      const excInCat = (selectedExcipients || []).some(n => (EXCIPIENT_PREC_DB[n] || {})[cat]);
-      const dirInCat = (precSections || []).find(s => s.cat === cat)?.items.filter(it => it.isDirective) || [];
-      if (!hasDbCat && !excInCat && !dirInCat.length) continue;
-      const dispSet = dispMap2.get(cat) || new Set();
-      const fnMap2  = fnMaps2[cat] || null;   // 이 섹션의 각주 성분명 맵
-
-      let lH = `<p style="margin:0 0 4pt;font-weight:bold;font-size:10pt;">${esc(label)}</p>`;
-      const rItems = [];
-
-      let dNum = 0;
-      if (hasDbCat && cat === '이상반응_및_즉각중지' && prec2['이상반응_성분매핑']) {
-        const advArr = prec2[cat];
-        const mapping = prec2['이상반응_성분매핑'];
-        const rawLines = advArr[0].split('\n').filter(l => l.trim());
-        lH += `<p style="margin:0 0 2pt;">${esc(_stripInlineMarkers(rawLines[0]))}</p>`;
-        rawLines.slice(1).forEach((line, idx) => {
-          const entry = mapping[idx];
-          const isActive = entry ? ctx2.classes.has(entry.class) : false;
-          if (isActive) {
-            lH += `<p style="margin:0;padding-left:10pt;${HL}">${_renderPrecWithInlineHL(line, ctx2, HL, fnMap2, true)}</p>`;
-          } else {
-            lH += `<p style="margin:0;padding-left:10pt;${DIM}">${esc(_stripInlineMarkers(line))}</p>`;
-          }
-        });
-        for (let i = 1; i < advArr.length; i++) {
-          const disp = dispSet.has(i);
-          lH += `<p style="margin:0 0 2pt;${disp ? '' : DIM}">${i}) ${esc(_stripInlineMarkers(advArr[i]))}</p>`;
-        }
-      } else if (hasDbCat) {
-        const flatItems = _flattenPrecItems(cat, prec2[cat]);
-        flatItems.forEach((item, i) => {
-          const isIndent = !!item.indent;
-          const isCircled2 = !!item.circled;
-          if (!isIndent && !isCircled2) dNum++;
-          const disp = dispSet.has(i);
-          const indent = isIndent ? 'padding-left:10pt;' : '';
-          const lPrefix = (isIndent || isCircled2) ? '' : `${dNum}) `;
-          if (disp) {
-            lH += `<p style="margin:0 0 2pt;${indent + HL}">${lPrefix}${_renderPrecWithInlineHL(item.text, ctx2, HL, fnMap2, true)}</p>`;
-          } else {
-            lH += `<p style="margin:0 0 2pt;${indent}${DIM}">${lPrefix}${esc(_stripInlineMarkers(item.text)).replace(/\n/g,'<br>')}</p>`;
-          }
-        });
-      }
-      if (dirInCat.length) {
-        lH += `<p style="font-size:9pt;color:#E65100;margin:4pt 0 2pt;font-style:italic;">[품목허가사항 변경지시]</p>`;
-        dirInCat.forEach(it => {
-          lH += `<p style="margin:0 0 1pt;background:#FFF3E0;">${it.displayNum}) ${esc(it.text)}</p>`;
-          if (it.citation) lH += `<p style="margin:0 0 4pt;padding-left:8pt;font-size:8pt;font-style:italic;color:#888;font-family:'맑은 고딕',sans-serif;">○ ${esc(it.citation)}</p>`;
-        });
-      }
-      for (const excName of (selectedExcipients || [])) {
-        const excItems = (EXCIPIENT_PREC_DB[excName] || {})[cat];
-        if (!excItems) continue;
-        lH += `<p style="font-size:9pt;color:#1565c0;margin:4pt 0 2pt;font-style:italic;">[첨가제: ${esc(excName)}]</p>`;
-        excItems.forEach(text => {
-          lH += `<p style="margin:0 0 2pt;${HL}">${++dNum}) ${esc(text)}</p>`;
-        });
-      }
-      // 우측 열: precSections에서 직접 구성 (화면과 동일한 번호·텍스트)
-      const precSec2 = precSections?.find(s => s.cat === cat);
-      if (precSec2) {
-        precSec2.items.forEach(it => {
-          if (it.text && it.text.includes('<삭제>')) return;
-          const clean = applyEasyTerms(removeEditorial(_stripIngredientParens(it.text)));
-          if (it.indent || it.isMapping) {
-            rItems.push(`   ${clean}`);
-          } else if (it.circled) {
-            rItems.push(clean);
-          } else {
-            rItems.push(`${it.displayNum}) ${clean}`);
-          }
-        });
-      }
-      const rLabelText = label.replace(/^\d+\.\s*/, '');
-      const rH = rItems.length
-        ? `<p style="margin:0 0 4pt;font-weight:bold;font-size:10pt;">${++rSecNum}. ${esc(rLabelText)}</p>`
-          + rItems.map(t => `<p style="margin:0 0 2pt;">${esc(t).replace(/\n/g,'<br>')}</p>`).join('')
-        : `<span style="color:#aaa;">(해당 없음)</span>`;
-      body += `<tr><td style="${TD}">${lH}</td><td style="${TD}">${rH}</td></tr>`;
-    }
-    body += `</tbody></table>`;
-
-    const html2 = `<html xmlns:o='urn:schemas-microsoft-com:office:office'`
-      + ` xmlns:w='urn:schemas-microsoft-com:office:word'`
-      + ` xmlns='http://www.w3.org/TR/REC-html40'>
-<head><meta charset="UTF-8"><title>${esc(productName)} 표준제조기준 검토</title>
-<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>90</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->
-<style>
-  @page { margin: 1.5cm 1cm; mso-page-orientation: portrait; }
-  body { font-family:'맑은 고딕',Arial,sans-serif; margin:0; font-size:9pt; }
-  p { margin:0; padding:1pt 0; line-height:1.4; }
-  table { border-collapse:collapse; width:100%; table-layout:fixed; }
-  td, th { padding:3pt 5pt; border:1px solid #aaa; word-wrap:break-word; overflow-wrap:break-word; }
-</style>
-</head><body>
-${body}
-</body></html>`;
-    const blob2 = new Blob(['﻿' + html2], { type: 'application/msword;charset=utf-8' });
-    const url2  = URL.createObjectURL(blob2);
-    const a2    = document.createElement('a');
-    a2.href = url2;
-    a2.download = `${productName}_표준제조기준검토_${new Date().toISOString().slice(0,10)}.doc`;
-    document.body.appendChild(a2);
-    a2.click();
-    document.body.removeChild(a2);
-    setTimeout(() => URL.revokeObjectURL(url2), 1000);
+    _wordDownload(productName, body);
     return;
   }
 
@@ -3775,137 +3795,13 @@ ${body}
     }
     body += `</tr></tbody></table>`;
 
-    // (5) [사용상의 주의사항] — ch2와 동일 2-col 비교표
-    body += `<p>&nbsp;</p><p>&nbsp;</p>`;
-    body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[사용상의 주의사항] <span style="${FN}font-size:9pt;font-weight:normal;color:#555;">(해당 부분 하이라이트)</span></p>`;
-    body += `<table style="width:100%;border-collapse:collapse;margin-bottom:12pt;"><thead><tr>`;
-    body += `<th style="${TH}width:50%;">의약품 표준제조기준</th>`;
-    body += `<th style="${TH}width:50%;">${esc(productName)}</th>`;
-    body += `</tr></thead><tbody>`;
-    {
-      const CAT_LABELS_MX = [
-        ['경고',                 '1.  경고'],
-        ['복용하지_말_것',       '2.  다음과 같은 사람은 이 약을 복용하지 말 것.'],
-        ['병용금기',             '3.  이 약을 복용하는 동안 다음의 약을 복용하지 말 것.'],
-        ['복용전_상의',          '5.  다음과 같은 사람은 이 약을 복용하기 전에 의사, 치과의사, 약사와 상의 할 것.'],
-        ['이상반응_및_즉각중지', '6.  다음과 같은 경우 이 약의 복용을 즉각 중지하고 의사, 치과의사, 약사와 상의할 것. 상담 시 가능한 한 이 첨부문서를 소지할 것.'],
-        ['소아투여',             '7.  소아에 대한 투여'],
-        ['임부수유부투여',       '임부 및 수유부에 대한 투여'],
-        ['복용시_주의',          '8.  기타 이 약의 복용 시 주의할 사항'],
-        ['저장상의_주의',        '9.  저장상의 주의사항'],
-      ];
-      const precMx    = DB[currentKey]?.['사용상의_주의사항'];
-      const ctxMx     = precMx ? buildPrecautionCtx(currentKey, form, activeRows, dosageRows) : null;
-      const fnMapsMx  = precMx?.['각주_맵'] || {};
-      const dispMapMx = new Map();
-      if (precSections) {
-        precSections.forEach(sec => {
-          if (!dispMapMx.has(sec.cat)) dispMapMx.set(sec.cat, new Set());
-          sec.items.forEach(it => dispMapMx.get(sec.cat).add(it.origIdx));
-        });
-      }
-      let rSecNumMx = 0;
-      for (const [cat, label] of CAT_LABELS_MX) {
-        const hasDbCat = precMx && cat in precMx;
-        const excInCat = (selectedExcipients || []).some(n => (EXCIPIENT_PREC_DB[n] || {})[cat]);
-        const dirInCat = (precSections || []).find(s => s.cat === cat)?.items.filter(it => it.isDirective) || [];
-        if (!hasDbCat && !excInCat && !dirInCat.length) continue;
-        const dispSet  = dispMapMx.get(cat) || new Set();
-        const fnMapMx  = fnMapsMx[cat] || null;
-        let lHmx = `<p style="margin:0 0 4pt;font-weight:bold;font-size:10pt;">${esc(label)}</p>`;
-        const rItemsMx = [];
-        let dNumMx = 0;
-        if (hasDbCat && cat === '이상반응_및_즉각중지' && precMx['이상반응_성분매핑']) {
-          const advArr  = precMx[cat];
-          const mapping = precMx['이상반응_성분매핑'];
-          const rawLines = advArr[0].split('\n').filter(l => l.trim());
-          lHmx += `<p style="margin:0 0 2pt;">${esc(_stripInlineMarkers(rawLines[0]))}</p>`;
-          rawLines.slice(1).forEach((line, idx) => {
-            const entry    = mapping[idx];
-            const isActive = entry ? ctxMx.classes.has(entry.class) : false;
-            if (isActive) {
-              lHmx += `<p style="margin:0;padding-left:10pt;${HL}">${_renderPrecWithInlineHL(line, ctxMx, HL, fnMapMx, true)}</p>`;
-            } else {
-              lHmx += `<p style="margin:0;padding-left:10pt;${DIM}">${esc(_stripInlineMarkers(line))}</p>`;
-            }
-          });
-          for (let i = 1; i < advArr.length; i++) {
-            const disp = dispSet.has(i);
-            lHmx += `<p style="margin:0 0 2pt;${disp ? '' : DIM}">${i}) ${esc(_stripInlineMarkers(advArr[i]))}</p>`;
-          }
-        } else if (hasDbCat) {
-          const flatItems = _flattenPrecItems(cat, precMx[cat]);
-          flatItems.forEach((item, i) => {
-            const isIndent = !!item.indent;
-            const isCircledMx = !!item.circled;
-            if (!isIndent && !isCircledMx) dNumMx++;
-            const disp   = dispSet.has(i);
-            const indent = isIndent ? 'padding-left:10pt;' : '';
-            const lPfx   = (isIndent || isCircledMx) ? '' : `${dNumMx}) `;
-            if (disp) {
-              lHmx += `<p style="margin:0 0 2pt;${indent + HL}">${lPfx}${_renderPrecWithInlineHL(item.text, ctxMx, HL, fnMapMx, true)}</p>`;
-            } else {
-              lHmx += `<p style="margin:0 0 2pt;${indent}${DIM}">${lPfx}${esc(_stripInlineMarkers(item.text)).replace(/\n/g,'<br>')}</p>`;
-            }
-          });
-        }
-        if (dirInCat.length) {
-          lHmx += `<p style="font-size:9pt;color:#E65100;margin:4pt 0 2pt;font-style:italic;">[품목허가사항 변경지시]</p>`;
-          dirInCat.forEach(it => {
-            lHmx += `<p style="margin:0 0 1pt;background:#FFF3E0;">${it.displayNum}) ${esc(it.text)}</p>`;
-            if (it.citation) lHmx += `<p style="margin:0 0 4pt;padding-left:8pt;font-size:8pt;font-style:italic;color:#888;font-family:'맑은 고딕',sans-serif;">○ ${esc(it.citation)}</p>`;
-          });
-        }
-        for (const excName of (selectedExcipients || [])) {
-          const excItems = (EXCIPIENT_PREC_DB[excName] || {})[cat];
-          if (!excItems) continue;
-          lHmx += `<p style="font-size:9pt;color:#1565c0;margin:4pt 0 2pt;font-style:italic;">[첨가제: ${esc(excName)}]</p>`;
-          excItems.forEach(text => { lHmx += `<p style="margin:0 0 2pt;${HL}">${++dNumMx}) ${esc(text)}</p>`; });
-        }
-        const precSecMx = precSections?.find(s => s.cat === cat);
-        if (precSecMx) {
-          precSecMx.items.forEach(it => {
-            if (it.text && it.text.includes('<삭제>')) return;
-            const clean = applyEasyTerms(removeEditorial(_stripIngredientParens(it.text)));
-            if (it.indent || it.isMapping) rItemsMx.push(`   ${clean}`);
-            else if (it.circled) rItemsMx.push(clean);
-            else rItemsMx.push(`${it.displayNum}) ${clean}`);
-          });
-        }
-        const rLabelMx = label.replace(/^\d+\.\s*/, '');
-        const rHmx = rItemsMx.length
-          ? `<p style="margin:0 0 4pt;font-weight:bold;font-size:10pt;">${++rSecNumMx}. ${esc(rLabelMx)}</p>`
-            + rItemsMx.map(t => `<p style="margin:0 0 2pt;">${esc(t).replace(/\n/g,'<br>')}</p>`).join('')
-          : `<span style="color:#aaa;">(해당 없음)</span>`;
-        body += `<tr><td style="${TD}">${lHmx}</td><td style="${TD}">${rHmx}</td></tr>`;
-      }
-    }
-    body += `</tbody></table>`;
+    // [사용상의 주의사항] — 공용 함수 (모든 장이 같은 표를 쓴다)
+    body += _wordPrecautionSection({
+      chapterKey: currentKey, form, activeRows, doseRows: dosageRows, precSections,
+      productName, FN, TH, TD, HL, DIM,
+    });
 
-    const htmlMx = `<html xmlns:o='urn:schemas-microsoft-com:office:office'`
-      + ` xmlns:w='urn:schemas-microsoft-com:office:word'`
-      + ` xmlns='http://www.w3.org/TR/REC-html40'>
-<head><meta charset="UTF-8"><title>${esc(productName)} 표준제조기준 검토</title>
-<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>90</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->
-<style>
-  @page { margin: 1.5cm 1cm; mso-page-orientation: portrait; }
-  body { font-family:'맑은 고딕',Arial,sans-serif; margin:0; font-size:9pt; }
-  p { margin:0; padding:1pt 0; line-height:1.4; }
-  table { border-collapse:collapse; width:100%; table-layout:fixed; }
-  td, th { padding:3pt 5pt; border:1px solid #aaa; word-wrap:break-word; overflow-wrap:break-word; }
-</style>
-</head><body>
-${body}
-</body></html>`;
-    const blobMx = new Blob(['﻿' + htmlMx], { type: 'application/msword;charset=utf-8' });
-    const urlMx  = URL.createObjectURL(blobMx);
-    const aMx    = document.createElement('a');
-    aMx.href = urlMx;
-    aMx.download = `${productName}_표준제조기준검토_${new Date().toISOString().slice(0,10)}.doc`;
-    document.body.appendChild(aMx);
-    aMx.click();
-    document.body.removeChild(aMx);
-    setTimeout(() => URL.revokeObjectURL(urlMx), 1000);
+    _wordDownload(productName, body);
     return;
   }
 
@@ -4381,33 +4277,9 @@ ${body}
   const commentListHtml2 = commentDefs2
     ? `<div style="mso-element:comment-list">${commentDefs2}</div>` : '';
 
-  const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office'`
-    + ` xmlns:w='urn:schemas-microsoft-com:office:word'`
-    + ` xmlns='http://www.w3.org/TR/REC-html40'>
-<head><meta charset="UTF-8"><title>${esc(productName)} 표준제조기준 검토</title>
-<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>90</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->
-<style>
-  @page { margin: 1.5cm 1cm; mso-page-orientation: portrait; }
-  body { font-family:'맑은 고딕',Arial,sans-serif; margin:0; font-size:9pt; }
-  p { margin:0; padding:1pt 0; line-height:1.4; }
-  table { border-collapse:collapse; width:100%; table-layout:fixed; }
-  td, th { padding:3pt 5pt; border:1px solid #aaa; word-wrap:break-word; overflow-wrap:break-word; }
-  .MsoCommentText { font-size:9pt; font-family:'맑은 고딕',sans-serif; }
-</style>
-</head><body>
-${body}
-${commentListHtml2}
-</body></html>`;
-
-  const blob = new Blob(['﻿' + html], { type: 'application/msword;charset=utf-8' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url;
-  a.download = `${productName}_표준제조기준검토_${new Date().toISOString().slice(0,10)}.doc`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  _wordDownload(productName, body,
+    "  .MsoCommentText { font-size:9pt; font-family:'맑은 고딕',sans-serif; }",
+    commentListHtml2);
 }
 
 /* =========================================================
