@@ -231,6 +231,17 @@ function flowSnapshot(win) {
       ?.querySelector('.res-doc-body')?.innerText ?? '',
     doseText: [...d.querySelectorAll('#results-body .res-doc')].find(x => /용법용량/.test(x.textContent))
       ?.querySelector('.res-doc-body')?.innerText ?? '',
+    // 제3장 조항별 적합여부 — "적합/부적합//(해당없음)/—(보류)"를 한 줄로
+    ch3Status: win.eval(`(function(){
+      if (currentKey !== '제3장_감기약' || typeof computeCh3KindsAmtsStatus !== 'function') return '';
+      var rows = getMatrixActiveRows(); var dr = dosageRows.filter(function(x){return x.age;})[0];
+      if (!dr || !rows.length) return '';
+      var v = validateChapter3(DB['제3장_감기약']['표'], currentForm, dr.age, rows,
+        {freqMin:dr.freqMin,freqMax:dr.freqMax,amtMin:dr.amtMin,amtMax:dr.amtMax,unit:dosageUnit});
+      var st = computeCh3KindsAmtsStatus([{dr:dr, v:v}], currentForm, rows);
+      var m = function(x){ return x.na ? '/' : x.ok === true ? 'O' : x.ok === false ? 'X' : '-'; };
+      return st.kindsSt.map(m).join('') + ' ' + st.amtsSt.map(m).join('');
+    })()`),
   };
 }
 
@@ -259,6 +270,21 @@ function flowStep(win, step) {
       el.value = String(val);
       el.dispatchEvent(new win.Event('input', { bubbles: true }));
     }
+  } else if (step.setAmt != null) {
+    // 1회 복용량(모든 연령)을 한꺼번에 바꾼다
+    for (const sel of d.querySelectorAll('.js-ch2-amt-min, .js-ch2-amt-max, .js-ch1-amt-min, .js-ch1-amt-max')) {
+      sel.value = String(step.setAmt);
+      sel.dispatchEvent(new win.Event('change', { bubbles: true }));
+    }
+  } else if (step.setDoseByName != null) {
+    // 성분명으로 배합량 칸을 찾아 넣는다 (칸 순번이 아니라 이름으로)
+    for (const [name, val] of Object.entries(step.setDoseByName)) {
+      const el = [...d.querySelectorAll('.mx-dose-input')]
+        .find(i => i.closest('tr')?.textContent.includes(name));
+      if (!el) throw new Error('배합량 칸 없음: ' + name);
+      el.value = String(val);
+      el.dispatchEvent(new win.Event('input', { bubbles: true }));
+    }
   } else if (step.runValidation) {
     d.getElementById('btn-validate').click();
   } else if (step.chooseFirstAge) {
@@ -266,6 +292,8 @@ function flowStep(win, step) {
     if (!cb) throw new Error('연령 선택 요소를 찾지 못함');
     if (cb.type === 'checkbox') { cb.checked = true; cb.dispatchEvent(new win.Event('change', { bubbles: true })); }
     else { cb.dispatchEvent(new win.Event('change', { bubbles: true })); }
+  } else if (!Object.keys(step).some(k => k !== 'expect')) {
+    // expect만 있는 단계 — 아무것도 하지 않고 지금 상태만 확인한다
   } else {
     throw new Error('알 수 없는 step: ' + JSON.stringify(step));
   }
@@ -293,6 +321,14 @@ function flowCheck(expect, snap) {
     } else if (k === 'precTextHasNot') {
       for (const s of want) if (snap.precText.includes(s))
         diffs.push({ path: `주의사항 없어야: ${s}`, was: '없어야 함', now: '남아 있음' });
+    } else if (k === 'ch3AmtRule') {
+      // 분량 n번 조항의 판정만 콕 집어 본다 ({'5':'X','6':'O'})
+      const amts = (snap.ch3Status || '').split(' ')[1] || '';
+      for (const [num, want2] of Object.entries(want)) {
+        const got = amts[+num - 1] ?? '?';
+        if (got !== want2)
+          diffs.push({ path: `분량 ${num}번`, was: want2, now: got });
+      }
     } else if (k === 'effTextHas') {
       if (!snap.effText.includes(want)) diffs.push({ path: '효능효과 문구', was: `"${want}" 포함`, now: snap.effText || '(없음)' });
     } else if (k === 'doseTextHas') {
@@ -444,7 +480,7 @@ async function main() {
     }
     const label = f.steps.map(st =>
       st.pick ?? st.setChapter?.split('_')[0]
-      ?? (st.setDose ? '배합량 입력' : st.runValidation ? '검토 실행' : st.restore ? '저장제품' : '연령선택')
+      ?? (st.setDose ? '배합량 입력' : st.setDoseByName ? '배합량 지정' : st.setAmt ? '1회량 변경' : st.runValidation ? '검토 실행' : st.restore ? '저장제품' : '연령선택')
     ).join(' → ');
     if (errMsg)      { results.err++;  renderCase(s4, 'err',  f.id, f.desc, null, errMsg); }
     else if (diffs.length) { results.fail++; renderCase(s4, 'fail', f.id, `${f.desc}  [${label}]`, diffs); }

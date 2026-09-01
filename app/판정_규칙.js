@@ -3264,6 +3264,191 @@ ${tail || ''}
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/* ══════════ 제3장 조항별 적합여부 ══════════
+   워드 검토서의 [유효성분의 종류]·[유효성분의 분량] 표에 조항마다
+   적합/부적합을 적기 위한 것. 원문 조항 번호와 1:1로 맞춘다.
+
+   상태는 넷:
+     ok:true          적합      — 검사했고 통과
+     ok:false         부적합    — 검사했고 위반 (reason 함께)
+     na:true          해당없음  — 이 배합에는 적용되지 않는 조항
+     ok:null,na:false 판정보류  — 프로그램이 판단할 수 없는 조항(서류 요건 등)
+
+   ★ 매핑하지 않은 조항은 자동으로 "판정보류"가 된다.
+     빠뜨려도 "적합"으로 잘못 나가지 않도록 일부러 이렇게 둔다. */
+function computeCh3KindsAmtsStatus(allVpairs, form, activeRows) {
+  const NA   = { ok: null, na: true,  reason: '' };
+  const HOLD = { ok: null, na: false, reason: '' };
+  const YES  = r => ({ ok: true,  na: false, reason: '' });
+  const NO   = r => ({ ok: false, na: false, reason: r });
+
+  if (!allVpairs.length) return { kindsSt: [], amtsSt: [] };
+  const v0     = allVpairs[0].v;
+  const ir0    = v0.itemResults || [];
+  const rules  = v0.ruleErrors  || [];
+  const tables = DB['제3장_감기약']?.['표'] ?? {};
+  const t1e    = tables['표1_유효성분'] ?? [];
+  const t1h    = tables['표1_생약_및_한약처방'] ?? [];
+  const t2     = tables['표2_한방처방_구성'] ?? {};
+  const rows   = activeRows.filter(r => r.ingr);
+
+  const isOk      = key => !rules.some(r => r.key === key && r.ok === false);
+  const reasonOf  = key => (rules.find(r => r.key === key) || {}).reason || '';
+  // 어느 연령에서든 한 번이라도 걸리면 부적합으로 본다 (가장 엄격한 쪽)
+  const anyFail   = pred => allVpairs.some(({ v }) => (v.itemResults||[]).some(pred));
+  const failNames = pred => {
+    const out = [];
+    allVpairs.forEach(({ dr, v }) => {
+      const al = displayAgeLabel(dr.age, '제3장_감기약', form) || dr.age;
+      (v.itemResults||[]).filter(pred).forEach(r => out.push(`${r.ingr}(${al}): ${r.reason}`));
+    });
+    return [...new Set(out)].join('; ');
+  };
+
+  // 배합된 성분이 표1의 어느 항인지
+  const eOf   = r => t1e.find(t => t['성분명'] === r.ingr);
+  const hOf   = r => t1h.find(t => t['성분명'] === r.ingr);
+  const inH   = pfx => rows.filter(r => (eOf(r)?.['구분'] ?? '').startsWith(pfx));
+  const inLan = lan => rows.filter(r => (hOf(r)?.['구분'] ?? '') === lan);
+
+  const n1 = inH('Ⅰ항').length,   n2 = inH('Ⅱ항').length;
+  const n8 = inH('Ⅷ항').length,   n9 = inH('Ⅸ항').length, n10 = inH('Ⅹ항').length;
+  const n13 = inH('ⅩⅢ항').length;
+  const ga = inLan('가란'), na_ = inLan('나란'), da = inLan('다란'), ra = inLan('라란');
+  const hasIbu  = rows.some(r => r.ingr.includes('이부프로펜'));
+  const hasAsp  = rows.some(r => r.ingr.includes('아스피린'));
+  const hasCaf  = rows.some(r => r.ingr.includes('카페인'));
+  const isLiquid = /내용액제/.test(form || '');
+  const 미등재  = ir0.filter(r => r.ok === null);
+
+  // 5) "Ⅲ항, Ⅳ항, Ⅴ-1항, Ⅵ항, Ⅶ항, Ⅺ항, Ⅻ항목 … 각 항 또는 라란의 각각 1종으로 한다"
+  const 단일항 = ['Ⅲ항','Ⅳ항','Ⅴ-1항','Ⅵ항','Ⅶ항','Ⅺ항','Ⅻ항'];
+  const 초과항 = 단일항.map(h => [h, inH(h).length]).filter(([, c]) => c > 1);
+  if (ra.length > 1) 초과항.push(['라란', ra.length]);
+
+  const kindsSt = [
+    // 1) 배합할 수 있는 유효성분의 종류는 <표1>의 성분으로 한다.
+    미등재.length
+      ? NO(미등재.map(r => `${r.ingr}: 표1에 없음`).join('; '))
+      : YES(),
+    // 2) 한약처방 규격·기초시험자료 제출 — 서류 요건이라 프로그램이 판정할 수 없다
+    ra.length ? HOLD : NA,
+    // 3) 배합하지 않으면 안되는 유효성분은 Ⅰ항과 Ⅱ항 중 1종 이상
+    (n1 + n2) >= 1 ? YES() : NO('Ⅰ항·Ⅱ항 성분이 하나도 없음'),
+    // 4) Ⅰ항의 유효성분은 3종까지
+    n1 <= 3 ? YES() : NO(`Ⅰ항 ${n1}종 — 최대 3종`),
+    // 5) 각 항 1종 (라란도 1종)
+    초과항.length
+      ? NO(초과항.map(([h, c]) => `${h} ${c}종 — 각 1종만`).join('; '))
+      : YES(),
+    // 6) 마황(및 마황 함유 처방) × Ⅴ-1항 배합 불가 — 검증기가 이미 본다
+    isOk('마황×Ⅴ-1항 배합금지') ? YES() : NO(reasonOf('마황×Ⅴ-1항 배합금지')),
+    // 7) 라란의 한약처방 × 가·나·다란 생약 배합 불가
+    ra.length === 0 ? NA
+      : (ga.length + na_.length + da.length) === 0 ? YES()
+      : NO(`라란(${ra.map(r=>r.ingr).join(',')})과 생약 동시 배합`),
+    // 8) 향소산 이외의 한약처방은 엑스에 한하여 배합
+    //    성분명만으로 엑스 여부를 가릴 수 없어 보류한다
+    ra.length === 0 ? NA : HOLD,
+    // 9) 라란 한약처방의 구성생약·분량은 <표2>에 의한다 — 참조 규정
+    ra.length === 0 ? NA : HOLD,
+    // 10) 이부프로펜은 Ⅰ항·Ⅸ항·가란·지룡·라란과 동시 배합 금지
+    !hasIbu ? NA : (() => {
+      const bad = [];
+      if (n1) bad.push('Ⅰ항');
+      if (n9) bad.push('Ⅸ항');
+      if (ga.length) bad.push('가란 생약');
+      if (da.some(r => r.ingr.includes('지룡'))) bad.push('지룡');
+      if (ra.length) bad.push('라란 한약처방');
+      return bad.length ? NO(`이부프로펜과 ${bad.join('·')} 동시 배합 불가`) : YES();
+    })(),
+    // 11) Ⅷ항 × Ⅹ항·가란·라란 동시 배합 불가
+    !n8 ? NA : (() => {
+      const bad = [];
+      if (n10) bad.push('Ⅹ항');
+      if (ga.length) bad.push('가란 생약');
+      if (ra.length) bad.push('라란 한약처방');
+      return bad.length ? NO(`Ⅷ항과 ${bad.join('·')} 동시 배합 불가`) : YES();
+    })(),
+    // 12) Ⅸ항 × Ⅱ항·Ⅹ항·가란·라란 동시 배합 불가
+    !n9 ? NA : (() => {
+      const bad = [];
+      if (n2) bad.push('Ⅱ항');
+      if (n10) bad.push('Ⅹ항');
+      if (ga.length) bad.push('가란 생약');
+      if (ra.length) bad.push('라란 한약처방');
+      return bad.length ? NO(`Ⅸ항과 ${bad.join('·')} 동시 배합 불가`) : YES();
+    })(),
+  ];
+
+  const overFail  = r => r.ok === false && /최대/.test(r.reason || '');
+  const underFail = r => r.ok === false && /최소|미달/.test(r.reason || '');
+
+  const amtsSt = [
+    // 1) 각 유효성분의 1일 최대분량은 <표1>의 양
+    anyFail(overFail) ? NO(failNames(overFail)) : YES(),
+    // 2) Ⅰ항 2종 이상 또는 가·나란 생약 2종 이상일 때 비례합 ≤ 1
+    //    지금 검증기는 이 합산을 계산하지 않는다 → 해당 구성일 때만 보류
+    (n1 >= 2 || (ga.length + na_.length) >= 2) ? HOLD : NA,
+    // 3) Ⅰ항 + 지룡/갈근탕/마황탕 비례합 ≤ 1 — 위와 같은 이유로 보류
+    (n1 >= 1 && (da.some(r => r.ingr.includes('지룡'))
+                 || ra.some(r => /갈근탕|마황탕/.test(r.ingr)))) ? HOLD : NA,
+    // 4) 라란 한약처방 배합분량은 1일 최대분량의 1/5 이상 1/2 미만
+    ra.length === 0 ? NA
+      : (anyFail(r => ra.some(x => x.ingr === r.ingr) && r.ok === false)
+          ? NO(failNames(r => ra.some(x => x.ingr === r.ingr) && r.ok === false)) : YES()),
+    // 5) 각 유효성분 배합량의 하한은 1일 최대분량의 1/2
+    anyFail(underFail) ? NO(failNames(underFail)) : YES(),
+    // 6) Ⅰ항 중 아세트아미노펜만 배합 시 1일 배합량의 하한은 600mg
+    //    5번(일반 하한 1/2)과 별개 조항이므로 600mg 기준으로 따로 본다.
+    //    표1 최대가 1,500이면 1/2 = 750이 되어 5번이 더 엄하다. 그래서
+    //    "5번 위반 = 6번 위반"으로 묶으면 700mg 같은 값에서 6번이 잘못
+    //    부적합으로 찍힌다 (600은 넘었는데 750은 못 넘은 경우).
+    !(n1 === 1 && inH('Ⅰ항')[0]?.ingr === '아세트아미노펜') ? NA
+      : (() => {
+          const bad = [];
+          allVpairs.forEach(({ dr, v }) => {
+            const r = (v.itemResults || []).find(x => x.ingr === '아세트아미노펜');
+            if (!r || r.dailyMin == null) return;
+            const floor = +(600 * (v.coeff ?? 1)).toFixed(4);
+            if (r.dailyMin < floor) {
+              const al = displayAgeLabel(dr.age, '제3장_감기약', form) || dr.age;
+              bad.push(`${al}: 1일 ${_num(r.dailyMin)} mg — 하한 ${_num(floor)} mg 미달`);
+            }
+          });
+          return bad.length ? NO(bad.join('; ')) : YES();
+        })(),
+    // 7) Ⅻ항·ⅩⅣ항 유효성분의 하한은 1일 최대분량의 1/5
+    (inH('Ⅻ항').length + inH('ⅩⅣ항').length) === 0 ? NA
+      : (anyFail(r => /Ⅻ항|ⅩⅣ항/.test(r.gubun || '') && underFail(r))
+          ? NO(failNames(r => /Ⅻ항|ⅩⅣ항/.test(r.gubun || '') && underFail(r))) : YES()),
+    // 8) 내용액제의 1회 카페인 30mg 초과 금지
+    !(isLiquid && hasCaf) ? NA : (() => {
+      const caf = ir0.find(r => r.ingr.includes('카페인'));
+      const per = caf?.dose1 != null ? +caf.dose1 : null;
+      if (per == null) return HOLD;
+      return per <= 30 ? YES() : NO(`1회 카페인 ${per} mg — 30 mg 초과`);
+    })(),
+    // 9) 아스피린과 Ⅴ-1항 성분은 배합하지 않는다
+    !hasAsp ? NA
+      : (inH('Ⅴ-1항').length ? NO('아스피린과 Ⅴ-1항 성분 동시 배합 불가') : YES()),
+    // 10) ⅩⅢ항 유효성분의 하한은 1일 최대분량 뒤 괄호 안의 양
+    !n13 ? NA
+      : (anyFail(r => /ⅩⅢ항/.test(r.gubun || '') && underFail(r))
+          ? NO(failNames(r => /ⅩⅢ항/.test(r.gubun || '') && underFail(r))) : YES()),
+    // 11) 가·나·다란 생약의 하한은 1일 최대분량의 1/10
+    (ga.length + na_.length + da.length) === 0 ? NA
+      : (anyFail(r => /1\/10/.test(r.reason || '')) ? NO(failNames(r => /1\/10/.test(r.reason || ''))) : YES()),
+    // 12) 기침·가래 효능 근거가 가란 또는 나란에만 의할 경우의 하한
+    //     "근거가 …에만 의할 경우"를 프로그램이 단정하기 어려워, 생약이
+    //     있고 다른 진해·거담 성분이 없을 때만 보류로 남긴다
+    (ga.length + na_.length) === 0 ? NA
+      : ((inH('Ⅳ항').length + inH('Ⅴ항').length + inH('Ⅶ항').length) === 0 ? HOLD : NA),
+  ];
+
+  return { kindsSt, amtsSt };
+}
+
 function generateFullWordDoc() {
   const rawProductName = ($('product-name')?.value || '').trim() || '(제품명)';
   const ch = chaptersMap[currentKey];
@@ -3700,24 +3885,40 @@ function generateFullWordDoc() {
       // 배합 규칙 체크 표 (유효성분의 종류/분량)
       const kinds3 = DB[currentKey]?.['기준']?.['유효성분의_종류'] ?? [];
       const amts3  = DB[currentKey]?.['기준']?.['유효성분의_분량'] ?? [];
-      const renderCheckMx = items => {
+      // 조항별 적합여부 — 지금은 제3장만 계산한다. 계산기가 없는 장은
+      // 빈 배열이 되어 모든 칸이 "판정보류(—)"로 남는다 (잘못된 적합 방지).
+      const st3 = (currentKey === '제3장_감기약' && typeof computeCh3KindsAmtsStatus === 'function')
+        ? computeCh3KindsAmtsStatus(allValidations, form, activeRows)
+        : { kindsSt: [], amtsSt: [] };
+
+      const renderCheckMx = (items, stList) => {
         if (!items.length) return '';
         let s = `<table style="width:100%;border-collapse:collapse;margin-bottom:10pt;table-layout:fixed;">`;
-        s += `<colgroup><col style="width:87%;mso-width-source:userset;"><col style="width:13%;mso-width-source:userset;"></colgroup>`;
-        s += `<thead><tr><th style="${TH}">세부내용</th><th style="${TH}text-align:center;">확인<br>(적합&amp;부적합)</th></tr></thead><tbody>`;
+        s += `<colgroup><col style="width:80%;mso-width-source:userset;"><col style="width:20%;mso-width-source:userset;"></colgroup>`;
+        s += `<thead><tr><th style="${TH}">세부내용</th><th style="${TH}text-align:center;">확인</th></tr></thead><tbody>`;
         items.forEach((item, i) => {
-          s += `<tr><td style="${TD}">${i+1}) ${esc(item)}</td><td style="${`${FN}font-size:10pt;color:#aaa;text-align:center;padding:2pt 3pt;${BORD}`}">—</td></tr>`;
+          const st = (stList || [])[i] || { ok: null, na: false, reason: '' };
+          const mark = st.na ? '/' : st.ok === true ? '적합' : st.ok === false ? '부적합' : '—';
+          const cellSt = `${FN}font-size:9pt;text-align:center;padding:3pt;${BORD}word-break:keep-all;`
+            + (st.ok === false ? 'color:#c62828;font-weight:bold;'
+               : st.ok === true ? '' : 'color:#aaa;');
+          const why = (st.ok === false && st.reason)
+            ? `<br><span style="font-size:8pt;color:#c62828;">↳ ${esc(st.reason)}</span>` : '';
+          s += `<tr><td style="${TD}">${i+1}) ${esc(item)}${why}</td><td style="${cellSt}">${mark}</td></tr>`;
         });
         s += `</tbody></table>`;
         return s;
       };
+      const legendMx = `<p style="${FN}font-size:8pt;color:#666;margin:0 0 6pt;">`
+        + `적합 = 확인함 · 부적합 = 기준을 벗어남 · / = 이 배합에는 해당 없음 · — = 프로그램이 판정하지 않음(직접 확인 필요)</p>`;
       if (kinds3.length) {
         body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 종류]</p>`;
-        body += renderCheckMx(kinds3);
+        body += legendMx;
+        body += renderCheckMx(kinds3, st3.kindsSt);
       }
       if (amts3.length) {
         body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 분량]</p>`;
-        body += renderCheckMx(amts3);
+        body += renderCheckMx(amts3, st3.amtsSt);
       }
     }
 
