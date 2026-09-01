@@ -117,7 +117,7 @@ window.FLOW_CASES = [
       { pick: '캐롤비콜드연질캡슐', expect: { chapter: '제3장_감기약' } },
       { runValidation: true, expect: {
           // "제증상" 쉬운말 치환 — 뒤에 괄호가 바로 이어져도 바뀌어야 한다
-          effTextHas: '감기의 여러 증상',
+          effTextHas: '감기의 제증상(여러 증상)',
           // 아스피린류·이부프로펜류(위통·소화관출혈·위부불쾌감·난청·이명)는
           // 아세트아미노펜만으로는 해당하지 않는다
           precTextHasNot: ['난청', '이명'],

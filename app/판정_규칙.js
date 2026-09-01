@@ -1629,10 +1629,10 @@ function generateEfficacy(chapterKey, form, activeRows, dosage) {
     if (okPhlegm) symptoms.push('가래');
     symptoms.push('오한(춥고 떨리는 증상)', '발열', '두통', '관절통', '근육통');
 
-    // "제증상"은 쉬운말 목록에 있지만(제증상→여러 증상), 바로 뒤에 실제 증상
-    // 목록이 괄호로 이어져서 applyEasyTerms의 "괄호 앞에서는 안 바꾼다" 규칙에
-    // 걸려 안 바뀐다. 여기서만 직접 쉬운말로 써서 "감기의 여러 증상(콧물, ...)"이 되게 한다.
-    const finalText = `감기의 여러 증상(${symptoms.join(', ')})의 완화`;
+    // "제증상"은 원래 단어를 그대로 두고 쉬운말은 괄호 설명으로 붙인다
+    // ("제증상(여러 증상)"). applyEasyTerms는 바로 뒤에 괄호가 또 이어지면
+    // 이중 괄호를 막으려고 건너뛰므로, 실제 증상 목록 괄호는 여기서 직접 이어 붙인다.
+    const finalText = `감기의 제증상(여러 증상)(${symptoms.join(', ')})의 완화`;
 
     // 조건부 항목 검토 결과 (결과 화면 표시용)
     const items = [
