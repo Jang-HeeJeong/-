@@ -428,6 +428,19 @@ window.TEST_CASES = [
     rows: [{ ingr: '아세트아미노펜', gubun: 'Ⅰ항', dose: '400', unit: 'mg' },
            { ingr: '인삼', gubun: '다란', dose: '1333.3333', unit: 'mg', herbBasis: '분말' }],
     dosage: { freqMin: 3, freqMax: 3, amtMin: 1, amtMax: 1, unit: 'mg' } },
+  /* ── 비례합에서 못 세는 성분이 있을 때 ──
+     예전에는 최대분량을 모르는 성분을 조용히 빼고 더해서, 합이 실제보다
+     작아진 채 "적합"이 나왔다. 이제 판정하지 않는다(ok:null). */
+  { id: 'prop-uncountable-ch2', chapter: '제2장_해열진통제', form: '정제', age: '만 15세 이상',
+    desc: '제2장 비례배합 — 한쪽 배합량이 숫자가 아니면 합산비를 판정하지 않아야 함',
+    rows: [{ ingr: '살리실산나트륨', gubun: 'Ⅰ항', dose: '300', unit: 'mg' },
+           { ingr: '살리실아미드',   gubun: 'Ⅰ항', dose: 'abc', unit: 'mg' }],
+    dosage: { freqMin: 3, freqMax: 3, amtMin: 1, amtMax: 1, unit: 'mg' } },
+  { id: 'prop-countable-ch2', chapter: '제2장_해열진통제', form: '정제', age: '만 15세 이상',
+    desc: '제2장 비례배합 — 둘 다 셀 수 있으면 종전대로 합산비를 낸다',
+    rows: [{ ingr: '살리실산나트륨', gubun: 'Ⅰ항', dose: '300', unit: 'mg' },
+           { ingr: '살리실아미드',   gubun: 'Ⅰ항', dose: '300', unit: 'mg' }],
+    dosage: { freqMin: 3, freqMax: 3, amtMin: 1, amtMax: 1, unit: 'mg' } },
 ];
 
 /* ═══════════════════════════════════════════════════════════════════

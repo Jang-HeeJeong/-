@@ -1819,6 +1819,82 @@ window.EXPECTED = {
       "rules": [],
       "prop": null,
       "coeff": 1
+    },
+    "prop-uncountable-ch2": {
+      "items": [
+        {
+          "ingr": "살리실산나트륨",
+          "ok": true,
+          "dailyMin": 900,
+          "dailyMax": 900,
+          "critMin": null,
+          "critMax": 3000,
+          "dose1Min": 300,
+          "dose1Max": 300,
+          "crit1Min": 200,
+          "crit1Max": 1000,
+          "unit": null,
+          "reason": ""
+        },
+        {
+          "ingr": "살리실아미드",
+          "ok": null,
+          "dailyMin": null,
+          "dailyMax": null,
+          "critMin": null,
+          "critMax": null,
+          "dose1Min": null,
+          "dose1Max": null,
+          "crit1Min": null,
+          "crit1Max": null,
+          "unit": "mg",
+          "reason": "배합량이 숫자가 아니어서 판정할 수 없음"
+        }
+      ],
+      "sums": [],
+      "rules": [],
+      "prop": {
+        "ok": null
+      },
+      "coeff": 1
+    },
+    "prop-countable-ch2": {
+      "items": [
+        {
+          "ingr": "살리실산나트륨",
+          "ok": true,
+          "dailyMin": 900,
+          "dailyMax": 900,
+          "critMin": null,
+          "critMax": 3000,
+          "dose1Min": 300,
+          "dose1Max": 300,
+          "crit1Min": 200,
+          "crit1Max": 1000,
+          "unit": null,
+          "reason": ""
+        },
+        {
+          "ingr": "살리실아미드",
+          "ok": true,
+          "dailyMin": 900,
+          "dailyMax": 900,
+          "critMin": null,
+          "critMax": 3000,
+          "dose1Min": 300,
+          "dose1Max": 300,
+          "crit1Min": 200,
+          "crit1Max": 1000,
+          "unit": null,
+          "reason": ""
+        }
+      ],
+      "sums": [],
+      "rules": [],
+      "prop": {
+        "ok": true
+      },
+      "coeff": 1
     }
   }
 };

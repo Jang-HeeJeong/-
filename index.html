@@ -4682,7 +4682,7 @@ function renderChapter2Results(validation, form, ageGroup) {
           amtMin = 1, amtMax = 1, freqMin = freq, freqMax = freq } = validation;
   const allOk = ruleErrors.every(r => r.ok !== false)
              && itemResults.every(r => r.ok !== false)
-             && (propResult == null || propResult.ok !== false);
+             && (propResult == null || propResult.ok === true);
   const amtStr = amtMin === amtMax ? `${amtMax}` : `${amtMin}~${amtMax}`;
   const unit   = dosageUnit || '정';
 
@@ -4722,10 +4722,15 @@ function renderChapter2Results(validation, form, ageGroup) {
   }).join('');
 
   // 비례배합 결과 알림
+  // 적합(초록) / 부적합(빨강) / 판정보류(노랑) 세 가지
+  const _pHold = propResult && propResult.ok === null;
+  const _pBg   = !propResult ? '' : _pHold ? '#fffaf0' : propResult.ok ? '#f6fef8' : '#fff5f5';
+  const _pBd   = !propResult ? '' : _pHold ? '#e3d4a0' : propResult.ok ? '#a5d6a7' : '#ef9a9a';
+  const _pFg   = !propResult ? '' : _pHold ? '#8a5a00' : propResult.ok ? '#2e7d32' : '#c62828';
   const propAlert = propResult
-    ? `<div style="margin-top:6px;padding:4px 8px;background:${propResult.ok ? '#f6fef8' : '#fff5f5'};
-          border:1px solid ${propResult.ok ? '#a5d6a7' : '#ef9a9a'};border-radius:3px;
-          font-size:11px;color:${propResult.ok ? '#2e7d32' : '#c62828'};">
+    ? `<div style="margin-top:6px;padding:4px 8px;background:${_pBg};
+          border:1px solid ${_pBd};border-radius:3px;
+          font-size:11px;color:${_pFg};">
         ${propResult.ok ? '✅' : '❌'} Ⅰ항 비례배합: ${esc(propResult.reason)}
       </div>` : '';
 
