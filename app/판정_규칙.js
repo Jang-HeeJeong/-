@@ -3518,28 +3518,32 @@ function computeCh3KindsAmtsStatus(allVpairs, form, activeRows) {
     (inH('Ⅻ항').length + inH('ⅩⅣ항').length) === 0 ? NA
       : (anyFail(r => /Ⅻ항|ⅩⅣ항/.test(r.gubun || '') && underFail(r))
           ? NO(failNames(r => /Ⅻ항|ⅩⅣ항/.test(r.gubun || '') && underFail(r))) : YES()),
-    // 8) 내용액제의 1회 카페인 30mg 초과 금지
+    /* 8~12번은 원문 순서다. 예전에 누락 조항을 배열 끝에 덧붙인 탓에
+       카페인·아스피린이 8·9번에 놓여 있었는데, 원문에서는 11·12번이다.
+       이 배열은 자리로 조항을 가리키므로 순서가 어긋나면 판정이
+       엉뚱한 조항에 붙는다. 원문 순서로 되돌렸다. */
+    // 8) ⅩⅢ항 유효성분의 하한은 1일 최대분량 뒤 괄호 안의 양
+    !n13 ? NA
+      : (anyFail(r => /ⅩⅢ항/.test(r.gubun || '') && underFail(r))
+          ? NO(failNames(r => /ⅩⅢ항/.test(r.gubun || '') && underFail(r))) : YES()),
+    // 9) ⅩⅤ항 글리시리진산·가·나·다란 생약의 하한은 1일 최대분량의 1/10
+    (n15 + ga.length + na_.length + da.length) === 0 ? NA
+      : (anyFail(r => /1\/10/.test(r.reason || '')) ? NO(failNames(r => /1\/10/.test(r.reason || ''))) : YES()),
+    // 10) 기침·가래 효능 근거가 가란 또는 나란에만 의할 경우의 하한
+    //     "근거가 …에만 의할 경우"를 프로그램이 단정하기 어려워, 생약이
+    //     있고 다른 진해·거담 성분이 없을 때만 보류로 남긴다
+    (ga.length + na_.length) === 0 ? NA
+      : ((inH('Ⅳ항').length + inH('Ⅴ항').length + inH('Ⅶ항').length) === 0 ? HOLD : NA),
+    // 11) 내용액제의 1회 카페인 30mg 초과 금지
     !(isLiquid && hasCaf) ? NA : (() => {
       const caf = ir0.find(r => r.ingr.includes('카페인'));
       const per = caf?.dose1 != null ? +caf.dose1 : null;
       if (per == null) return HOLD;
       return per <= 30 ? YES() : NO(`1회 카페인 ${per} mg — 30 mg 초과`);
     })(),
-    // 9) 아스피린과 Ⅴ-1항 성분은 배합하지 않는다
+    // 12) 아스피린과 Ⅴ-1항 성분은 배합하지 않는다
     !hasAsp ? NA
       : (inH('Ⅴ-1항').length ? NO('아스피린과 Ⅴ-1항 성분 동시 배합 불가') : YES()),
-    // 10) ⅩⅢ항 유효성분의 하한은 1일 최대분량 뒤 괄호 안의 양
-    !n13 ? NA
-      : (anyFail(r => /ⅩⅢ항/.test(r.gubun || '') && underFail(r))
-          ? NO(failNames(r => /ⅩⅢ항/.test(r.gubun || '') && underFail(r))) : YES()),
-    // 11) 가·나·다란 생약의 하한은 1일 최대분량의 1/10
-    (ga.length + na_.length + da.length) === 0 ? NA
-      : (anyFail(r => /1\/10/.test(r.reason || '')) ? NO(failNames(r => /1\/10/.test(r.reason || ''))) : YES()),
-    // 12) 기침·가래 효능 근거가 가란 또는 나란에만 의할 경우의 하한
-    //     "근거가 …에만 의할 경우"를 프로그램이 단정하기 어려워, 생약이
-    //     있고 다른 진해·거담 성분이 없을 때만 보류로 남긴다
-    (ga.length + na_.length) === 0 ? NA
-      : ((inH('Ⅳ항').length + inH('Ⅴ항').length + inH('Ⅶ항').length) === 0 ? HOLD : NA),
   ];
 
   return { kindsSt, amtsSt };
@@ -3776,10 +3780,10 @@ function _clauseForReason(chapterKey, reason, gubun) {
 
   if (chapterKey === '제3장_감기약') {
     if (/최대.*(넘음|초과)/.test(r))            return pick('분량', 1);
-    if (/1\/10/.test(r))                        return pick('분량', 9);
+    if (/1\/10/.test(r))                        return pick('분량', 9);   // ⅩⅤ항·생약 1/10
     if (/라란/.test(g) || /1\/5\s*이상/.test(r)) return pick('분량', 4);
     if (/Ⅻ항|ⅩⅣ항/.test(g))                    return pick('분량', 7);
-    if (/ⅩⅢ항/.test(g))                        return pick('분량', 8);
+    if (/ⅩⅢ항/.test(g))                        return pick('분량', 8);   // ⅩⅢ항 괄호값
     if (/600/.test(r))                          return pick('분량', 6);
     if (/최소|미달|하한/.test(r))               return pick('분량', 5);
     return null;
