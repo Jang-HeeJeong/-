@@ -2954,6 +2954,21 @@ function runValidation() {
   const validDosageRows = dosageRows.filter(dr => dr.age);
   if (!validDosageRows.length) { setStatus('연령을 1개 이상 선택하세요', 'error'); return; }
 
+  /* 범위가 거꾸로 든 행(1회 2~1캡슐)은 검토하지 않는다.
+     화면에서 자동으로 바로잡지만, 저장해 둔 옛 제품을 불러오면
+     뒤집힌 값이 그대로 들어올 수 있다. 그대로 계산하면 최대·최소
+     기준이 서로 바뀌어 엉뚱하게 "적합"이 나온다. */
+  const flipped = validDosageRows.filter(dr =>
+    (dr.freqMin > dr.freqMax) || (dr.amtMin > dr.amtMax));
+  if (flipped.length) {
+    const d = flipped[0];
+    const what = d.freqMin > d.freqMax
+      ? `1일 ${d.freqMin}~${d.freqMax}회`
+      : `1회 ${d.amtMin}~${d.amtMax}${typeof dosageUnit !== 'undefined' ? dosageUnit : ''}`;
+    setStatus(`용법용량 범위가 거꾸로입니다 — ${d.age} ${what} (앞이 뒤보다 클 수 없습니다)`, 'error');
+    return;
+  }
+
   const activeRows = currentKey === '제1장_비타민미네랄' ? getCh1ActiveRows()
                    : isMatrixMode() ? getMatrixActiveRows()
                    : ingredientRows.filter(r => r.ingr && r.dose);

@@ -175,4 +175,28 @@ window.FLOW_CASES = [
       { clearDraft: true },
     ],
   },
+  {
+    id: 'flow-range-not-reversed',
+    desc: '1회 2~1캡슐처럼 거꾸로 넣으면 자동으로 바로잡힌다',
+    steps: [
+      { pick: '캐롤비콜드연질캡슐' },
+      // 최소를 2로 올리면 최대도 따라 올라가야 한다 (2~2)
+      { setAmtMin: 2, expect: { amtRange: '2~2' } },
+      // 최대를 1로 내리면 최소도 따라 내려가야 한다 (1~1)
+      { setAmtMax: 1, expect: { amtRange: '1~1' } },
+      // 정상 범위는 그대로 둔다
+      { setAmtMax: 3, expect: { amtRange: '1~3' } },
+    ],
+  },
+  {
+    id: 'flow-added-ingr-stays-visible',
+    desc: '직접 추가한 성분은 "입력된 성분만 보기"에도 남아야 함 (인삼)',
+    steps: [
+      { pick: '캐롤비콜드연질캡슐' },
+      // 고르기만 하면 담긴다 — [추가] 버튼을 누르지 않는다
+      { addMxIngr: '인삼', expect: { visibleHas: ['인삼'] } },
+      // 다른 성분에 값을 넣어 다시 그려도 사라지면 안 된다 (원래 버그)
+      { setDoseByName: { '아세트아미노펜': 150 }, expect: { visibleHas: ['인삼'] } },
+    ],
+  },
 ];

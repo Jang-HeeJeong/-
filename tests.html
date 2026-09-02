@@ -239,6 +239,12 @@ function flowSnapshot(win) {
     product: d.getElementById('product-name').value,
     filled: filledRows.length,
     filledNames: filledRows,
+    // 표에 그려진 행들의 글자 — "입력된 성분만 보기"에 걸러졌는지 본다.
+    // (filledNames는 값이 든 성분만이라 갓 추가해 값이 없는 행은 안 잡힌다)
+    // 성분명 칸의 클래스가 장마다 달라 행 전체 글자로 본다.
+    visibleIngrs: [...d.querySelectorAll('#ch2-integrated-wrap tr, #ch1-integrated-wrap tr')]
+      .map(tr => tr.textContent.replace(/\s+/g, ' ').trim())
+      .filter(Boolean),
     excipients: [...win.eval('(selectedExcipients)')],
     ages: win.eval('(dosageRows)').map(r => r.age),
     ageUserSet: win.eval('(dosageRows)').map(r => !!r.ageUserSet),
@@ -260,6 +266,13 @@ function flowSnapshot(win) {
       ?.querySelector('.res-doc-body')?.innerText ?? '',
     doseText: [...d.querySelectorAll('#results-body .res-doc')].find(x => /용법용량/.test(x.textContent))
       ?.querySelector('.res-doc-body')?.innerText ?? '',
+    // 용법용량 행 — 범위가 거꾸로 들었는지 본다
+    dosageRows: win.eval(`(function(){
+      try { return dosageRows.map(function(r){
+        return { age:r.age, freqMin:r.freqMin, freqMax:r.freqMax,
+                 amtMin:r.amtMin, amtMax:r.amtMax };
+      }); } catch(e) { return []; }
+    })()`),
     // 하단 판정 문구 — 용법용량이 기본값일 때 "부적합"이라 단정하면 안 된다
     statusText: d.getElementById('live-summary')?.textContent.replace(/\s+/g, ' ').trim() ?? '',
     // 임시저장에 담긴 성분 수 (0이면 안 담긴 것)
@@ -336,6 +349,26 @@ function flowStep(win, step) {
     else { cb.dispatchEvent(new win.Event('change', { bubbles: true })); }
   } else if (step.clearDraft) {
     win.eval("try { localStorage.removeItem('표제기_임시저장'); } catch (e) {}");
+  } else if (step.setAmtMin != null || step.setAmtMax != null) {
+    const isMin = step.setAmtMin != null;
+    // 장을 갈아끼워도 이전 장의 입력칸이 화면에 남아 있을 수 있다.
+    // 쉼표 선택자는 문서 순서로 먼저 나오는 것을 잡으므로, 지금 장의 것을
+    // 먼저 찾고 없을 때만 다른 장으로 넘어간다.
+    const pick2 = isMin ? '.js-ch2-amt-min' : '.js-ch2-amt-max';
+    const pick1 = isMin ? '.js-ch1-amt-min' : '.js-ch1-amt-max';
+    const sel = d.querySelector(pick2) || d.querySelector(pick1);
+    if (!sel) throw new Error('1회량 드롭다운 없음');
+    sel.value = String(isMin ? step.setAmtMin : step.setAmtMax);
+    sel.dispatchEvent(new win.Event('change', { bubbles: true }));
+  } else if (step.addMxIngr != null) {
+    // 성분 추가 패널에서 고르기만 한다 ([추가] 버튼은 없앴다)
+    win.openCh2AddIngrPanel();
+    const sel = d.getElementById('ch2-add-ingr-select');
+    if (!sel) throw new Error('성분 추가 목록 없음');
+    const opt = [...sel.options].find(o => o.textContent.includes(step.addMxIngr));
+    if (!opt) throw new Error('목록에 없는 성분: ' + step.addMxIngr);
+    sel.value = opt.value;
+    sel.dispatchEvent(new win.Event('change', { bubbles: true }));
   } else if (step.flushDraft) {
     // 임시저장은 입력이 멈춘 뒤 한 번 담긴다. 시험에서는 기다리지 않고
     // 바로 담게 해서 저장되는 내용만 확인한다.
@@ -377,6 +410,15 @@ function flowCheck(expect, snap) {
         if (got !== want2)
           diffs.push({ path: `분량 ${num}번`, was: want2, now: got });
       }
+    } else if (k === 'visibleHas') {
+      for (const nm of want) {
+        if (!snap.visibleIngrs.some(v => v.includes(nm)))
+          diffs.push({ path: '화면에 보임: ' + nm, was: '보여야 함', now: '안 보임' });
+      }
+    } else if (k === 'amtRange') {
+      const r = snap.dosageRows?.[0];
+      const got = r ? `${r.amtMin}~${r.amtMax}` : '(행 없음)';
+      if (got !== want) diffs.push({ path: '1회량 범위', was: want, now: got });
     } else if (k === 'statusHas') {
       if (!snap.statusText.includes(want))
         diffs.push({ path: '하단 문구', was: '…' + want + '…', now: snap.statusText || '(빈칸)' });
@@ -550,7 +592,7 @@ async function main() {
     }
     const label = f.steps.map(st =>
       st.pick ?? st.setChapter?.split('_')[0]
-      ?? (st.setDose ? '배합량 입력' : st.setDoseByName ? '배합량 지정' : st.setAmt ? '1회량 변경' : st.runValidation ? '검토 실행' : st.restore ? '저장제품' : '연령선택')
+      ?? (st.setDose ? '배합량 입력' : st.setDoseByName ? '배합량 지정' : st.setAmt ? '1회량 변경' : st.setAmtMin != null ? '1회량 최소' : st.setAmtMax != null ? '1회량 최대' : st.addMxIngr ? '성분 추가' : st.clearDraft ? '임시저장 비움' : st.flushDraft ? '임시저장 담기' : st.runValidation ? '검토 실행' : st.restore ? '저장제품' : '연령선택')
     ).join(' → ');
     if (errMsg)      { results.err++;  renderCase(s4, 'err',  f.id, f.desc, null, errMsg); }
     else if (diffs.length) { results.fail++; renderCase(s4, 'fail', f.id, `${f.desc}  [${label}]`, diffs); }

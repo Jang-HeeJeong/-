@@ -2200,8 +2200,10 @@ function renderCh1Integrated() {
 
   const shownRows    = ch1Rows.filter(r => r.isShown);
   const filledCount  = shownRows.filter(ch1RowHasDose).length;
-  // 못 쓰는 값이 든 행은 "입력된 성분만 보기"에도 반드시 남긴다 — 안 보이면 고칠 수 없다
-  const keepVisible  = r => ch1RowHasDose(r) || ch1RowHasBadDose(r);
+  // 못 쓰는 값이 든 행은 "입력된 성분만 보기"에도 반드시 남긴다 — 안 보이면 고칠 수 없다.
+  // 작업자가 직접 추가한 성분(isMain이 아닌 것)도 값이 없어도 남긴다 —
+  // 추가하자마자 사라지면 추가가 안 된 줄 알게 된다.
+  const keepVisible  = r => ch1RowHasDose(r) || ch1RowHasBadDose(r) || r.isMain === false;
   // "입력된 성분만 보기"가 켜져 있으면 배합량이 있는 행만 (없으면 전체 유지)
   const visibleRows  = (ch1OnlyFilled && filledCount)
     ? shownRows.filter(keepVisible)
@@ -3257,8 +3259,13 @@ function renderCh2Integrated() {
   const ss = 'padding:4px 5px;font-size:13px;font-family:inherit;';
   const shownRows   = matrixRows.filter(r => r.isMain || r.isShown);
   const filledCount = shownRows.filter(mxRowHasDose).length;
+  /* "입력된 성분만 보기"가 켜져 있어도, 작업자가 방금 직접 추가한 성분은
+     남겨 둔다. 추가했다는 것 자체가 "이제 값을 넣겠다"는 뜻인데,
+     값이 없다고 걸러 버리면 추가한 성분이 화면에서 사라져 버린다.
+     (표에 원래 있던 행 isMain은 값이 없으면 종전대로 접힌다) */
+  const userAdded = r => r.isCustom || (r.isShown && !r.isMain);
   const visibleRows = (mxOnlyFilled && filledCount)
-    ? shownRows.filter(r => mxRowHasDose(r) || mxRowHasBadDose(r))
+    ? shownRows.filter(r => mxRowHasDose(r) || mxRowHasBadDose(r) || userAdded(r))
     : shownRows;
   // 표제기 기준 1회 최소/최대 열: 해당 장에 1회 기준값이 있을 때만 표시
   const hasStd1dose = visibleRows.some(r => r.std.min1 != null || r.std.max1 != null);
@@ -3508,10 +3515,10 @@ function renderCh2Integrated() {
   html += `<div id="ch2-add-ingr-panel" style="display:none;margin-top:5px;padding:8px;background:var(--paper);border-radius:4px;border:1px solid var(--hairline);">`;
   html += `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">`;
   html += `<span style="font-size:12px;color:#555;white-space:nowrap;">성분 선택:</span>`;
-  html += `<select id="ch2-add-ingr-select" style="flex:1;min-width:200px;padding:4px 6px;font-size:12px;border:1px solid var(--hairline);border-radius:4px;"><option value="">-- 선택 --</option></select>`;
-  html += `<button class="btn btn-add" onclick="confirmCh2IngrAdd()" style="font-size:12px;padding:4px 10px;">추가</button>`;
-  html += `<button class="btn" onclick="$('ch2-add-ingr-panel').style.display='none'" style="font-size:12px;padding:4px 10px;background:#999;color:#fff;">취소</button>`;
-  html += `</div></div>`;
+  // 고르면 바로 담긴다 — 따로 [추가]를 누르지 않는다
+  html += `<select id="ch2-add-ingr-select" onchange="confirmCh2IngrAdd()" style="flex:1;min-width:200px;padding:4px 6px;font-size:12px;border:1px solid var(--hairline);border-radius:4px;"><option value="">-- 선택 --</option></select>`;
+  html += `<button class="btn" onclick="$('ch2-add-ingr-panel').style.display='none'" style="font-size:12px;padding:4px 10px;background:#999;color:#fff;">닫기</button>`;
+  html += `</div><div id="ch2-add-ingr-msg" style="font-size:11.5px;color:var(--ok,#2f6b45);margin-top:5px;min-height:15px;"></div></div>`;
 
   wrap.innerHTML = html;
   syncStickyHeaders(wrap);
@@ -3531,26 +3538,32 @@ function renderCh2Integrated() {
     renderCh2Integrated();
   }));
   // 복용 횟수/용량 변경 → 해당 블록 함량만 재계산
-  wrap.querySelectorAll('.js-ch2-freq-min').forEach(el => el.addEventListener('change', e => {
-    clearDoseDefaultFlag();
-    const dr = dosageRows.find(r => r.id === +e.target.dataset.id);
-    if (dr) { dr.freqMin = parseInt(e.target.value)||1; updateCh2BlockAmts(dr.id); }
-  }));
-  wrap.querySelectorAll('.js-ch2-freq-max').forEach(el => el.addEventListener('change', e => {
-    clearDoseDefaultFlag();
-    const dr = dosageRows.find(r => r.id === +e.target.dataset.id);
-    if (dr) { dr.freqMax = parseInt(e.target.value)||1; updateCh2BlockAmts(dr.id); }
-  }));
-  wrap.querySelectorAll('.js-ch2-amt-min').forEach(el => el.addEventListener('change', e => {
-    clearDoseDefaultFlag();
-    const dr = dosageRows.find(r => r.id === +e.target.dataset.id);
-    if (dr) { dr.amtMin = parseInt(e.target.value)||1; updateCh2BlockAmts(dr.id); }
-  }));
-  wrap.querySelectorAll('.js-ch2-amt-max').forEach(el => el.addEventListener('change', e => {
-    clearDoseDefaultFlag();
-    const dr = dosageRows.find(r => r.id === +e.target.dataset.id);
-    if (dr) { dr.amtMax = parseInt(e.target.value)||1; updateCh2BlockAmts(dr.id); }
-  }));
+  /* 범위(1회 n~m)는 앞이 뒤보다 클 수 없다.
+     "1회 2~1캡슐"처럼 거꾸로 넣으면 최대·최소 기준이 뒤바뀌어
+     엉뚱하게 적합으로 나오던 문제가 있었다.
+     앞을 올리면 뒤를 같이 올리고, 뒤를 내리면 앞을 같이 내린다. */
+  const bindRange = (minSel, maxSel, minKey, maxKey) => {
+    wrap.querySelectorAll(minSel).forEach(el => el.addEventListener('change', e => {
+      clearDoseDefaultFlag();
+      const dr = dosageRows.find(r => r.id === +e.target.dataset.id);
+      if (!dr) return;
+      dr[minKey] = parseInt(e.target.value) || 1;
+      if (dr[maxKey] < dr[minKey]) dr[maxKey] = dr[minKey];   // 뒤를 같이 올린다
+      renderDosageRows();
+      updateCh2BlockAmts(dr.id);
+    }));
+    wrap.querySelectorAll(maxSel).forEach(el => el.addEventListener('change', e => {
+      clearDoseDefaultFlag();
+      const dr = dosageRows.find(r => r.id === +e.target.dataset.id);
+      if (!dr) return;
+      dr[maxKey] = parseInt(e.target.value) || 1;
+      if (dr[minKey] > dr[maxKey]) dr[minKey] = dr[maxKey];   // 앞을 같이 내린다
+      renderDosageRows();
+      updateCh2BlockAmts(dr.id);
+    }));
+  };
+  bindRange('.js-ch2-freq-min', '.js-ch2-freq-max', 'freqMin', 'freqMax');
+  bindRange('.js-ch2-amt-min',  '.js-ch2-amt-max',  'amtMin',  'amtMax');
   // 단위당 함량 입력 → 모든 블록 제품함량 실시간 갱신 (포커스 유지, DOM 최소 업데이트)
   wrap.querySelectorAll('.mx-dose-input').forEach(el => el.addEventListener('input', e => {
     const row = matrixRows.find(r => r.id === +e.target.dataset.id);
@@ -3713,14 +3726,29 @@ function confirmCh2IngrAdd() {
   if (!sel) return;
   const val = sel.value;
   if (!val) return;
+  let added = '';
   if (val === 'custom') {
     matrixRows.push({ id: ++mxRowIdSeq, gubun: '추가성분', ingr: '', unit: 'mg',
       std: {min1:null,max1:null,min1d:null,max1d:null}, dose:'', isCustom:true, isMain:false, isShown:true });
+    added = '직접 입력 행';
   } else {
     const row = matrixRows.find(r => r.id === +val);
-    if (row) row.isShown = true;
+    if (row) { row.isShown = true; added = row.ingr; }
   }
   renderCh2Integrated();
+  // 여러 성분을 이어서 담을 수 있게 패널을 열어 둔 채 목록만 새로 고친다
+  if (added) {
+    openCh2AddIngrPanel();
+    const msg = $('ch2-add-ingr-msg');
+    if (msg) msg.textContent = `${added} 추가됨 — 아래 표에서 배합량을 넣어 주세요`;
+    // 방금 담은 행으로 옮겨 준다 (표가 길면 어디 생겼는지 못 찾는다)
+    setTimeout(() => {
+      const tr = [...document.querySelectorAll('#ch2-integrated-wrap tr')]
+        .find(t => t.textContent.includes(added));
+      const inp = tr?.querySelector('.mx-dose-input, .mx-ingr-input');
+      if (inp) { inp.scrollIntoView({ block: 'center' }); inp.focus(); }
+    }, 30);
+  }
 }
 
 // ── ch1 성분 추가 패널 ──────────────────────────────────────────────
