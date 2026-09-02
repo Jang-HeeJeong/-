@@ -3606,30 +3606,45 @@ function computeCh7KindsAmtsStatus(allVpairs, form, activeRows) {
   const overFail  = r => r.ok === false && /최대/.test(r.reason || '');
   const underFail = r => r.ok === false && /최소|미달|하한/.test(r.reason || '');
 
+  /* 조항 번호는 원문을 따른다. 원문 1)은 세 가지를 한 조항에 담고 있다 —
+     배합가능 종류 · 트로키제 △표시 · 9항은 트로키제만.
+     예전 데이터는 이걸 1·2·3번으로 쪼개 놓아 그 뒤 번호가 전부 밀려 있었다. */
   const kindsSt = [
-    // 1) 배합가능한 유효성분의 종류는 <표1>에 기재된 것
-    notFound.length ? NO(notFound.map(r => `${r.ingr}: 표1에 없음`).join('; ')) : YES(),
-    // 2) 트로키제에 배합할 수 있는 것은 △표시를 한 것에 한한다
-    //    데이터에 △ 표시 열이 없어 판정할 수 없다
-    !isTroki ? NA : HOLD,
-    // 3) 9항 성분은 트로키제 이외의 제제에 배합 불가 — 검증기가 성분별로 본다
-    !n9 ? NA
-      : (H.anyFail(r => /9항/.test(r.gubun || '') && r.ok === false && /트로키/.test(r.reason || ''))
-          ? NO('9항 성분은 트로키제에만 배합 가능') : YES()),
-    // 4) 1항·2항·3항·가란 중 1종은 반드시 배합
+    // 1) 배합가능한 종류는 <표1> / 트로키제는 △표시한 것만 / 9항은 트로키제에만
+    (() => {
+      const bad = [];
+      if (notFound.length) bad.push(notFound.map(r => `${r.ingr}: 표1에 없음`).join('; '));
+      if (n9 && H.anyFail(r => /9항/.test(r.gubun || '') && r.ok === false && /트로키/.test(r.reason || '')))
+        bad.push('9항 성분은 트로키제에만 배합 가능');
+      /* 트로키제에는 표1에서 △ 표시된 성분만 배합할 수 있다.
+         표1의 성분명 앞에 △가 붙어 있어 그것으로 가린다
+         (예: "△구아이페네신"). 트로키제가 아니면 볼 것이 없다. */
+      if (isTroki) {
+        const noTri = rows.filter(r => {
+          const e = eOf(r);
+          return e && !String(e['성분명']).includes('△');
+        });
+        if (noTri.length)
+          bad.push('트로키제에 배합할 수 없는 성분: '
+                   + noTri.map(r => r.ingr.replace(/^△/, '')).join(', ')
+                   + ' (표1에서 △ 표시된 성분만 가능)');
+      }
+      return bad.length ? NO(bad.join('; ')) : YES();
+    })(),
+    // 2) 1항·2항·3항·가란 중 1종은 반드시 배합
     (n1 + n2 + n3 + ga.length) >= 1 ? YES() : NO('1항·2항·3항·가란 성분이 하나도 없음'),
-    // 5) 8항은 1항 또는 7항을 함유하는 제제에만 배합 가능
+    // 3) 8항은 1항 또는 7항을 함유하는 제제에만 배합 가능
     !n8 ? NA
       : ((n1 + n7) >= 1 ? YES() : NO('8항(카페인류)은 1항 또는 7항과 함께만 배합 가능')),
-    // 6) 1항~9항은 동일항 내에서 1종
+    // 4) 1항~9항은 동일항 내에서 1종
     over1.length ? NO(over1.map(([h, c]) => `${h} ${c}종 — 각 1종만`).join('; ')) : YES(),
-    // 7) 나란·다란은 동일란 내에서 5종까지
+    // 5) 나란·다란은 동일란 내에서 5종까지
     (naL.length + da.length) === 0 ? NA
       : (naL.length > 5 || da.length > 5
           ? NO([naL.length > 5 ? `나란 ${naL.length}종` : '', da.length > 5 ? `다란 ${da.length}종` : '']
                 .filter(Boolean).join('; ') + ' — 각 5종까지')
           : YES()),
-    // 8) 가란은 2항·4항과 배합 불가 — 검증기가 이미 본다
+    // 6) 가란은 2항·4항과 배합 불가 — 검증기가 이미 본다
     !ga.length ? NA
       : (H.isOk('가란(마황)×2항/4항 배합금지') ? YES() : NO(H.reasonOf('가란(마황)×2항/4항 배합금지'))),
   ];

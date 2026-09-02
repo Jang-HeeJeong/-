@@ -196,9 +196,16 @@ function runRuleStatusCase(win, scope, c) {
   const tabs = scope.DB[c.chapter]?.['표'];
   if (!tabs) throw new Error('DB에 ' + c.chapter + ' 없음');
   const t1e = tabs['표1_유효성분'] ?? [];
-  const rows = c.gubuns.map((g, i) => {
-    const e = t1e.find(x => (x['구분'] ?? '').startsWith(g));
-    if (!e) throw new Error('구분을 표1에서 못 찾음: ' + g);
+  // 구분으로 대표 성분을 뽑거나(gubuns), 성분명을 직접 지정한다(ingrs).
+  // △ 표시처럼 성분 하나를 콕 집어야 하는 규칙은 ingrs로 쓴다.
+  const picks = c.ingrs
+    ? c.ingrs.map(nm => ({ by: 'ingr', v: nm }))
+    : c.gubuns.map(g => ({ by: 'gubun', v: g }));
+  const rows = picks.map((p, i) => {
+    const e = p.by === 'ingr'
+      ? t1e.find(x => x['성분명'] === p.v)
+      : t1e.find(x => (x['구분'] ?? '').startsWith(p.v));
+    if (!e) throw new Error('표1에서 못 찾음: ' + p.v);
     const max = typeof e['1일최대분량_mg'] === 'number' ? e['1일최대분량_mg'] : 90;
     return { id: i + 1, ingr: e['성분명'], gubun: e['구분'],
              dose: String(+(max * 0.8 / 3).toFixed(4)), unit: 'mg' };

@@ -11,8 +11,10 @@
 import io, os, re, json, sys
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 현행 원문 — 개정될 때마다 이 줄을 새 파일로 바꾼다.
+# (옛 원문은 참고자료에 그대로 남겨 두어 개정대조에 쓴다)
 ORIG = os.path.join(BASE, '참고자료',
-                    '[별표 1] 의약품의 표준제조기준(제3조 관련)(의약품 표준제조기준).txt')
+                    '「의약품 표준제조기준」 전문 (제2026-57호, 2026. 8. 6.).txt')
 DATA = os.path.join(BASE, 'app', '표제기_데이터.js')
 OUT  = os.path.join(BASE, '도구', '원문대조_결과.txt')
 
