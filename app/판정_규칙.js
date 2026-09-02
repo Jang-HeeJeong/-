@@ -770,6 +770,22 @@ function parseCh9CoeffStr(s) {
 
 /* ══════════ 3) 장별 검증 ══════════ */
 
+/* 배합량이 숫자가 아니면(빈칸·오타·문자) 판정하지 않는다.
+   화면에는 이런 값을 막는 차단막이 있지만, 검증 함수 자체가
+   "적합"을 돌려주면 그 막을 우회하는 경로가 생겼을 때
+   허가 서류에 근거 없는 적합이 실린다. 여기서 한 번 더 막는다. */
+function _doseUnusable(row) {
+  const v = row.dose;
+  if (v === '' || v == null) return true;
+  const n = +v;
+  return !Number.isFinite(n) || n < 0;
+}
+function _unusableResult(base, unit) {
+  return { ...base, dose1: null, dailyMin: null, dailyMax: null,
+           critMin: null, critMax: null, unit: unit || 'mg',
+           ok: null, reason: '배합량이 숫자가 아니어서 판정할 수 없음' };
+}
+
 function validateChapter1(tables, form, ageGroup, rows, dosage) {
   const table1    = tables['표1_비타민'] ?? [];
   const table2    = tables['표2_미네랄'] ?? [];
@@ -785,6 +801,7 @@ function validateChapter1(tables, form, ageGroup, rows, dosage) {
   const ageMinMonths = DYNAMIC_AGE_MIN_MONTHS[ageGroup] ?? CH1_AGE_MIN_MONTHS[ageGroup] ?? 999;
 
   const itemResults = rows.filter(r => r.ingr).map(row => {
+    if (_doseUnusable(row)) return _unusableResult({ ingr: row.ingr, gubun: row.gubun }, row.unit);
     const vitRow = findVitaminRow(table1, row.ingr);
     if (vitRow) return checkVitamin(row, vitRow, coeff, dosage, ageMinMonths);
     const minRow = findMineralRow(table2, row.ingr);
@@ -853,6 +870,7 @@ function validateChapter2(tables, form, ageGroup, rows, dosage) {
 
   // ── 개별 성분 분량 검증 ──
   const itemResults = rows.filter(r => r.ingr).map(row => {
+    if (_doseUnusable(row)) return _unusableResult({ ingr: row.ingr, gubun: row.gubun }, row.unit);
     const dose1     = parseFloat(row.dose);
     const dose1dose = +(dose1 * amtMax).toFixed(4);   // 1회 투여 배합량
     const dose1d    = +(dose1dose * freq).toFixed(4); // 1일 배합량
@@ -1006,6 +1024,7 @@ function validateChapter3(tables, form, ageGroup, rows, dosage) {
 
   const itemResults = rows.filter(r=>r.ingr).map(row => {
     const base = { ingr:row.ingr, gubun:row.gubun };
+    if (_doseUnusable(row)) return _unusableResult(base, row.unit);
 
     const eRef = table1e.find(t=>t['성분명']===row.ingr);
     if (eRef) {
@@ -1080,6 +1099,7 @@ function validateChapter7(tables, form, ageGroup, rows, dosage) {
 
   const itemResults = rows.filter(r=>r.ingr).map(row => {
     const base = { ingr:row.ingr, gubun:row.gubun };
+    if (_doseUnusable(row)) return _unusableResult(base, row.unit);
 
     const eRef = table1e.find(t=>t['성분명']===row.ingr);
     if (eRef) {
@@ -1201,6 +1221,7 @@ function validateChapter9(tables, form, ageGroup, rows, dosage) {
 
   const itemResults = rows.filter(r=>r.ingr).map(row => {
     const base = { ingr:row.ingr, gubun:row.gubun };
+    if (_doseUnusable(row)) return _unusableResult(base, row.unit);
 
     const eRef = table1e.find(t=>t['성분명']===row.ingr);
     if (eRef) {
@@ -3449,6 +3470,219 @@ function computeCh3KindsAmtsStatus(allVpairs, form, activeRows) {
   return { kindsSt, amtsSt };
 }
 
+/* 조항별 판정에서 되풀이되는 부분 — 제3·7·9장이 함께 쓴다 */
+function _ruleStatusHelpers(allVpairs, chapterKey, form) {
+  const v0    = allVpairs[0].v;
+  const rules = v0.ruleErrors || [];
+  return {
+    v0,
+    ir0:      v0.itemResults || [],
+    isOk:     key => !rules.some(r => r.key === key && r.ok === false),
+    reasonOf: key => (rules.find(r => r.key === key) || {}).reason || '',
+    // 어느 연령에서든 한 번이라도 걸리면 부적합으로 본다 (가장 엄격한 쪽)
+    anyFail:  pred => allVpairs.some(({ v }) => (v.itemResults||[]).some(pred)),
+    failNames: pred => {
+      const out = [];
+      allVpairs.forEach(({ dr, v }) => {
+        const al = displayAgeLabel(dr.age, chapterKey, form) || dr.age;
+        (v.itemResults||[]).filter(pred).forEach(r => out.push(`${r.ingr}(${al}): ${r.reason}`));
+      });
+      return [...new Set(out)].join('; ');
+    },
+  };
+}
+
+/* ══════════ 제7장(진해거담제) 조항별 적합여부 ══════════
+   상태 넷은 제3장과 같다 — 적합 / 부적합 / 해당없음(/) / 판정보류(—).
+   매핑하지 않은 조항은 자동으로 판정보류가 된다. */
+function computeCh7KindsAmtsStatus(allVpairs, form, activeRows) {
+  const NA   = { ok: null, na: true,  reason: '' };
+  const HOLD = { ok: null, na: false, reason: '' };
+  const YES  = () => ({ ok: true,  na: false, reason: '' });
+  const NO   = r => ({ ok: false, na: false, reason: r });
+  if (!allVpairs.length) return { kindsSt: [], amtsSt: [] };
+
+  const H = _ruleStatusHelpers(allVpairs, '제7장_진해거담제', form);
+  const tables = DB['제7장_진해거담제']?.['표'] ?? {};
+  const t1e = tables['표1_유효성분'] ?? [];
+  const t1h = tables['표1_생약'] ?? [];
+  const rows = activeRows.filter(r => r.ingr);
+
+  const eOf = r => t1e.find(t => t['성분명'] === r.ingr);
+  const hOf = r => t1h.find(t => t['성분명'] === r.ingr);
+  const inH = pfx => rows.filter(r => (eOf(r)?.['구분'] ?? '').startsWith(pfx));
+  const inLan = lan => rows.filter(r => (hOf(r)?.['구분'] ?? '') === lan);
+  const isTroki = /트로키/.test(form || '');
+
+  const ga = inLan('가란'), naL = inLan('나란'), da = inLan('다란');
+  const n1 = inH('1항').length, n2 = inH('2항').length, n3 = inH('3항').length;
+  const n4 = inH('4항').length, n7 = inH('7항').length, n8 = inH('8항').length;
+  const n9 = inH('9항').length, n10 = inH('10항').length;
+  const notFound = H.ir0.filter(r => r.ok === null);
+
+  // 6) 1항~9항은 동일항 내에서 1종
+  const hangs = ['1항','2항','3항','4항','5항','6항','7항','8항','9항'];
+  const over1 = hangs.map(h => [h, inH(h).length]).filter(([, c]) => c > 1);
+
+  const overFail  = r => r.ok === false && /최대/.test(r.reason || '');
+  const underFail = r => r.ok === false && /최소|미달|하한/.test(r.reason || '');
+
+  const kindsSt = [
+    // 1) 배합가능한 유효성분의 종류는 <표1>에 기재된 것
+    notFound.length ? NO(notFound.map(r => `${r.ingr}: 표1에 없음`).join('; ')) : YES(),
+    // 2) 트로키제에 배합할 수 있는 것은 △표시를 한 것에 한한다
+    //    데이터에 △ 표시 열이 없어 판정할 수 없다
+    !isTroki ? NA : HOLD,
+    // 3) 9항 성분은 트로키제 이외의 제제에 배합 불가 — 검증기가 성분별로 본다
+    !n9 ? NA
+      : (H.anyFail(r => /9항/.test(r.gubun || '') && r.ok === false && /트로키/.test(r.reason || ''))
+          ? NO('9항 성분은 트로키제에만 배합 가능') : YES()),
+    // 4) 1항·2항·3항·가란 중 1종은 반드시 배합
+    (n1 + n2 + n3 + ga.length) >= 1 ? YES() : NO('1항·2항·3항·가란 성분이 하나도 없음'),
+    // 5) 8항은 1항 또는 7항을 함유하는 제제에만 배합 가능
+    !n8 ? NA
+      : ((n1 + n7) >= 1 ? YES() : NO('8항(카페인류)은 1항 또는 7항과 함께만 배합 가능')),
+    // 6) 1항~9항은 동일항 내에서 1종
+    over1.length ? NO(over1.map(([h, c]) => `${h} ${c}종 — 각 1종만`).join('; ')) : YES(),
+    // 7) 나란·다란은 동일란 내에서 5종까지
+    (naL.length + da.length) === 0 ? NA
+      : (naL.length > 5 || da.length > 5
+          ? NO([naL.length > 5 ? `나란 ${naL.length}종` : '', da.length > 5 ? `다란 ${da.length}종` : '']
+                .filter(Boolean).join('; ') + ' — 각 5종까지')
+          : YES()),
+    // 8) 가란은 2항·4항과 배합 불가 — 검증기가 이미 본다
+    !ga.length ? NA
+      : (H.isOk('가란(마황)×2항/4항 배합금지') ? YES() : NO(H.reasonOf('가란(마황)×2항/4항 배합금지'))),
+  ];
+
+  const amtsSt = [
+    // 1) 각 유효성분의 1회·1일 최대분량은 <표1>의 양
+    H.anyFail(overFail) ? NO(H.failNames(overFail)) : YES(),
+    // 2) 2항+4항, 또는 가란·나란 2종 이상일 때 비례합 ≤ 1
+    //    지금 검증기는 제7장의 비례합을 계산하지 않는다
+    ((n2 && n4) || (ga.length + naL.length) >= 2) ? HOLD : NA,
+    // 3) 하한은 1회·1일 최대분량의 1/2 (8항은 1/5)
+    H.anyFail(underFail) ? NO(H.failNames(underFail)) : YES(),
+    // 4) 2항으로 기침·천식·가래 효능을 내는 경우 4항의 하한은 1/5
+    //    "무엇으로 효능을 내는지"는 프로그램이 단정할 수 없다
+    (n2 && n4) ? HOLD : NA,
+    // 5) 생약의 하한은 1일 최대분량의 1/10 (생약 효능을 내면 1/2)
+    (ga.length + naL.length + da.length) === 0 ? NA : (() => {
+      const p = r => r.ok === false && /1\/10|1\/2/.test(r.reason || '');
+      return H.anyFail(p) ? NO(H.failNames(p)) : YES();
+    })(),
+    // 6) 9항 성분을 배합한 트로키제에 소아 용법이 있으면 계수와 무관하게 성인과 동일
+    !(isTroki && n9) ? NA : HOLD,
+    // 7) 1일 5~6회 복용 트로키제의 하한은 1일 최대분량의 1/2
+    !isTroki ? NA
+      : (allVpairs.some(({ dr }) => (dr.freqMax ?? 0) >= 5) ? HOLD : NA),
+    // 8) 10항 성분의 하한은 1일 최대분량의 1/5
+    !n10 ? NA : (() => {
+      const p = r => /10항/.test(r.gubun || '') && underFail(r);
+      return H.anyFail(p) ? NO(H.failNames(p)) : YES();
+    })(),
+  ];
+
+  return { kindsSt, amtsSt };
+}
+
+/* ══════════ 제9장(비염용 경구제) 조항별 적합여부 ══════════ */
+function computeCh9KindsAmtsStatus(allVpairs, form, activeRows) {
+  const NA   = { ok: null, na: true,  reason: '' };
+  const HOLD = { ok: null, na: false, reason: '' };
+  const YES  = () => ({ ok: true,  na: false, reason: '' });
+  const NO   = r => ({ ok: false, na: false, reason: r });
+  if (!allVpairs.length) return { kindsSt: [], amtsSt: [] };
+
+  const H = _ruleStatusHelpers(allVpairs, '제9장_비염용경구제', form);
+  const tables = DB['제9장_비염용경구제']?.['표'] ?? {};
+  const t1e = tables['표1_유효성분'] ?? [];
+  const t1h = tables['표1_생약'] ?? [];
+  const rows = activeRows.filter(r => r.ingr);
+
+  const eOf = r => t1e.find(t => t['성분명'] === r.ingr);
+  const hOf = r => t1h.find(t => t['성분명'] === r.ingr);
+  const inH = pfx => rows.filter(r => (eOf(r)?.['구분'] ?? '').startsWith(pfx));
+  const has6 = rows.some(r => (hOf(r)?.['구분'] ?? '') === 'Ⅵ란');
+
+  const n1 = inH('Ⅰ란').length, n12 = inH('Ⅰ란 2항').length;
+  const n21 = inH('Ⅱ란 1항').length, n22 = inH('Ⅱ란 2항').length;
+  const n3 = inH('Ⅲ란').length, n4 = inH('Ⅳ란').length;
+  const n42 = inH('Ⅳ란 2항').length, n5 = inH('Ⅴ란').length;
+  const notFound = H.ir0.filter(r => r.ok === null);
+
+  const overFail  = r => r.ok === false && /최대/.test(r.reason || '');
+  const underFail = r => r.ok === false && /최소|미달|하한/.test(r.reason || '');
+
+  const kindsSt = [
+    // 1) 배합가능한 유효성분의 종류는 <표 1>에 기재된 것
+    notFound.length ? NO(notFound.map(r => `${r.ingr}: 표1에 없음`).join('; ')) : YES(),
+    // 2) 반드시 배합해야 할 유효성분은 Ⅰ란 — 검증기가 이미 본다
+    H.isOk('Ⅰ란 필수') ? YES() : NO(H.reasonOf('Ⅰ란 필수')),
+    // 3) 각란의 유효성분은 상호 배합가능 — 금지가 아니라 허용 규정이라 판정 대상이 아니다
+    NA,
+    // 4) Ⅰ·Ⅲ·Ⅳ·Ⅴ란은 동일란 내 1종
+    (() => {
+      const bad = ['Ⅰ란 1종 초과','Ⅲ란 1종 초과','Ⅳ란 1종 초과','Ⅴ란 1종 초과']
+        .filter(k => !H.isOk(k)).map(k => H.reasonOf(k));
+      return bad.length ? NO(bad.join('; ')) : YES();
+    })(),
+    // 5) Ⅱ란 1항은 2종까지·2항은 1종, dl-메틸에페드린×슈도에페드린 금지
+    !(n21 + n22) ? NA : (() => {
+      const bad = [];
+      if (n21 > 2) bad.push(`Ⅱ란 1항 ${n21}종 — 2종까지`);
+      ['Ⅱ란 2항 1종 초과','Ⅱ란 1항 배합금지']
+        .filter(k => !H.isOk(k)).forEach(k => bad.push(H.reasonOf(k)));
+      return bad.length ? NO(bad.join('; ')) : YES();
+    })(),
+    // 6) Ⅳ란 2항·Ⅵ란의 생약엑스는 원칙적으로 수성엑스
+    //    엑스의 종류는 성분명만으로 가릴 수 없다
+    (n42 + (has6 ? 1 : 0)) === 0 ? NA : HOLD,
+    // 7) Ⅰ란 2항은 경구용 액제 이외에만, 또한 Ⅵ란 생약과 배합 불가
+    !n12 ? NA : (() => {
+      const bad = ['Ⅰ란2항 액제 금지','Ⅰ란2항×Ⅵ란 배합금지']
+        .filter(k => !H.isOk(k)).map(k => H.reasonOf(k));
+      return bad.length ? NO(bad.join('; ')) : YES();
+    })(),
+  ];
+
+  // 분량 3) Ⅱ란 2종 이상일 때 합 ≤ 2 — 검증기가 prop2Result로 계산한다
+  const props = allVpairs.map(({ v }) => v.prop2Result).filter(Boolean);
+
+  const amtsSt = [
+    // 1) 1일 최대분량은 <표 1>의 양, 1회는 1/3 (내용액제는 1/6)
+    H.anyFail(overFail) ? NO(H.failNames(overFail)) : YES(),
+    // 2) Ⅱ란 1항 + Ⅴ란 배합 시 Ⅴ란의 1일 최대분량은 1/2
+    //    검증기가 Ⅴ란감소로 기준값을 이미 낮춰 잡으므로 그 기준 대비 결과를 본다
+    !(n21 && n5) ? NA : (() => {
+      const p = r => (r.gubun || '').startsWith('Ⅴ란') && overFail(r);
+      return H.anyFail(p) ? NO(H.failNames(p)) : YES();
+    })(),
+    // 3) Ⅱ란 2종 이상일 때 수치의 합 ≤ 2
+    !props.length ? NA
+      : (props.every(p => p.ok) ? YES() : NO(props.find(p => !p.ok).reason)),
+    // 4) Ⅰ란의 1일량 하한은 1/2
+    !n1 ? NA : (() => {
+      const p = r => (r.gubun || '').startsWith('Ⅰ란') && underFail(r);
+      return H.anyFail(p) ? NO(H.failNames(p)) : YES();
+    })(),
+    // 5) Ⅱ·Ⅲ·Ⅴ란의 1일량 하한은 1/5
+    (n21 + n22 + n3 + n5) === 0 ? NA : (() => {
+      const p = r => /^(Ⅱ란|Ⅲ란|Ⅴ란)/.test(r.gubun || '') && underFail(r);
+      return H.anyFail(p) ? NO(H.failNames(p)) : YES();
+    })(),
+    // 6) Ⅳ란·Ⅵ란의 1일량 하한은 1/10
+    (n4 + (has6 ? 1 : 0)) === 0 ? NA : (() => {
+      const p = r => /^(Ⅳ란|Ⅵ란)/.test(r.gubun || '') && underFail(r);
+      return H.anyFail(p) ? NO(H.failNames(p)) : YES();
+    })(),
+    // 7) 배합법·배합계수는 <표 2>를 참고한다 — 참조 안내라 판정 대상이 아니다
+    NA,
+  ];
+
+  return { kindsSt, amtsSt };
+}
+
 function generateFullWordDoc() {
   const rawProductName = ($('product-name')?.value || '').trim() || '(제품명)';
   const ch = chaptersMap[currentKey];
@@ -3885,10 +4119,17 @@ function generateFullWordDoc() {
       // 배합 규칙 체크 표 (유효성분의 종류/분량)
       const kinds3 = DB[currentKey]?.['기준']?.['유효성분의_종류'] ?? [];
       const amts3  = DB[currentKey]?.['기준']?.['유효성분의_분량'] ?? [];
-      // 조항별 적합여부 — 지금은 제3장만 계산한다. 계산기가 없는 장은
-      // 빈 배열이 되어 모든 칸이 "판정보류(—)"로 남는다 (잘못된 적합 방지).
-      const st3 = (currentKey === '제3장_감기약' && typeof computeCh3KindsAmtsStatus === 'function')
-        ? computeCh3KindsAmtsStatus(allValidations, form, activeRows)
+      // 조항별 적합여부 — 장마다 계산기가 따로 있다.
+      // 계산기가 없는 장은 빈 배열이 되어 모든 칸이 "판정보류(—)"로 남는다
+      // (근거 없는 "적합"이 나가지 않도록 일부러 이렇게 둔다).
+      const RULE_STATUS_FN = {
+        '제3장_감기약':       'computeCh3KindsAmtsStatus',
+        '제7장_진해거담제':   'computeCh7KindsAmtsStatus',
+        '제9장_비염용경구제': 'computeCh9KindsAmtsStatus',
+      };
+      const stFnName = RULE_STATUS_FN[currentKey];
+      const st3 = (stFnName && typeof window[stFnName] === 'function')
+        ? window[stFnName](allValidations, form, activeRows)
         : { kindsSt: [], amtsSt: [] };
 
       const renderCheckMx = (items, stList) => {

@@ -182,6 +182,35 @@ function runMatchCase(win, m) {
   return win.ingrMatchLevel(m.a, m.b);
 }
 
+/* 조항별 적합여부 — 표1에서 해당 구분의 대표 성분을 뽑아
+   최대분량의 80%를 넣고, 조항마다 어떤 판정이 나오는지 본다.
+   O 적합 / X 부적합 / "/" 해당없음 / "-" 판정보류 */
+const RULE_STATUS_FNS = {
+  '제3장_감기약':       ['validateChapter3', 'computeCh3KindsAmtsStatus'],
+  '제7장_진해거담제':   ['validateChapter7', 'computeCh7KindsAmtsStatus'],
+  '제9장_비염용경구제': ['validateChapter9', 'computeCh9KindsAmtsStatus'],
+};
+function runRuleStatusCase(win, scope, c) {
+  const [vFn, sFn] = RULE_STATUS_FNS[c.chapter] ?? [];
+  if (!vFn) throw new Error('계산기 없음: ' + c.chapter);
+  const tabs = scope.DB[c.chapter]?.['표'];
+  if (!tabs) throw new Error('DB에 ' + c.chapter + ' 없음');
+  const t1e = tabs['표1_유효성분'] ?? [];
+  const rows = c.gubuns.map((g, i) => {
+    const e = t1e.find(x => (x['구분'] ?? '').startsWith(g));
+    if (!e) throw new Error('구분을 표1에서 못 찾음: ' + g);
+    const max = typeof e['1일최대분량_mg'] === 'number' ? e['1일최대분량_mg'] : 90;
+    return { id: i + 1, ingr: e['성분명'], gubun: e['구분'],
+             dose: String(+(max * 0.8 / 3).toFixed(4)), unit: 'mg' };
+  });
+  const dr = { age: '만 15세 이상', freqMin: 3, freqMax: 3, amtMin: 1, amtMax: 1 };
+  const v = win[vFn](tabs, c.form, dr.age, rows,
+    { freqMin: 3, freqMax: 3, amtMin: 1, amtMax: 1, unit: 'mg' });
+  const st = win[sFn]([{ dr, v }], c.form, rows);
+  const m = x => x.na ? '/' : x.ok === true ? 'O' : x.ok === false ? 'X' : '-';
+  return { kinds: st.kindsSt.map(m).join(''), amts: st.amtsSt.map(m).join('') };
+}
+
 function runInferCase(win, c) {
   const parsed = win._parseExcelIngredients(c.ingr);
   const ranked = win.rankChaptersByIngredients(parsed);
@@ -456,6 +485,19 @@ async function main() {
     if (actual === c.expectKey) { results.pass++; renderCase(s3, 'pass', id, c.desc); }
     else { results.fail++; renderCase(s3, 'fail', id, c.desc, [{ path: '추정 장', was: c.expectKey, now: actual }]); }
   });
+
+  // 3-b) 조항별 적합여부
+  const sRS = section(`조항별 적합여부 — 워드 검토서 확인란 (${(window.RULE_STATUS_CASES ?? []).length}건)`);
+  for (const c of (window.RULE_STATUS_CASES ?? [])) {
+    let got;
+    try { got = runRuleStatusCase(win, scope, c); }
+    catch (e) { results.err++; renderCase(sRS, 'err', c.id, c.desc, null, `오류: ${e.message}`); continue; }
+    const diffs = [];
+    if (got.kinds !== c.expect.kinds) diffs.push({ path: '유효성분의 종류', was: c.expect.kinds, now: got.kinds });
+    if (got.amts  !== c.expect.amts)  diffs.push({ path: '유효성분의 분량', was: c.expect.amts,  now: got.amts });
+    if (diffs.length) { results.fail++; renderCase(sRS, 'fail', c.id, c.desc, diffs); }
+    else { results.pass++; renderCase(sRS, 'pass', c.id, c.desc); }
+  }
 
   // 4) 전환 흐름
   const s4 = section(`전환 흐름 — 제품·장 갈아끼우기 (${(window.FLOW_CASES ?? []).length}건)`);

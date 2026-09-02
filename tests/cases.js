@@ -398,6 +398,17 @@ window.TEST_CASES = [
     rows: [R('시아노코발라민', 'Ⅵ(비타민B12)', 0.1, 'μg')],
     dosage: D(3, 3, 1, 1, '캡슐'),
   },
+  /* ── 숫자가 아닌 배합량은 "적합"이 되면 안 된다 ──
+     화면 차단막을 우회하는 경로가 생겨도 판정 자체가 막아야 한다.
+     예전에는 다섯 장 모두 ok:true "적합"을 돌려줬다. */
+  { id: 'guard-nan-ch2', chapter: '제2장_해열진통제', form: '정제', age: '만 15세 이상',
+    desc: '문자 배합량 — 판정 보류(ok:null)여야 함',
+    rows: [{ ingr: '아세트아미노펜', gubun: 'Ⅰ항', dose: 'abc', unit: 'mg' }],
+    dosage: { freqMin: 3, freqMax: 3, amtMin: 1, amtMax: 1, unit: 'mg' } },
+  { id: 'guard-nan-ch3', chapter: '제3장_감기약', form: '정제', age: '만 15세 이상',
+    desc: '빈 배합량 — 판정 보류(ok:null)여야 함',
+    rows: [{ ingr: '아세트아미노펜', gubun: 'Ⅰ항', dose: '', unit: 'mg' }],
+    dosage: { freqMin: 3, freqMax: 3, amtMin: 1, amtMax: 1, unit: 'mg' } },
 ];
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -436,4 +447,26 @@ window.INFER_CASES = [
     expectKey: null,
   },
 
+];
+/* ═══ 제7·9장 조항별 적합여부 ═══
+   워드 검토서의 [유효성분의 종류]·[유효성분의 분량] 확인란에 들어가는 값.
+   기대값 기호:  O 적합   X 부적합   / 해당없음   - 판정보류
+   '-'가 보이면 조항 매핑이 빠진 것이므로 그때는 코드를 먼저 의심한다. */
+window.RULE_STATUS_CASES = [
+  { id: 'rs-ch7-normal', chapter: '제7장_진해거담제', form: '정제',
+    desc: '제7장 1항+5항 정상 배합',
+    gubuns: ['1항', '5항'],
+    expect: { kinds: 'O//O/O//', amts: 'O/O/////' } },
+  { id: 'rs-ch7-8hang-alone', chapter: '제7장_진해거담제', form: '정제',
+    desc: '제7장 8항 단독 — 필수성분 없음(4번) + 8항 단독 불가(5번) 둘 다 부적합',
+    gubuns: ['8항'],
+    expect: { kinds: 'O//XXO//', amts: 'O/O/////' } },
+  { id: 'rs-ch9-normal', chapter: '제9장_비염용경구제', form: '정제',
+    desc: '제9장 Ⅰ란1항+Ⅲ란 정상 배합',
+    gubuns: ['Ⅰ란 1항', 'Ⅲ란'],
+    expect: { kinds: 'OO/O///', amts: 'O//OO//' } },
+  { id: 'rs-ch9-no-1ran', chapter: '제9장_비염용경구제', form: '정제',
+    desc: '제9장 Ⅰ란 없음 — 필수성분 조항(2번)이 부적합이어야 함',
+    gubuns: ['Ⅲ란'],
+    expect: { kinds: 'OX/O///', amts: 'O///O//' } },
 ];

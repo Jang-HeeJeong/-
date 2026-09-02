@@ -1,17 +1,3 @@
-/* ═══════════════════════════════════════════════════════════════════
-   기준값 (baseline) — 2026-08-26 시점의 판정 결과를 고정한 것
-
-   ⚠ 이 값들은 "지금 코드가 내는 답"이지 "고시가 정한 정답"이 아닙니다.
-     처음 한 번은 담당자가 고시와 대조해 검토해 주세요.
-     이후로는 이 값이 바뀌면 = 판정이 바뀐 것이므로 원인을 확인해야 합니다.
-
-   갱신 방법
-     tests.html 하단 [기준값 새로 저장] → 출력된 내용으로 이 파일 전체를 교체
-     (표제기 개정 등으로 판정이 "의도적으로" 바뀐 경우에만)
-
-   ※ 성분명 매칭·장 추정 테스트는 tests/cases.js에 기대값이 직접 적혀 있어
-     이 파일에는 들어오지 않습니다 (스냅샷이 아니라 사람이 정한 정답이므로).
-   ═══════════════════════════════════════════════════════════════════ */
 window.EXPECTED = {
   "validation": {
     "ch1-basic-ok": {
@@ -1711,6 +1697,50 @@ window.EXPECTED = {
           "crit1Max": null,
           "unit": "mg",
           "reason": ""
+        }
+      ],
+      "sums": [],
+      "rules": [],
+      "prop": null,
+      "coeff": 1
+    },
+    "guard-nan-ch2": {
+      "items": [
+        {
+          "ingr": "아세트아미노펜",
+          "ok": null,
+          "dailyMin": null,
+          "dailyMax": null,
+          "critMin": null,
+          "critMax": null,
+          "dose1Min": null,
+          "dose1Max": null,
+          "crit1Min": null,
+          "crit1Max": null,
+          "unit": "mg",
+          "reason": "배합량이 숫자가 아니어서 판정할 수 없음"
+        }
+      ],
+      "sums": [],
+      "rules": [],
+      "prop": null,
+      "coeff": 1
+    },
+    "guard-nan-ch3": {
+      "items": [
+        {
+          "ingr": "아세트아미노펜",
+          "ok": null,
+          "dailyMin": null,
+          "dailyMax": null,
+          "critMin": null,
+          "critMax": null,
+          "dose1Min": null,
+          "dose1Max": null,
+          "crit1Min": null,
+          "crit1Max": null,
+          "unit": "mg",
+          "reason": "배합량이 숫자가 아니어서 판정할 수 없음"
         }
       ],
       "sums": [],
