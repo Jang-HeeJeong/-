@@ -1747,6 +1747,78 @@ window.EXPECTED = {
       "rules": [],
       "prop": null,
       "coeff": 1
+    },
+    "herb-basis-raw": {
+      "items": [
+        {
+          "ingr": "아세트아미노펜",
+          "ok": true,
+          "dailyMin": 1200,
+          "dailyMax": 1200,
+          "critMin": 750,
+          "critMax": 1500,
+          "dose1Min": null,
+          "dose1Max": null,
+          "crit1Min": null,
+          "crit1Max": null,
+          "unit": "mg",
+          "reason": ""
+        },
+        {
+          "ingr": "인삼",
+          "ok": true,
+          "dailyMin": 4,
+          "dailyMax": 4,
+          "critMin": null,
+          "critMax": 6,
+          "dose1Min": null,
+          "dose1Max": null,
+          "crit1Min": null,
+          "crit1Max": null,
+          "unit": "g",
+          "reason": ""
+        }
+      ],
+      "sums": [],
+      "rules": [],
+      "prop": null,
+      "coeff": 1
+    },
+    "herb-basis-powder": {
+      "items": [
+        {
+          "ingr": "아세트아미노펜",
+          "ok": true,
+          "dailyMin": 1200,
+          "dailyMax": 1200,
+          "critMin": 750,
+          "critMax": 1500,
+          "dose1Min": null,
+          "dose1Max": null,
+          "crit1Min": null,
+          "crit1Max": null,
+          "unit": "mg",
+          "reason": ""
+        },
+        {
+          "ingr": "인삼",
+          "ok": false,
+          "dailyMin": 4,
+          "dailyMax": 4,
+          "critMin": null,
+          "critMax": 3,
+          "dose1Min": null,
+          "dose1Max": null,
+          "crit1Min": null,
+          "crit1Max": null,
+          "unit": "g",
+          "reason": "1일 4 g — 기준 최대 3 g을 넘음"
+        }
+      ],
+      "sums": [],
+      "rules": [],
+      "prop": null,
+      "coeff": 1
     }
   }
 };

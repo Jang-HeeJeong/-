@@ -414,6 +414,20 @@ window.TEST_CASES = [
     desc: '빈 배합량 — 판정 보류(ok:null)여야 함',
     rows: [{ ingr: '아세트아미노펜', gubun: 'Ⅰ항', dose: '', unit: 'mg' }],
     dosage: { freqMin: 3, freqMax: 3, amtMin: 1, amtMax: 1, unit: 'mg' } },
+  /* ── 생약 기준(원생약·처방환산량 / 분말) ──
+     성분마다 1일 최대분량이 다르다. 인삼은 원생약 6 g, 분말 3 g.
+     예전에는 늘 원생약 값만 써서, 분말로 배합한 제품이 두 배까지
+     "적합"으로 통과했다. */
+  { id: 'herb-basis-raw', chapter: '제3장_감기약', form: '정제', age: '만 15세 이상',
+    desc: '생약 원생약 기준 — 인삼 1일 4 g은 6 g 이하라 적합',
+    rows: [{ ingr: '아세트아미노펜', gubun: 'Ⅰ항', dose: '400', unit: 'mg' },
+           { ingr: '인삼', gubun: '다란', dose: '1333.3333', unit: 'mg', herbBasis: '원생약' }],
+    dosage: { freqMin: 3, freqMax: 3, amtMin: 1, amtMax: 1, unit: 'mg' } },
+  { id: 'herb-basis-powder', chapter: '제3장_감기약', form: '정제', age: '만 15세 이상',
+    desc: '생약 분말 기준 — 같은 인삼 1일 4 g이 3 g을 넘어 부적합',
+    rows: [{ ingr: '아세트아미노펜', gubun: 'Ⅰ항', dose: '400', unit: 'mg' },
+           { ingr: '인삼', gubun: '다란', dose: '1333.3333', unit: 'mg', herbBasis: '분말' }],
+    dosage: { freqMin: 3, freqMax: 3, amtMin: 1, amtMax: 1, unit: 'mg' } },
 ];
 
 /* ═══════════════════════════════════════════════════════════════════

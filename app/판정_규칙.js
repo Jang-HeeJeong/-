@@ -1056,7 +1056,16 @@ function validateChapter3(tables, form, ageGroup, rows, dosage) {
       if (rawG===null) return {...base, dose1:null, dailyMin:null, dailyMax:null, critMin:null, critMax:null, unit:'g', ok:false, reason:'IU 단위는 생약에 사용 불가'};
       const dailyMin = +(rawG*amtMin*freqMin).toFixed(4);
       const dailyMax = +(rawG*amtMax*freqMax).toFixed(4);
-      const maxG     = hRef['1일최대분량_원생약_g'] ?? hRef['1일최대분량_분말_g'];
+      /* 생약은 원생약(처방환산량)으로 넣을 때와 분말로 넣을 때
+         1일 최대분량이 다르다. 어느 쪽인지는 작업자가 행마다 고르며,
+         고르지 않았으면 흔한 쪽인 원생약·처방환산량으로 본다.
+         (분말 값이 아예 없는 생약은 분말 배합이 인정되지 않는 것이므로
+          그 경우에도 원생약 값을 쓴다) */
+      const _basis   = row.herbBasis === '분말' ? '분말' : '원생약';
+      const _powder  = hRef['1일최대분량_분말_g'];
+      const maxG     = (_basis === '분말' && _powder != null)
+                     ? _powder
+                     : (hRef['1일최대분량_원생약_g'] ?? _powder);
       if (maxG==null) return {...base, dose1:+rawG.toFixed(4), dailyMin, dailyMax, critMin:null, critMax:null, unit:'g', ok:null, reason:'최대분량 없음'};
       const isLa = hRef['구분']==='라란';
       if (isLa) {
@@ -1136,7 +1145,16 @@ function validateChapter7(tables, form, ageGroup, rows, dosage) {
       if (rawG===null) return {...base, dose1:null, dailyMin:null, dailyMax:null, critMin:null, critMax:null, unit:'g', ok:false, reason:'IU 단위는 생약에 사용 불가'};
       const dailyMin = +(rawG*amtMin*freqMin).toFixed(4);
       const dailyMax = +(rawG*amtMax*freqMax).toFixed(4);
-      const maxG     = hRef['1일최대분량_원생약_g'] ?? hRef['1일최대분량_분말_g'];
+      /* 생약은 원생약(처방환산량)으로 넣을 때와 분말로 넣을 때
+         1일 최대분량이 다르다. 어느 쪽인지는 작업자가 행마다 고르며,
+         고르지 않았으면 흔한 쪽인 원생약·처방환산량으로 본다.
+         (분말 값이 아예 없는 생약은 분말 배합이 인정되지 않는 것이므로
+          그 경우에도 원생약 값을 쓴다) */
+      const _basis   = row.herbBasis === '분말' ? '분말' : '원생약';
+      const _powder  = hRef['1일최대분량_분말_g'];
+      const maxG     = (_basis === '분말' && _powder != null)
+                     ? _powder
+                     : (hRef['1일최대분량_원생약_g'] ?? _powder);
       const critMax  = maxG!=null ? +(maxG*coeff).toFixed(4) : null;
       const critMin  = critMax!=null ? +(critMax/10).toFixed(4) : null;
       const issues   = [];
@@ -1270,7 +1288,16 @@ function validateChapter9(tables, form, ageGroup, rows, dosage) {
       if (rawG===null) return {...base, dose1:null, dailyMin:null, dailyMax:null, dose1Max:null, critMin:null, critMax:null, unit:'g', ok:false, reason:'IU 단위는 생약에 사용 불가'};
       const dailyMin = +(rawG*amtMin*freqMin).toFixed(4);
       const dailyMax = +(rawG*amtMax*freqMax).toFixed(4);
-      const maxG     = hRef['1일최대분량_원생약_g'] ?? hRef['1일최대분량_분말_g'];
+      /* 생약은 원생약(처방환산량)으로 넣을 때와 분말로 넣을 때
+         1일 최대분량이 다르다. 어느 쪽인지는 작업자가 행마다 고르며,
+         고르지 않았으면 흔한 쪽인 원생약·처방환산량으로 본다.
+         (분말 값이 아예 없는 생약은 분말 배합이 인정되지 않는 것이므로
+          그 경우에도 원생약 값을 쓴다) */
+      const _basis   = row.herbBasis === '분말' ? '분말' : '원생약';
+      const _powder  = hRef['1일최대분량_분말_g'];
+      const maxG     = (_basis === '분말' && _powder != null)
+                     ? _powder
+                     : (hRef['1일최대분량_원생약_g'] ?? _powder);
       const t2row    = table2.find(t=>t['성분구분']==='Ⅵ란');
       const cp       = parseCh9CoeffStr(t2row?.['1종배합_계수']);
       const critMax  = maxG!=null ? +(maxG*coeff).toFixed(4) : null;
@@ -3176,7 +3203,7 @@ function _wordPrecautionSection(opts) {
 
   let out = '';
   out += `<p>&nbsp;</p><p>&nbsp;</p>`;
-  out += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[사용상의 주의사항] <span style="${FN}font-size:9pt;font-weight:normal;color:#555;">(해당 부분 하이라이트)</span></p>`;
+  out += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[사용상의 주의사항] <span style="${FN}font-size:9pt;font-weight:normal;color:#555;">(해당 부분 하이라이트)</span></p>`;
   out += `<table style="width:100%;border-collapse:collapse;margin-bottom:12pt;"><thead><tr>`;
   out += `<th style="${TH}width:50%;">의약품 표준제조기준</th>`;
   out += `<th style="${TH}width:50%;">${esc(productName)}</th>`;
@@ -3290,7 +3317,14 @@ function _wordDownload(productName, body, extraStyle, tail) {
   body { font-family:'맑은 고딕',Arial,sans-serif; margin:0; font-size:9pt; }
   p { margin:0; padding:1pt 0; line-height:1.4; }
   table { border-collapse:collapse; width:100%; table-layout:fixed; }
-  td, th { padding:3pt 5pt; border:1px solid #aaa; word-wrap:break-word; overflow-wrap:break-word; }
+  td, th { padding:3pt 5pt; border:1px solid #b8c4d4; word-wrap:break-word; overflow-wrap:break-word;
+           vertical-align:middle; mso-vertical-align-alt:middle; }
+  /* 표가 페이지에 걸릴 때 아무 데서나 잘리지 않게 한다 */
+  tr { page-break-inside:avoid; mso-yfti-cnfc:0; }
+  thead { display:table-header-group; }      /* 페이지가 넘어가면 머리행을 다시 그린다 */
+  table { page-break-inside:auto; }
+  /* 절 제목은 바로 아래 내용과 붙여 둔다 — 제목만 남고 표가 넘어가지 않게 */
+  p.sec-head { page-break-after:avoid; page-break-inside:avoid; }
 ${extraStyle || ''}
 </style>
 </head><body>
@@ -3724,6 +3758,49 @@ function computeCh9KindsAmtsStatus(allVpairs, form, activeRows) {
   return { kindsSt, amtsSt };
 }
 
+/* ══════════ 부적합 사유 → 표제기 원문 조항 ══════════
+   "1일 540 mg — 기준 최소 750 mg에 미달"만 보여 주면 무엇을 근거로
+   그렇게 판정했는지 알 수 없다. 해당 조항의 원문을 함께 싣는다.
+
+   ★ 짚을 수 없는 사유는 아무것도 돌려주지 않는다.
+     엉뚱한 조항을 갖다 붙이면 없느니만 못하다. */
+function _clauseForReason(chapterKey, reason, gubun) {
+  const r = String(reason || '');
+  const g = String(gubun || '');
+  const base = DB[chapterKey]?.['기준'] ?? {};
+  const pick = (sec, n) => {
+    const arr = base[sec === '종류' ? '유효성분의_종류' : '유효성분의_분량'];
+    if (!Array.isArray(arr) || !arr[n - 1]) return null;
+    return { label: `유효성분의 ${sec} ${n})`, text: arr[n - 1] };
+  };
+
+  if (chapterKey === '제3장_감기약') {
+    if (/최대.*(넘음|초과)/.test(r))            return pick('분량', 1);
+    if (/1\/10/.test(r))                        return pick('분량', 9);
+    if (/라란/.test(g) || /1\/5\s*이상/.test(r)) return pick('분량', 4);
+    if (/Ⅻ항|ⅩⅣ항/.test(g))                    return pick('분량', 7);
+    if (/ⅩⅢ항/.test(g))                        return pick('분량', 8);
+    if (/600/.test(r))                          return pick('분량', 6);
+    if (/최소|미달|하한/.test(r))               return pick('분량', 5);
+    return null;
+  }
+  if (chapterKey === '제7장_진해거담제') {
+    if (/최대.*(넘음|초과)/.test(r))  return pick('분량', 1);
+    if (/10항/.test(g))               return pick('분량', 8);
+    if (/1\/10/.test(r))              return pick('분량', 5);
+    if (/최소|미달|하한/.test(r))     return pick('분량', 3);
+    return null;
+  }
+  if (chapterKey === '제9장_비염용경구제') {
+    if (/최대.*(넘음|초과)/.test(r))     return pick('분량', 1);
+    if (/^Ⅰ란/.test(g) && /최소|미달|하한/.test(r)) return pick('분량', 4);
+    if (/^(Ⅱ란|Ⅲ란|Ⅴ란)/.test(g) && /최소|미달|하한/.test(r)) return pick('분량', 5);
+    if (/^(Ⅳ란|Ⅵ란)/.test(g) && /최소|미달|하한/.test(r)) return pick('분량', 6);
+    return null;
+  }
+  return null;
+}
+
 function generateFullWordDoc() {
   const rawProductName = ($('product-name')?.value || '').trim() || '(제품명)';
   const ch = chaptersMap[currentKey];
@@ -3792,11 +3869,11 @@ function generateFullWordDoc() {
 
     // (1-a) [원료약품 및 그 분량]
     // 7열 표를 Word 페이지 너비에 맞게: table-layout:fixed + colgroup + 소형 폰트/패딩
-    const THRAW  = `${FN}font-size:8pt;padding:3pt 4pt;${BORD}font-weight:bold;text-align:center;word-break:keep-all;vertical-align:middle;line-height:1.25;`;
-    const TH2R   = THRAW + 'background:#d6e4f5;';
-    const TH3R   = THRAW + 'background:#d9f0e0;';
-    const TDRAW  = `${FN}font-size:8.5pt;padding:3pt 4pt;${BORD}vertical-align:middle;word-break:keep-all;line-height:1.3;`;
-    body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[원료약품 및 그 분량]</p>`;
+    const THRAW  = `${FN}font-size:9pt;padding:2pt 4pt;${BORD}font-weight:bold;text-align:center;word-break:keep-all;vertical-align:middle;mso-vertical-align-alt:middle;line-height:1.15;`;
+    const TH2R   = THRAW + 'background:#d5e2f2;';
+    const TH3R   = THRAW + 'background:#daebdd;';
+    const TDRAW  = `${FN}font-size:9.5pt;padding:2pt 5pt;${BORD}vertical-align:middle;mso-vertical-align-alt:middle;word-break:keep-all;line-height:1.2;`;
+    body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[원료약품 및 그 분량]</p>`;
     {
       // 연령별로 각각 표 출력 — 연령계수로 인해 표제기 기준값(1회최대/최소, 1일최대)이
       // 연령마다 다르므로 동일 용법이더라도 병합하지 않음
@@ -3882,7 +3959,7 @@ function generateFullWordDoc() {
             body += `<td style="${TDRAW}text-align:right;background:#edfaf1;">${fmt(act1d2)}</td>`;
             body += `</tr>`;
             if (fail2 && r.reason && r.reason !== '부적합') {
-              body += `<tr style="background:#fff5f5;"><td colspan="7" style="${TDRAW}font-size:8pt;color:#c62828;padding:1pt 6pt;">↳ ${esc(r.reason)}</td></tr>`;
+              body += `<tr style="background:#fdf2f2;"><td colspan="7" style="${TDRAW}font-size:8pt;color:#c62828;padding:1pt 6pt;">↳ ${esc(r.reason)}</td></tr>`;
             }
           }
         } else {
@@ -3940,18 +4017,18 @@ function generateFullWordDoc() {
         return s;
       };
       if (kinds2.length) {
-        body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 종류]</p>`;
+        body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 종류]</p>`;
         body += renderCheckTable2(kinds2, kSt2);
       }
       if (amts2.length) {
-        body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 분량]</p>`;
+        body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 분량]</p>`;
         body += renderCheckTable2(amts2, aSt2);
       }
     }
 
     // (2) [효능효과] — plain text, no table
     body += `<p>&nbsp;</p><p>&nbsp;</p>`;
-    body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[효능효과]</p>`;
+    body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[효능효과]</p>`;
     const effDbItems2 = DB['제2장_해열진통제']?.['기준']?.['효능효과'] ?? [];
     body += `<p style="${FN}font-size:10pt;margin:0 0 4pt;">효능 및 효과의 범위는 다음 범위로 한다.</p>`;
     effDbItems2.forEach((t, i) => {
@@ -3960,7 +4037,7 @@ function generateFullWordDoc() {
     body += `<p>&nbsp;</p><p>&nbsp;</p>`;
 
     // (3) [용법용량] — 2-col table
-    body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[용법용량]</p>`;
+    body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[용법용량]</p>`;
     body += `<table style="width:100%;border-collapse:collapse;margin-bottom:14pt;"><thead><tr>`;
     body += `<th style="${TH}width:50%;">의약품 표준제조기준</th>`;
     body += `<th style="${TH}width:50%;">${esc(productName)}</th>`;
@@ -4062,16 +4139,16 @@ function generateFullWordDoc() {
 
   // ── ch3/ch7/ch9 감기약·진해거담제·비염 전용 서식 (ch2와 동일 레이아웃) ──
   if (isMatrixMode() && currentKey !== '제1장_비타민미네랄') {
-    const THRAW  = `${FN}font-size:8pt;padding:3pt 4pt;${BORD}font-weight:bold;text-align:center;word-break:keep-all;vertical-align:middle;line-height:1.25;`;
-    const TH2R   = THRAW + 'background:#d6e4f5;';
-    const TH3R   = THRAW + 'background:#d9f0e0;';
-    const TDRAW  = `${FN}font-size:8.5pt;padding:3pt 4pt;${BORD}vertical-align:middle;word-break:keep-all;line-height:1.3;`;
+    const THRAW  = `${FN}font-size:9pt;padding:2pt 4pt;${BORD}font-weight:bold;text-align:center;word-break:keep-all;vertical-align:middle;mso-vertical-align-alt:middle;line-height:1.15;`;
+    const TH2R   = THRAW + 'background:#d5e2f2;';
+    const TH3R   = THRAW + 'background:#daebdd;';
+    const TDRAW  = `${FN}font-size:9.5pt;padding:2pt 5pt;${BORD}vertical-align:middle;mso-vertical-align-alt:middle;word-break:keep-all;line-height:1.2;`;
 
     // (1) 제목 — 제품명만
     body += `<p style="${FN}font-size:16pt;font-weight:bold;color:#1a4b8c;text-align:left;margin:0 0 16pt;">${esc(productName)}</p>`;
 
     // (2) [원료약품 및 그 분량]
-    body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 4pt;">[원료약품 및 그 분량]</p>`;
+    body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 4pt;">[원료약품 및 그 분량]</p>`;
     {
       const ingrGrpsMx = allValidations.map(({ dr, v }) => ({
         dr, v, labels: [displayAgeLabel(dr.age, currentKey, currentForm) || dr.age],
@@ -4096,31 +4173,35 @@ function generateFullWordDoc() {
         if (multiGrpMx) {
           // 연령별로 기준값이 달라지는 근거(연령구분계수)와 그 연령의 용법용량을 함께 적는다
           const coefMx = _ageCoefLabel(currentKey, dr.age);
-          body += `<p style="${FN}font-size:9.5pt;font-weight:bold;color:#1a4b8c;margin:6pt 0 2pt;">▶ ${esc(ageLblMx)}`
+          body += `<p class="sec-head" style="${FN}font-size:9.5pt;font-weight:bold;color:#1a4b8c;margin:6pt 0 2pt;">▶ ${esc(ageLblMx)}`
                 + (coefMx ? `<span style="font-weight:normal;color:#555;"> · 연령구분계수 ${esc(coefMx)}</span>` : '')
                 + `<span style="font-weight:normal;color:#555;"> · ${esc(freqDispW)}, ${esc(amtDispW)}</span></p>`;
         }
         body += `<table style="width:100%;border-collapse:collapse;margin-bottom:${multiGrpMx?'8':'12'}pt;table-layout:fixed;mso-table-layout-alt:fixed;">`;
-        body += `<colgroup><col style="width:28%;mso-width-source:userset;"><col style="width:13%;mso-width-source:userset;"><col style="width:13%;mso-width-source:userset;"><col style="width:15%;mso-width-source:userset;"><col style="width:16%;mso-width-source:userset;"><col style="width:15%;mso-width-source:userset;"></colgroup>`;
+        body += `<colgroup><col style="width:9%;mso-width-source:userset;"><col style="width:31%;mso-width-source:userset;"><col style="width:11%;mso-width-source:userset;"><col style="width:11%;mso-width-source:userset;"><col style="width:13%;mso-width-source:userset;"><col style="width:13%;mso-width-source:userset;"><col style="width:12%;mso-width-source:userset;"></colgroup>`;
         body += `<thead><tr>`;
-        body += `<th colspan="3" style="${TH2R}">의약품 표준제조기준</th>`;
+        body += `<th colspan="4" style="${TH2R}">의약품 표준제조기준</th>`;
         body += `<th colspan="2" style="${TH3R}">${esc(productName)}</th>`;
-        body += `<th style="${TH2R}">적합<br>여부</th>`;
+        body += `<th style="${TH2R}" rowspan="2">적합<br>여부</th>`;
         body += `</tr><tr>`;
+        body += `<th style="${TH2R}">구분</th>`;
         body += `<th style="${TH2R}">유효성분명</th>`;
         body += `<th style="${TH2R}">1일최대<br>(mg)</th>`;
         body += `<th style="${TH2R}">1일최소<br>(mg)</th>`;
         body += `<th style="${TH3R}">1회용량<br>(mg)</th>`;
         body += `<th style="${TH3R}">1일용량<br>(mg)</th>`;
-        body += `<th style="${TH2R}"></th>`;
         body += `</tr></thead><tbody>`;
         if (v && v.itemResults && v.itemResults.length) {
           let lastGubun = null;
           for (const r of v.itemResults) {
-            if (r.gubun && r.gubun !== lastGubun) {
-              lastGubun = r.gubun;
-              body += `<tr style="background:#edf2fa;"><td colspan="6" style="${TDRAW}font-weight:bold;color:#1a4b8c;padding:2pt 4pt;">${esc(r.gubun)}</td></tr>`;
-            }
+            // 구분은 맨 앞 칸에 적는다. 같은 항이 이어지면 비워 두어
+            // 같은 글자가 되풀이되지 않게 한다 (묶음 머리행을 없앤 이유).
+            // 괄호 안 설명(항히스타민제 등)은 떼고 항 번호만 적는다.
+            // 열이 좁아 통째로 넣으면 두세 줄로 접혀 행이 다시 높아진다.
+            // 기준 조항이 짚는 것도 "Ⅲ항"이라는 번호다.
+            const gubunShort = g => String(g || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+            const gubunCell = (r.gubun && r.gubun !== lastGubun) ? gubunShort(r.gubun) : '';
+            if (r.gubun) lastGubun = r.gubun;
             const fail = r.ok === false;
             const rowBg = fail ? 'background:#fff5f5;' : '';
             const ingrRow = activeRows.find(ar => ar.ingr === r.ingr);
@@ -4131,22 +4212,26 @@ function generateFullWordDoc() {
             const okSt = `${FN}font-size:9pt;text-align:center;padding:3pt;${BORD}word-break:keep-all;`
                        + (r.ok === false ? 'color:#c62828;font-weight:bold;' : r.ok === true ? '' : 'color:#aaa;');
             body += `<tr style="${rowBg}">`;
+            body += `<td style="${TDRAW}font-size:8.5pt;color:#3d4d63;">${esc(gubunCell)}</td>`;
             body += `<td style="${TDRAW}">${esc(r.ingr)}</td>`;
-            body += `<td style="${TDRAW}text-align:right;background:#edf3fb;">${fmt(r.critMax)}</td>`;
-            body += `<td style="${TDRAW}text-align:right;background:#edf3fb;">${fmt(r.critMin)}</td>`;
-            body += `<td style="${TDRAW}text-align:right;background:#edfaf1;">${fmt(act1)}</td>`;
-            body += `<td style="${TDRAW}text-align:right;background:#edfaf1;">${fmt(act1d)}</td>`;
+            body += `<td style="${TDRAW}text-align:right;background:#f2f6fb;">${fmt(r.critMax)}</td>`;
+            body += `<td style="${TDRAW}text-align:right;background:#f2f6fb;">${fmt(r.critMin)}</td>`;
+            body += `<td style="${TDRAW}text-align:right;background:#f1f8f3;">${fmt(act1)}</td>`;
+            body += `<td style="${TDRAW}text-align:right;background:#f1f8f3;">${fmt(act1d)}</td>`;
             body += `<td style="${okSt}">${okMark}</td>`;
             body += `</tr>`;
             if (fail && r.reason) {
-              body += `<tr style="background:#fff5f5;"><td colspan="6" style="${TDRAW}font-size:8pt;color:#c62828;padding:1pt 6pt;">↳ ${esc(r.reason)}</td></tr>`;
+              const cite = _clauseForReason(currentKey, r.reason, r.gubun);
+              body += `<tr style="background:#fdf2f2;"><td colspan="7" style="${TDRAW}font-size:8.5pt;color:#b3261e;padding:1pt 6pt 2pt 6pt;">↳ ${esc(r.reason)}`
+                    + (cite ? `<br><span style="color:#6a7686;font-size:8pt;">〔${esc(cite.label)}〕 ${esc(cite.text)}</span>` : '')
+                    + `</td></tr>`;
             }
           }
           // 배합 규칙 위반 별도 표시
           if (v.ruleErrors && v.ruleErrors.some(e => !e.ok)) {
-            body += `<tr style="background:#fff5f5;"><td colspan="6" style="${TDRAW}font-size:8pt;color:#c62828;font-weight:bold;padding:2pt 6pt;">⚠ 배합 규칙 위반</td></tr>`;
+            body += `<tr style="background:#fdf2f2;"><td colspan="7" style="${TDRAW}font-size:8.5pt;color:#b3261e;font-weight:bold;padding:2pt 6pt;">⚠ 배합 규칙 위반</td></tr>`;
             for (const re of v.ruleErrors.filter(e => !e.ok)) {
-              body += `<tr style="background:#fff5f5;"><td colspan="6" style="${TDRAW}font-size:8pt;color:#c62828;padding:1pt 6pt;">↳ ${esc(re.reason || re.key)}</td></tr>`;
+              body += `<tr style="background:#fdf2f2;"><td colspan="7" style="${TDRAW}font-size:8.5pt;color:#b3261e;padding:1pt 6pt;">↳ ${esc(re.reason || re.key)}</td></tr>`;
             }
           }
         } else {
@@ -4191,22 +4276,22 @@ function generateFullWordDoc() {
         s += `</tbody></table>`;
         return s;
       };
-      const legendMx = `<p style="${FN}font-size:8pt;color:#666;margin:0 0 6pt;">`
-        + `적합 = 확인함 · 부적합 = 기준을 벗어남 · / = 이 배합에는 해당 없음 · — = 프로그램이 판정하지 않음(직접 확인 필요)</p>`;
+      // 범례는 빼기로 했다 — 표만으로 읽힌다
+      const legendMx = '';
       if (kinds3.length) {
-        body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 종류]</p>`;
+        body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 종류]</p>`;
         body += legendMx;
         body += renderCheckMx(kinds3, st3.kindsSt);
       }
       if (amts3.length) {
-        body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 분량]</p>`;
+        body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 분량]</p>`;
         body += renderCheckMx(amts3, st3.amtsSt);
       }
     }
 
     // (3) [효능효과]
     body += `<p>&nbsp;</p><p>&nbsp;</p>`;
-    body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[효능효과]</p>`;
+    body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[효능효과]</p>`;
     if (effResult?.finalTexts?.length) {
       effResult.finalTexts.forEach(t => {
         body += `<p style="${FN}font-size:10pt;margin:0 0 4pt;">${esc(applyEasyTerms(t))}</p>`;
@@ -4242,7 +4327,7 @@ function generateFullWordDoc() {
     body += `<p>&nbsp;</p><p>&nbsp;</p>`;
 
     // (4) [용법용량] — 2-col
-    body += `<p style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[용법용량]</p>`;
+    body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[용법용량]</p>`;
     body += `<table style="width:100%;border-collapse:collapse;margin-bottom:14pt;"><thead><tr>`;
     body += `<th style="${TH}width:50%;">의약품 표준제조기준</th>`;
     body += `<th style="${TH}width:50%;">${esc(productName)}</th>`;
@@ -4250,7 +4335,10 @@ function generateFullWordDoc() {
     {
       let dosL = '', dosR = '';
       const dosDB = DB[currentKey]?.['기준']?.['용법용량'] ?? [];
-      dosDB.forEach(t => { dosL += `<p style="margin:0 0 2pt;">${esc(t)}</p>`; });
+      // 원문처럼 조항 번호를 붙인다 — 어느 조항인지 짚어 말할 수 있어야 한다
+      dosDB.forEach((t, i) => {
+        dosL += `<p style="margin:0 0 3pt;padding-left:14pt;text-indent:-14pt;">${i+1}) ${esc(t)}</p>`;
+      });
       const tbl3mx = DB[currentKey]?.['표']?.['표3_연령구분계수'] ?? [];
       if (tbl3mx.length) {
         dosL += `<p style="margin:6pt 0 3pt;font-weight:bold;">&lt;표3&gt; 연령 구분별 용량의 환산 계수표</p>`;
@@ -4353,7 +4441,7 @@ function generateFullWordDoc() {
           t += `<td style="${TDRAW1}text-align:right;background:#edfaf1;">${fmt(act1d)}</td>`;
           t += `</tr>`;
           if (fail1 && r.reason && r.reason !== '부적합') {
-            t += `<tr style="background:#fff5f5;"><td colspan="7" style="${TDRAW1}font-size:8pt;color:#c62828;padding:1pt 6pt;">↳ ${esc(r.reason)}</td></tr>`;
+            t += `<tr style="background:#fdf2f2;"><td colspan="7" style="${TDRAW1}font-size:8pt;color:#c62828;padding:1pt 6pt;">↳ ${esc(r.reason)}</td></tr>`;
           }
         }
       } else {
@@ -4415,7 +4503,7 @@ function generateFullWordDoc() {
         body += `<td style="${TD}text-align:right;background:#edfaf1;">${fmt(act1d)}</td>`;
         body += `</tr>`;
         if (fail && r.reason && r.reason !== '부적합') {
-          body += `<tr style="background:#fff5f5;"><td colspan="7" style="${TD}font-size:9pt;color:#c62828;padding:2pt 8pt;">↳ ${esc(r.reason)}</td></tr>`;
+          body += `<tr style="background:#fdf2f2;"><td colspan="7" style="${TD}font-size:9pt;color:#c62828;padding:2pt 8pt;">↳ ${esc(r.reason)}</td></tr>`;
         }
       }
       if (allValidations.length > 1) {

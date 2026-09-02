@@ -417,6 +417,13 @@
       color: #666;
       white-space: nowrap;
     }
+    /* 생약 기준 선택 — 성분명 아래 작게 */
+    select.mx-herb-basis {
+      display: block; margin-top: 3px; font-family: inherit; font-size: 10.5px;
+      color: #6b5518; background: #fdf8e8; border: 1px solid #e3d4a0;
+      border-radius: 3px; padding: 1px 4px; max-width: 100%;
+    }
+    select.mx-herb-basis:hover { background: #fcf3d8; }
     input.mx-dose-input {
       width: 72px; text-align: right; padding: 2px 7px; height: 26px;
       border: none; border-radius: 4px; font-size:12px; font-weight: 500;
@@ -442,6 +449,14 @@
 
     /* 부적합 사유 — 왜 걸렸는지 판정 칸 아래 한 줄로.
        예전에는 오른쪽 결과표에만 있어서, 왼쪽만 보면 이유를 알 수 없었다. */
+    /* 부적합 근거가 된 표제기 원문 조항 — 접지 않고 그대로 편다 */
+    .mx-cite {
+      display: block; margin-top: 3px; padding: 3px 7px;
+      border-left: 2px solid #c9d4e3; background: #f5f8fc;
+      font-size: 11px; line-height: 1.5; color: #4a5a70;
+      white-space: normal; word-break: keep-all;
+    }
+    .mx-cite b { color: #1a4b8c; font-weight: 600; margin-right: 4px; }
     .mx-why {
       display: block; margin-top: 3px;
       font-size: 11px; font-weight: 500; color: var(--red);
@@ -1782,11 +1797,20 @@ function buildMatrixRows(chapterKey) {
     }
     for (const ref of tables['표1_생약_및_한약처방'] ?? []) {
       const g     = ref['구분'] ?? '생약';
-      const gval  = ref['1일최대분량_원생약_g'] ?? ref['1일최대분량_분말_g'];
+      const gRaw  = ref['1일최대분량_원생약_g'];
+      const gPow  = ref['1일최대분량_분말_g'];
+      const gval  = gRaw ?? gPow;
       const max1d = gval != null ? +(gval * 1000).toFixed(4) : null;
       const frac  = g === '라란' ? 1/5 : 1/2;
       const min1d = max1d != null ? +(max1d * frac).toFixed(4) : null;
-      matrixRows.push(mk(ref['성분명'], g, { min1: null, max1: null, min1d, max1d }));
+      const r = mk(ref['성분명'], g, { min1: null, max1: null, min1d, max1d });
+      // 생약은 원생약(처방환산량)과 분말의 1일 최대분량이 다르다.
+      // 두 값이 다를 때만 고르게 하고, 기본은 흔한 쪽인 원생약으로 둔다.
+      r.isHerb    = true;
+      r.herbRawG  = gRaw ?? null;
+      r.herbPowG  = gPow ?? null;
+      r.herbBasis = '원생약';
+      matrixRows.push(r);
     }
 
   } else if (chapterKey === '제7장_진해거담제') {
@@ -3196,7 +3220,13 @@ function updateCh1BlockAmts(drId) {
     } else {
       // 왜 걸렸는지를 같이 보여준다 — 예전에는 오른쪽 결과표에만 있었다
       okHtml = '<span class="mx-fail">부적합</span>'
-             + (vr?.reason && vr.reason !== '부적합' ? `<span class="mx-why">${esc(vr.reason)}</span>` : '');
+             + (vr?.reason && vr.reason !== '부적합' ? `<span class="mx-why">${esc(vr.reason)}</span>` : '')
+             + (() => {   // 무엇을 근거로 부적합인지 원문 조항을 함께 편다
+                 if (!vr || !vr.reason) return '';
+                 const c = (typeof _clauseForReason === 'function')
+                   ? _clauseForReason(currentKey, vr.reason, row.gubun) : null;
+                 return c ? `<span class="mx-cite"><b>${esc(c.label)}</b> ${esc(c.text)}</span>` : '';
+               })();
     }
     set('ok', okHtml);
     // 비고 셀 업데이트
@@ -3417,12 +3447,28 @@ function renderCh2Integrated() {
                    : ok===null ? '<span class="mx-na">미입력</span>'
                    : ok ? '<span class="mx-ok">적합</span>'
                    : '<span class="mx-fail">부적합</span>'
-                     + (vr?.reason ? `<span class="mx-why">${esc(vr.reason)}</span>` : '');
+                     + (vr?.reason ? `<span class="mx-why">${esc(vr.reason)}</span>` : '')
+                     + (() => {   // 무엇을 근거로 부적합인지 원문 조항을 함께 편다
+                         if (!vr || !vr.reason) return '';
+                         const c = (typeof _clauseForReason === 'function')
+                           ? _clauseForReason(currentKey, vr.reason, row.gubun) : null;
+                         return c ? `<span class="mx-cite"><b>${esc(c.label)}</b> ${esc(c.text)}</span>` : '';
+                       })();
       const rowCls = isActive ? 'mx-row mx-active' : 'mx-row';
       const canRemove = isFirst && !row.isMain && row.isShown;
-      const nameCell = row.isCustom
+      /* 생약은 원생약(처방환산량)과 분말의 1일 최대분량이 다르다.
+         두 값이 다른 성분만 고르게 한다 — 같거나 분말 배합이 인정되지
+         않는 성분(분말 값 없음)은 고를 것이 없다. */
+      const herbPick = (row.isHerb && row.herbRawG != null && row.herbPowG != null
+                        && row.herbRawG !== row.herbPowG)
+        ? `<select class="mx-herb-basis" data-id="${row.id}" title="원생약(처방환산량)과 분말은 1일 최대분량이 다릅니다">`
+          + `<option value="원생약"${row.herbBasis!=='분말'?' selected':''}>원생약·처방환산량 ${row.herbRawG}g</option>`
+          + `<option value="분말"${row.herbBasis==='분말'?' selected':''}>분말 ${row.herbPowG}g</option>`
+          + `</select>`
+        : '';
+      const nameCell = (row.isCustom
         ? `<input class="mx-custom-name" data-id="${row.id}" value="${esc(row.ingr)}" placeholder="성분명 입력">`
-        : esc(row.ingr);
+        : esc(row.ingr)) + herbPick;
 
       rows += `<tr class="${rowCls}" data-id="${row.id}">`;
       rows += `<td class="mx-gubun-cell">${canRemove?`<button class="mx-remove-btn" data-id="${row.id}" title="제거">×</button>`:''}</td>`;
@@ -3515,8 +3561,10 @@ function renderCh2Integrated() {
   html += `<div id="ch2-add-ingr-panel" style="display:none;margin-top:5px;padding:8px;background:var(--paper);border-radius:4px;border:1px solid var(--hairline);">`;
   html += `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">`;
   html += `<span style="font-size:12px;color:#555;white-space:nowrap;">성분 선택:</span>`;
-  // 고르면 바로 담긴다 — 따로 [추가]를 누르지 않는다
-  html += `<select id="ch2-add-ingr-select" onchange="confirmCh2IngrAdd()" style="flex:1;min-width:200px;padding:4px 6px;font-size:12px;border:1px solid var(--hairline);border-radius:4px;"><option value="">-- 선택 --</option></select>`;
+  // 목록이 70개가 넘어 훑기 어렵다 — 글자를 치면 좁혀 준다.
+  // 비워 두면 전체가 그대로 보이므로 종전처럼 훑어 골라도 된다.
+  html += `<input id="ch2-add-ingr-q" type="text" placeholder="성분명 검색" oninput="filterCh2AddIngr(this.value)" style="flex:0 1 150px;min-width:110px;padding:4px 7px;font-size:12px;border:1px solid var(--hairline);border-radius:4px;">`;
+  html += `<select id="ch2-add-ingr-select" size="1" onchange="confirmCh2IngrAdd()" style="flex:1;min-width:180px;padding:4px 6px;font-size:12px;border:1px solid var(--hairline);border-radius:4px;"><option value="">-- 선택 --</option></select>`;
   html += `<button class="btn" onclick="$('ch2-add-ingr-panel').style.display='none'" style="font-size:12px;padding:4px 10px;background:#999;color:#fff;">닫기</button>`;
   html += `</div><div id="ch2-add-ingr-msg" style="font-size:11.5px;color:var(--ok,#2f6b45);margin-top:5px;min-height:15px;"></div></div>`;
 
@@ -3565,6 +3613,19 @@ function renderCh2Integrated() {
   bindRange('.js-ch2-freq-min', '.js-ch2-freq-max', 'freqMin', 'freqMax');
   bindRange('.js-ch2-amt-min',  '.js-ch2-amt-max',  'amtMin',  'amtMax');
   // 단위당 함량 입력 → 모든 블록 제품함량 실시간 갱신 (포커스 유지, DOM 최소 업데이트)
+  /* 생약 기준(원생약·처방환산량 / 분말)을 고르면 그 기준으로 다시 잡는다.
+     성분마다 두 값이 달라, 잘못 잡으면 한도가 몇 배까지 어긋난다. */
+  wrap.querySelectorAll('.mx-herb-basis').forEach(el => el.addEventListener('change', e => {
+    const row = matrixRows.find(r => r.id === +e.target.dataset.id);
+    if (!row) return;
+    row.herbBasis = e.target.value;
+    const g = row.herbBasis === '분말' ? row.herbPowG : row.herbRawG;
+    row.std.max1d = g != null ? +(g * 1000).toFixed(4) : null;
+    const frac = row.gubun === '라란' ? 1/5 : 1/2;   // 라란은 하한이 1/5
+    row.std.min1d = row.std.max1d != null ? +(row.std.max1d * frac).toFixed(4) : null;
+    renderCh2Integrated();
+    updateLiveSummary();
+  }));
   wrap.querySelectorAll('.mx-dose-input').forEach(el => el.addEventListener('input', e => {
     const row = matrixRows.find(r => r.id === +e.target.dataset.id);
     if (!row) return;
@@ -3682,7 +3743,13 @@ function updateCh2BlockAmts(drId) {
                  : ok===null ? '<span class="mx-na">미입력</span>'
                  : ok ? '<span class="mx-ok">적합</span>'
                  : '<span class="mx-fail">부적합</span>'
-                   + (vr?.reason && vr.reason !== '부적합' ? `<span class="mx-why">${esc(vr.reason)}</span>` : '');
+                   + (vr?.reason && vr.reason !== '부적합' ? `<span class="mx-why">${esc(vr.reason)}</span>` : '')
+             + (() => {   // 무엇을 근거로 부적합인지 원문 조항을 함께 편다
+                 if (!vr || !vr.reason) return '';
+                 const c = (typeof _clauseForReason === 'function')
+                   ? _clauseForReason(currentKey, vr.reason, row.gubun) : null;
+                 return c ? `<span class="mx-cite"><b>${esc(c.label)}</b> ${esc(c.text)}</span>` : '';
+               })();
     set('ok', okHtml);
     tr.className = dose!==null ? 'mx-row mx-active' : 'mx-row';
   });
@@ -3711,15 +3778,38 @@ function addCh2AgeGroup() {
 }
 
 /* ch2 성분 추가 패널 */
+let _ch2AddOptions = [];   // 검색으로 좁히기 전의 전체 목록
+
 function openCh2AddIngrPanel() {
   const nonShown = matrixRows.filter(r => !r.isMain && !r.isShown && !r.isCustom);
   const sel = $('ch2-add-ingr-select');
   if (!sel) return;
-  sel.innerHTML = '<option value="">-- 선택 --</option>'
-    + nonShown.map(r => `<option value="${r.id}">[${esc(r.gubun)}] ${esc(r.ingr)}</option>`).join('')
-    + '<option value="custom">직접 입력 (비표준)</option>';
+  _ch2AddOptions = nonShown.map(r => ({
+    id: r.id,
+    label: `[${r.gubun}] ${r.ingr}`,
+    key: `${r.gubun} ${r.ingr}`.replace(/\s+/g, '').toLowerCase(),
+  }));
+  const q = $('ch2-add-ingr-q');
+  if (q) q.value = '';
+  filterCh2AddIngr('');
   const panel = $('ch2-add-ingr-panel');
-  if (panel) { panel.style.display = ''; sel.focus(); }
+  if (panel) { panel.style.display = ''; (q || sel).focus(); }
+}
+
+/* 친 글자가 들어간 성분만 남긴다. 띄어쓰기는 무시하고 견준다
+   ("dl 메틸"로 쳐도 "dl-메틸에페드린염산염"이 잡히게). */
+function filterCh2AddIngr(q) {
+  const sel = $('ch2-add-ingr-select');
+  if (!sel) return;
+  const k = String(q || '').replace(/\s+/g, '').toLowerCase();
+  const hit = k ? _ch2AddOptions.filter(o => o.key.includes(k)) : _ch2AddOptions;
+  sel.innerHTML =
+      `<option value="">${k ? `-- ${hit.length}건 --` : '-- 선택 --'}</option>`
+    + hit.map(o => `<option value="${o.id}">${esc(o.label)}</option>`).join('')
+    + (k ? '' : '<option value="custom">직접 입력 (비표준)</option>');
+  const msg = $('ch2-add-ingr-msg');
+  if (msg && k && !hit.length) msg.textContent = `"${q}" 에 맞는 성분이 없습니다`;
+  else if (msg && k) msg.textContent = '';
 }
 function confirmCh2IngrAdd() {
   const sel = $('ch2-add-ingr-select');
