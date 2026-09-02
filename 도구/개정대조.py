@@ -40,14 +40,46 @@ def load(path):
     return re.sub(r'&#\d+;', '', t)
 
 
+# 새 항목이 시작되는 자리 — 이 모양으로 시작하는 줄만 새 덩어리로 본다
+_ITEM_HEAD = re.compile(
+    r'^('
+    r'제\s*\d+\s*장'            # 제3장
+    r'|\(\s*\d+\s*\)'           # (2)
+    r'|\(\s*[가-힣]\s*\)'        # (가)
+    r'|\d+\s*\)'                # 1)
+    r'|[가-힣]\s*\.\s'           # 가.
+    r'|[\u2460-\u2473\u3260-\u327b\u326e-\u3273]'   # ① ㉮
+    r'|<\s*표'                  # <표1>
+    r'|\['                      # [별표
+    r')')
+
+
 def norm_lines(text):
-    """견주기 전에 정리한다 — 공백 차이만으로 "바뀜"이 뜨는 것을 줄인다."""
-    out = []
+    """문단을 조항 단위로 다시 이어 붙인다.
+
+    옛 원문은 PDF에서 뽑아 24자마다 끊겨 있고, 새 원문은 한글파일에서
+    뽑아 문단 단위(53자)로 끊겨 있다. 그대로 견주면 글자가 같아도
+    끊긴 자리가 달라 거의 전부 "바뀜"으로 나온다.
+
+    조항 머리(1) (2) 제n장 <표 …)가 나올 때만 새 덩어리를 시작하고,
+    그 사이 줄은 하나로 합쳐서 견준다. 이러면 줄바꿈 차이는 사라지고
+    실제로 글자가 달라진 조항만 남는다."""
+    items, cur = [], ''
     for ln in text.split('\n'):
-        s = re.sub(r'[ \t ]+', ' ', ln).strip()
-        if s:
-            out.append(s)
-    return out
+        raw = ln.rstrip()
+        s = re.sub(r'[ \t\u00a0\u3000]+', ' ', raw).strip()
+        if not s:
+            continue
+        if _ITEM_HEAD.match(s) or not cur:
+            if cur:
+                items.append(cur)
+            cur = s
+        else:
+            # 표의 칸(탭)으로 시작하면 칸 구분을 살려 둔다
+            cur += ('\t' if raw.startswith('\t') else ' ') + s
+    if cur:
+        items.append(cur)
+    return items
 
 
 def chapter_of(lines, idx):
