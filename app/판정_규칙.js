@@ -3359,6 +3359,8 @@ function computeCh3KindsAmtsStatus(allVpairs, form, activeRows) {
   const n8 = inH('Ⅷ항').length,   n9 = inH('Ⅸ항').length, n10 = inH('Ⅹ항').length;
   const n13 = inH('ⅩⅢ항').length;
   const ga = inLan('가란'), na_ = inLan('나란'), da = inLan('다란'), ra = inLan('라란');
+  const n15     = inH('ⅩⅤ항').length;
+  const hasMeq  = rows.some(r => r.ingr.includes('메퀴타진'));
   const hasIbu  = rows.some(r => r.ingr.includes('이부프로펜'));
   const hasAsp  = rows.some(r => r.ingr.includes('아스피린'));
   const hasCaf  = rows.some(r => r.ingr.includes('카페인'));
@@ -3366,7 +3368,8 @@ function computeCh3KindsAmtsStatus(allVpairs, form, activeRows) {
   const 미등재  = ir0.filter(r => r.ok === null);
 
   // 5) "Ⅲ항, Ⅳ항, Ⅴ-1항, Ⅵ항, Ⅶ항, Ⅺ항, Ⅻ항목 … 각 항 또는 라란의 각각 1종으로 한다"
-  const 단일항 = ['Ⅲ항','Ⅳ항','Ⅴ-1항','Ⅵ항','Ⅶ항','Ⅺ항','Ⅻ항'];
+  // 2026-57호 개정으로 ⅩⅤ항(글리시리진산)이 이 목록에 들어왔다
+  const 단일항 = ['Ⅲ항','Ⅳ항','Ⅴ-1항','Ⅵ항','Ⅶ항','Ⅺ항','Ⅻ항','ⅩⅤ항'];
   const 초과항 = 단일항.map(h => [h, inH(h).length]).filter(([, c]) => c > 1);
   if (ra.length > 1) 초과항.push(['라란', ra.length]);
 
@@ -3422,6 +3425,21 @@ function computeCh3KindsAmtsStatus(allVpairs, form, activeRows) {
       if (ga.length) bad.push('가란 생약');
       if (ra.length) bad.push('라란 한약처방');
       return bad.length ? NO(`Ⅸ항과 ${bad.join('·')} 동시 배합 불가`) : YES();
+    })(),
+    // 13) 메퀴타진은 경구용 액제 이외의 제제에만, 라란 한약처방과 배합 불가 (2026-57호 신설)
+    !hasMeq ? NA : (() => {
+      const bad = [];
+      if (/내용액제|경구용\s*액제|시럽/.test(form || '')) bad.push('경구용 액제에는 배합 불가');
+      if (ra.length) bad.push('라란 한약처방과 동시 배합 불가');
+      return bad.length ? NO('메퀴타진 — ' + bad.join('; ')) : YES();
+    })(),
+    // 14) ⅩⅤ항(글리시리진산)은 가란 생약·나란 감초·라란 한약처방과 배합 불가 (2026-57호 신설)
+    !n15 ? NA : (() => {
+      const bad = [];
+      if (ga.length) bad.push('가란 생약');
+      if (na_.some(r => r.ingr.includes('감초'))) bad.push('나란 감초');
+      if (ra.length) bad.push('라란 한약처방');
+      return bad.length ? NO(`ⅩⅤ항(글리시리진산)과 ${bad.join('·')} 동시 배합 불가`) : YES();
     })(),
   ];
 

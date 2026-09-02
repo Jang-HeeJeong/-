@@ -474,4 +474,15 @@ window.RULE_STATUS_CASES = [
     desc: '제9장 Ⅰ란 없음 — 필수성분 조항(2번)이 부적합이어야 함',
     gubuns: ['Ⅲ란'],
     expect: { kinds: 'OX/O///', amts: 'O///O//' } },
+  /* 이 두 건이 보는 것은 종류 13번(메퀴타진은 경구용 액제에 배합 불가)이다.
+     구분에서 대표 성분을 뽑을 때 Ⅰ항의 첫 성분(살리실산콜린)이 잡히므로
+     분량 6번(아세트아미노펜 단독 하한)은 "해당없음"이 된다 — 의도한 바다. */
+  { id: 'rs-ch3-mequitazine-tablet', chapter: '제3장_감기약', form: '정제',
+    desc: '제3장 메퀴타진 + 정제 — 종류 13번 적합 (2026-57호 신설)',
+    gubuns: ['Ⅰ항', 'Ⅲ항 2란'],
+    expect: { kinds: 'O/OOOO//////O/', amts: 'O///O///////' } },
+  { id: 'rs-ch3-mequitazine-liquid', chapter: '제3장_감기약', form: '내용액제',
+    desc: '제3장 메퀴타진 + 내용액제 — 종류 13번 부적합이어야 함 (2026-57호 신설)',
+    gubuns: ['Ⅰ항', 'Ⅲ항 2란'],
+    expect: { kinds: 'O/OOOO//////X/', amts: 'O///O///////' } },
 ];
