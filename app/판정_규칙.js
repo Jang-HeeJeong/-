@@ -3026,7 +3026,15 @@ function runValidation() {
 
   body.innerHTML = html || '<div class="empty-state"><span>결과 없음</span></div>';
   if (typeof collapseResultTables === 'function') collapseResultTables(body);
-  setStatus(anyFail ? '❌ 부적합 항목 있음' : '✅ 검토 완료 — 적합', anyFail ? 'error' : 'ok');
+  /* 용법용량이 아직 기본값(허가목록에 용법이 없어 임시로 넣은 값)이면,
+     그 값으로 나온 부적합은 이 제품의 부적합이 아니다. 실제 용법을 넣기
+     전까지는 "부적합"이라고 단정하지 않고 확인을 요청한다. */
+  const usingDefaultDose = (typeof doseIsDefault !== 'undefined') && doseIsDefault;
+  if (anyFail && usingDefaultDose) {
+    setStatus('⚠️ 용법용량 확인 필요 — 실제 용법을 넣어야 판정할 수 있습니다', 'warn');
+  } else {
+    setStatus(anyFail ? '❌ 부적합 항목 있음' : '✅ 검토 완료 — 적합', anyFail ? 'error' : 'ok');
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════

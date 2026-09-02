@@ -149,4 +149,30 @@ window.FLOW_CASES = [
       { expect: { ch3AmtRule: { '5': 'X', '6': 'O' } } },
     ],
   },
+  {
+    id: 'flow-default-dose-not-verdict',
+    desc: '용법용량이 기본값이면 "부적합"이라 단정하지 않는다 (캐롤비콜드)',
+    steps: [
+      // 허가목록에는 용법이 없어 1회 1캡슐이 임시로 들어간다.
+      // 그 값으로 나온 미달은 이 제품의 부적합이 아니다.
+      { pick: '캐롤비콜드연질캡슐' },
+      { runValidation: true, expect: {
+          statusHas: '용법용량 확인 필요',
+          statusHasNot: '부적합 항목 있음',
+        } },
+      // 실제 용법(1회 2캡슐)을 넣으면 정상 판정으로 돌아와야 한다
+      { setAmt: 2 },
+      { runValidation: true, expect: { statusHas: '적합', statusHasNot: '용법용량 확인 필요' } },
+    ],
+  },
+  {
+    id: 'flow-draft-autosave',
+    desc: '작업 중 내용이 임시저장에 담긴다 — 새로고침해도 잃지 않아야 함',
+    steps: [
+      { clearDraft: true },
+      { pick: '캐롤비콜드연질캡슐' },
+      { flushDraft: true, expect: { draftDosesAtLeast: 7 } },
+      { clearDraft: true },
+    ],
+  },
 ];

@@ -260,6 +260,19 @@ function flowSnapshot(win) {
       ?.querySelector('.res-doc-body')?.innerText ?? '',
     doseText: [...d.querySelectorAll('#results-body .res-doc')].find(x => /용법용량/.test(x.textContent))
       ?.querySelector('.res-doc-body')?.innerText ?? '',
+    // 하단 판정 문구 — 용법용량이 기본값일 때 "부적합"이라 단정하면 안 된다
+    statusText: d.getElementById('live-summary')?.textContent.replace(/\s+/g, ' ').trim() ?? '',
+    // 임시저장에 담긴 성분 수 (0이면 안 담긴 것)
+    draftDoses: win.eval(`(function(){
+      try {
+        var raw = localStorage.getItem('표제기_임시저장');
+        if (!raw) return 0;
+        var d = JSON.parse(raw);
+        if (d.matrix) return Object.keys(d.matrix.doses).length;
+        if (d.ch1) return d.ch1.filter(function(r){return r.dose !== '' && r.dose != null;}).length;
+        return (d.ingredients || []).length;
+      } catch (e) { return -1; }
+    })()`),
     // 제3장 조항별 적합여부 — "적합/부적합//(해당없음)/—(보류)"를 한 줄로
     ch3Status: win.eval(`(function(){
       if (currentKey !== '제3장_감기약' || typeof computeCh3KindsAmtsStatus !== 'function') return '';
@@ -321,6 +334,12 @@ function flowStep(win, step) {
     if (!cb) throw new Error('연령 선택 요소를 찾지 못함');
     if (cb.type === 'checkbox') { cb.checked = true; cb.dispatchEvent(new win.Event('change', { bubbles: true })); }
     else { cb.dispatchEvent(new win.Event('change', { bubbles: true })); }
+  } else if (step.clearDraft) {
+    win.eval("try { localStorage.removeItem('표제기_임시저장'); } catch (e) {}");
+  } else if (step.flushDraft) {
+    // 임시저장은 입력이 멈춘 뒤 한 번 담긴다. 시험에서는 기다리지 않고
+    // 바로 담게 해서 저장되는 내용만 확인한다.
+    win.saveDraftNow();
   } else if (!Object.keys(step).some(k => k !== 'expect')) {
     // expect만 있는 단계 — 아무것도 하지 않고 지금 상태만 확인한다
   } else {
@@ -358,6 +377,15 @@ function flowCheck(expect, snap) {
         if (got !== want2)
           diffs.push({ path: `분량 ${num}번`, was: want2, now: got });
       }
+    } else if (k === 'statusHas') {
+      if (!snap.statusText.includes(want))
+        diffs.push({ path: '하단 문구', was: '…' + want + '…', now: snap.statusText || '(빈칸)' });
+    } else if (k === 'statusHasNot') {
+      if (snap.statusText.includes(want))
+        diffs.push({ path: '하단 문구', was: '"' + want + '" 없어야 함', now: snap.statusText });
+    } else if (k === 'draftDosesAtLeast') {
+      if (!(snap.draftDoses >= want))
+        diffs.push({ path: '임시저장 성분 수', was: '≥ ' + want, now: String(snap.draftDoses) });
     } else if (k === 'effTextHas') {
       if (!snap.effText.includes(want)) diffs.push({ path: '효능효과 문구', was: `"${want}" 포함`, now: snap.effText || '(없음)' });
     } else if (k === 'doseTextHas') {

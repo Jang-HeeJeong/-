@@ -585,6 +585,25 @@
       writing-mode: vertical-rl; letter-spacing: 0.18em; color: #94a3b8;
     }
 
+    /* ══════════ 임시저장 안내줄 ══════════ */
+    #draft-bar {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      padding: 9px 16px; background: #fff8e1; border-bottom: 1px solid #f0dfa8;
+      font-size: 12.5px; color: #6b5518;
+    }
+    #draft-bar .db-txt { flex: 0 1 auto; min-width: 0; }
+    #draft-bar .db-txt b { font-weight: 600; color: #4a3a0f; }
+    #draft-bar .db-meta { color: #9a8a5e; flex: 1 1 auto; min-width: 0; }
+    #draft-bar .db-act { display: flex; gap: 7px; flex: 0 0 auto; }
+    #draft-bar button {
+      font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+      padding: 4px 12px; border-radius: 4px; border: 1px solid transparent;
+    }
+    #draft-bar .db-yes { background: #1a4b8c; color: #fff; }
+    #draft-bar .db-yes:hover { background: #153d72; }
+    #draft-bar .db-no  { background: #fff; color: #6b5518; border-color: #e0cf98; }
+    #draft-bar .db-no:hover { background: #fdf6e3; }
+
     /* ══════════ 결과 패널 (검토 결과) ══════════ */
 
     /* 결과 요약 카드 — 판정의 전제 조건을 한눈에 */
@@ -1385,6 +1404,8 @@ function jumpToNextFail() {
 
 function updateLiveSummary() {
   refreshFillMarks();
+  // 화면이 갱신될 때마다 임시저장을 예약한다 (실제 저장은 입력이 멈춘 뒤 한 번)
+  if (typeof scheduleDraftSave === 'function') scheduleDraftSave();
   {
     const nm = document.getElementById('product-name')?.value || '';
     showPickedProduct(nm);
@@ -5288,6 +5309,9 @@ async function saveProduct() {
   state.savedAt = new Date().toISOString();
   try {
     await _fsdb.collection(PRODUCTS_COL).doc(state.id).set(state);
+    // 정식으로 저장했으니 임시본은 지운다 — 남겨 두면 다음에 열 때
+    // 이미 저장한 내용을 두고 "이어서 할까요?"를 묻게 되어 헷갈린다
+    if (typeof clearDraft === 'function') clearDraft();
     setStatus(`"${state.name}" 저장 완료 (${fmtSavedAt(state.savedAt)})`, 'ok');
   } catch(e) {
     // 저장에 실패해도 입력한 내용은 화면에 그대로 남는다 — 다시 누르면 된다
@@ -5352,6 +5376,135 @@ async function deleteProduct(id) {
 
 function refreshSavedProductList() {
   filterProductList($('product-search')?.value || '');
+}
+
+/* ══════════ 임시저장 ══════════
+   성분을 한참 입력하다 실수로 새로고침하거나 브라우저가 닫히면 전부
+   사라지던 문제. 저장 버튼을 누르기 전 상태를 브라우저에 담아 두고,
+   다음에 열 때 "이어서 하시겠어요?"를 묻는다.
+
+   담기는 곳은 이 브라우저 안(localStorage)이며 서버로 나가지 않는다.
+   제품을 정식으로 저장하면 임시본은 지운다 — 남겨 두면 다음에 열 때
+   이미 저장한 내용을 두고 이어서 할지 묻게 되어 헷갈린다. */
+const DRAFT_KEY = '표제기_임시저장';
+const DRAFT_TTL_H = 72;          // 사흘이 지난 임시본은 안내하지 않는다
+let _draftTimer = null;
+
+function _draftReadable() {
+  try { localStorage.setItem('__t', '1'); localStorage.removeItem('__t'); return true; }
+  catch (e) { return false; }    // 시크릿 창·저장 차단 설정
+}
+
+/* 입력이 멈춘 뒤 한 번만 담는다 (글자마다 쓰면 느려진다) */
+function scheduleDraftSave() {
+  if (!_draftReadable()) return;
+  clearTimeout(_draftTimer);
+  _draftTimer = setTimeout(saveDraftNow, 800);
+}
+
+function saveDraftNow() {
+  if (!_draftReadable() || !currentKey) return;
+  try {
+    // captureProductState는 제품명이 없으면 경고창을 띄우므로 쓰지 않고,
+    // 같은 모양을 조용히 만든다. 이름은 아직 없어도 담아 둔다.
+    const pn = ($('product-name')?.value || '').trim();
+    const sv = document.getElementById('save-name')?.value.trim() || '';
+    const st = {
+      draftAt: new Date().toISOString(),
+      name: sv || pn,
+      chapter: currentKey,
+      form: currentForm,
+      dosageRows: dosageRows.map(r => ({ age: r.age, freqMin: r.freqMin, freqMax: r.freqMax,
+                                         amtMin: r.amtMin, amtMax: r.amtMax })),
+      excipients: [...selectedExcipients],
+    };
+    if (currentKey === '제1장_비타민미네랄') {
+      st.ch1 = ch1Rows.map(r => ({ id: r.id, 항목: r.항목, type: r.type, ingrNames: r.ingrNames,
+                                   ingr: r.ingr, dose: r.dose, unit: r.unit,
+                                   isMain: r.isMain, isShown: r.isShown }));
+    } else if (isMatrixMode()) {
+      st.matrix = {
+        doses: Object.fromEntries(matrixRows
+          .filter(r => (r.isMain || r.isShown) && !r.isCustom && r.dose !== '' && r.dose != null)
+          .map(r => [r.ingr, r.dose])),
+        shown:  matrixRows.filter(r => !r.isMain && r.isShown && !r.isCustom).map(r => r.ingr),
+        custom: matrixRows.filter(r => r.isCustom)
+          .map(r => ({ gubun: r.gubun, ingr: r.ingr, dose: r.dose ?? '', unit: r.unit ?? 'mg' })),
+      };
+    } else {
+      st.ingredients = ingredientRows.map(r => ({ gubun: r.gubun, ingr: r.ingr,
+                                                  dose: r.dose, unit: r.unit }));
+    }
+    // 아무것도 입력 안 한 상태는 담지 않는다
+    const filled = (st.matrix && (Object.keys(st.matrix.doses).length || st.matrix.custom.length))
+                || (st.ch1 && st.ch1.some(r => r.dose !== '' && r.dose != null))
+                || (st.ingredients && st.ingredients.some(r => r.ingr));
+    if (!filled) return;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(st));
+  } catch (e) { /* 저장 공간이 꽉 찼거나 차단됨 — 작업을 막지는 않는다 */ }
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+  document.getElementById('draft-bar')?.remove();
+}
+
+function readDraft() {
+  if (!_draftReadable()) return null;
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    const age = (Date.now() - new Date(d.draftAt).getTime()) / 36e5;
+    if (!(age >= 0) || age > DRAFT_TTL_H) { clearDraft(); return null; }
+    return d;
+  } catch (e) { return null; }
+}
+
+function _draftWhen(iso) {
+  const t = new Date(iso), now = new Date();
+  const mins = Math.round((now - t) / 6e4);
+  if (mins < 1)  return '방금';
+  if (mins < 60) return mins + '분 전';
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24 && t.toDateString() === now.toDateString()) return hrs + '시간 전';
+  return `${t.getMonth() + 1}월 ${t.getDate()}일 ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+}
+
+/* 화면 맨 위에 한 줄로 묻는다 — 자동으로 되살리지 않는다.
+   작업자가 새 제품을 시작하려던 것일 수도 있기 때문이다. */
+function offerDraftRestore() {
+  const d = readDraft();
+  if (!d) return;
+  // 드롭다운에 보이는 것과 같은 문구로 적는다 ("제3장 감기약 표준제조기준")
+  const opt = document.querySelector(`#sel-chapter option[value="${d.chapter}"]`);
+  const ch  = opt?.textContent.trim()
+           || (typeof chaptersMap !== 'undefined' && chaptersMap[d.chapter]?.label)
+           || d.chapter || '';
+  const bar = document.createElement('div');
+  bar.id = 'draft-bar';
+  bar.innerHTML =
+      `<span class="db-txt">하던 작업이 있습니다 — <b>${esc(d.name || '(제품명 없음)')}</b>`
+    + `</span><span class="db-meta">${esc(ch)} · ${esc(_draftWhen(d.draftAt))}</span>`
+    + `<span class="db-act">`
+    + `<button type="button" class="db-yes" onclick="restoreDraft()">이어서 하기</button>`
+    + `<button type="button" class="db-no" onclick="clearDraft()">새로 시작</button>`
+    + `</span>`;
+  document.body.insertBefore(bar, document.body.firstChild);
+}
+
+function restoreDraft() {
+  const d = readDraft();
+  if (!d) { document.getElementById('draft-bar')?.remove(); return; }
+  try {
+    restoreProductState(d);
+    const sv = document.getElementById('save-name');
+    if (sv && d.name) sv.value = d.name;
+    setStatus('이어서 작업합니다 — ' + _draftWhen(d.draftAt) + ' 내용', 'ok');
+  } catch (e) {
+    setStatus('이어서 하기에 실패했습니다. 새로 시작해 주세요.', 'error');
+  }
+  document.getElementById('draft-bar')?.remove();
 }
 
 function restoreProductState(product) {
@@ -5492,8 +5645,10 @@ function setStatus(msg, type) {
   // 이게 없으면 검토 실행이 조건 미충족으로 중단돼도 아무 반응이 없어 보인다.
   const bar = $('live-summary');
   if (!bar) return;
-  const color = type === 'error' ? '#c62828' : type === 'ok' ? '#2e7d32' : '#475569';
-  const icon  = type === 'error' ? '⚠' : type === 'ok' ? '✓' : 'ℹ';
+  const color = type === 'error' ? '#c62828' : type === 'ok' ? '#2e7d32'
+              : type === 'warn'  ? '#8a5a00' : '#475569';
+  const icon  = type === 'error' ? '⚠' : type === 'ok' ? '✓'
+              : type === 'warn'  ? '⚠' : 'ℹ';
   const hasIcon = /^[^\w가-힣]/.test(String(msg).trim());   // 메시지에 이미 기호가 있으면 중복 표시 안 함
   bar.innerHTML = `<span style="color:${color};font-weight:600;">${hasIcon ? '' : icon + ' '}${esc(msg)}</span>`;
 }
@@ -5504,6 +5659,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // 결과 패널은 검토 실행 전까지 접어 두고 입력 패널이 전폭을 쓰게 한다
   setResultsCollapsed(true);
   updateLiveSummary();
+
+  // 지난번에 하던 작업이 있으면 이어서 할지 묻는다 (자동으로 되살리지는 않는다)
+  offerDraftRestore();
+
+  // 탭을 닫기 전에 마지막 상태를 한 번 더 담는다 (예약 대기 중이던 것 포함)
+  window.addEventListener('beforeunload', () => { try { saveDraftNow(); } catch (e) {} });
 
   $('sel-chapter').addEventListener('change', e => {
     onChapterChange(e.target.value || null);
@@ -5704,8 +5865,16 @@ function collapseResultTables(root) {
   if (!flags.length) return;
   const box = document.createElement('div');
   box.className = 'res-flags';
-  box.innerHTML = `<div class="res-flags-title">확인이 필요한 항목 ${flags.length}건`
-    + `<span class="rf-sub">아래 문구는 이 항목을 고친 뒤에 쓰세요</span></div>`
+  /* 용법용량이 아직 기본값이면 여기 걸린 항목은 "이 제품이 기준을 벗어났다"가
+     아니라 "아직 실제 용법을 안 넣었다"는 뜻이다. 제목을 그렇게 바꿔 준다. */
+  const dflt = (typeof doseIsDefault !== 'undefined') && doseIsDefault;
+  box.innerHTML = `<div class="res-flags-title">`
+    + (dflt ? `용법용량을 먼저 넣어 주세요`
+            : `확인이 필요한 항목 ${flags.length}건`)
+    + `<span class="rf-sub">`
+    + (dflt ? `지금 값은 임시 기본값이라 아래 ${flags.length}건은 실제 판정이 아닙니다`
+            : `아래 문구는 이 항목을 고친 뒤에 쓰세요`)
+    + `</span></div>`
     + flags.map(f => `<div class="res-flag"><span class="rf-name">${esc(f.name)}</span>`
                    + `<span class="rf-why">${esc(f.why)}</span></div>`).join('');
   const gate = root.querySelector('.res-gate');
