@@ -3354,199 +3354,210 @@ ${tail || ''}
 
    ★ 매핑하지 않은 조항은 자동으로 "판정보류"가 된다.
      빠뜨려도 "적합"으로 잘못 나가지 않도록 일부러 이렇게 둔다. */
-function computeCh3KindsAmtsStatus(allVpairs, form, activeRows) {
-  const NA   = { ok: null, na: true,  reason: '' };
-  const HOLD = { ok: null, na: false, reason: '' };
-  const YES  = r => ({ ok: true,  na: false, reason: '' });
-  const NO   = r => ({ ok: false, na: false, reason: r });
+/* ══════════ 조항 표 ══════════
+   조항 하나가 [절, 번호, 판정] 한 줄이다.
 
-  if (!allVpairs.length) return { kindsSt: [], amtsSt: [] };
-  const v0     = allVpairs[0].v;
-  const ir0    = v0.itemResults || [];
-  const rules  = v0.ruleErrors  || [];
+   왜 이렇게 바꿨나 —
+   예전에는 판정 결과를 배열에 순서대로 담았다. 배열의 몇 번째냐가
+   곧 조항 번호였다. 그래서 조항이 하나 끼거나 순서가 밀리면
+   판정이 통째로 엉뚱한 조항에 붙었다. 실제로 그런 일이 있었고,
+   원문 근거 표시가 "1/10 미달" 사유에 "아스피린과 Ⅴ-1항은 배합하지
+   않는다"를 갖다 대고 있었다.
+
+   이제 번호를 값으로 적으므로 순서가 어긋날 수 없다. 개정으로
+   조항이 하나 늘면 표에 한 줄 더하면 되고, 적지 않은 번호는
+   자동으로 "판정보류"가 된다 — 근거 없는 "적합"이 나가지 않는다. */
+
+/* 조항 표를 돌려 절별 판정 배열을 만든다.
+   rules: [[절, 번호, 판정함수], …]  ctx: 판정함수에 넘길 것 */
+function _runClauseTable(rules, ctx, counts) {
+  const out = {};
+  for (const [sec, n] of Object.entries(counts)) {
+    // 표에 적지 않은 조항은 판정보류로 남긴다
+    out[sec] = Array.from({ length: n }, () => ({ ok: null, na: false, reason: '' }));
+  }
+  for (const [sec, no, fn] of rules) {
+    if (!out[sec]) continue;
+    if (no < 1 || no > out[sec].length) {
+      // 조항 수가 바뀌었는데 표를 안 고친 경우 — 조용히 넘기지 않는다
+      console.warn(`[조항 표] ${sec} ${no}번은 지금 ${out[sec].length}개 조항 밖입니다`);
+      continue;
+    }
+    try {
+      out[sec][no - 1] = fn(ctx);
+    } catch (e) {
+      console.warn(`[조항 표] ${sec} ${no}번 판정 중 오류:`, e);
+      // 오류가 나면 "적합"이 아니라 판정보류로 둔다
+      out[sec][no - 1] = { ok: null, na: false, reason: '' };
+    }
+  }
+  return out;
+}
+
+/* ══════════ 제3장 조항 표 ══════════
+   [절, 조항번호, 판정] — 번호를 값으로 적으므로 순서가 어긋날 수 없다. */
+const CH3_CLAUSES = [
+  // ── 유효성분의 종류 ──
+  ['종류', 1, c => c.미등재.length
+      ? c.NO(c.미등재.map(r => `${r.ingr}: 표1에 없음`).join('; ')) : c.YES()],
+  // 한약처방 규격·기초시험자료 제출 — 서류 요건이라 프로그램이 판정할 수 없다
+  ['종류', 2, c => c.ra.length ? c.HOLD : c.NA],
+  ['종류', 3, c => (c.n1 + c.n2) >= 1 ? c.YES() : c.NO('Ⅰ항·Ⅱ항 성분이 하나도 없음')],
+  ['종류', 4, c => c.n1 <= 3 ? c.YES() : c.NO(`Ⅰ항 ${c.n1}종 — 최대 3종`)],
+  ['종류', 5, c => c.초과항.length
+      ? c.NO(c.초과항.map(([h, n]) => `${h} ${n}종 — 각 1종만`).join('; ')) : c.YES()],
+  ['종류', 6, c => c.isOk('마황×Ⅴ-1항 배합금지')
+      ? c.YES() : c.NO(c.reasonOf('마황×Ⅴ-1항 배합금지'))],
+  ['종류', 7, c => c.ra.length === 0 ? c.NA
+      : (c.ga.length + c.na_.length + c.da.length) === 0 ? c.YES()
+      : c.NO(`라란(${c.ra.map(r => r.ingr).join(',')})과 생약 동시 배합`)],
+  // 향소산 이외의 한약처방은 엑스에 한하여 — 성분명으로 엑스 여부를 가릴 수 없다
+  ['종류', 8, c => c.ra.length === 0 ? c.NA : c.HOLD],
+  // 라란 구성생약·분량은 <표2>에 의한다 — 참조 규정이라 판정 대상이 아니다
+  ['종류', 9, c => c.ra.length === 0 ? c.NA : c.HOLD],
+  ['종류', 10, c => !c.hasIbu ? c.NA : (() => {
+      const bad = [];
+      if (c.n1) bad.push('Ⅰ항');
+      if (c.n9) bad.push('Ⅸ항');
+      if (c.ga.length) bad.push('가란 생약');
+      if (c.da.some(r => r.ingr.includes('지룡'))) bad.push('지룡');
+      if (c.ra.length) bad.push('라란 한약처방');
+      return bad.length ? c.NO(`이부프로펜과 ${bad.join('·')} 동시 배합 불가`) : c.YES();
+    })()],
+  ['종류', 11, c => !c.n8 ? c.NA : (() => {
+      const bad = [];
+      if (c.n10) bad.push('Ⅹ항');
+      if (c.ga.length) bad.push('가란 생약');
+      if (c.ra.length) bad.push('라란 한약처방');
+      return bad.length ? c.NO(`Ⅷ항과 ${bad.join('·')} 동시 배합 불가`) : c.YES();
+    })()],
+  ['종류', 12, c => !c.n9 ? c.NA : (() => {
+      const bad = [];
+      if (c.n2) bad.push('Ⅱ항');
+      if (c.n10) bad.push('Ⅹ항');
+      if (c.ga.length) bad.push('가란 생약');
+      if (c.ra.length) bad.push('라란 한약처방');
+      return bad.length ? c.NO(`Ⅸ항과 ${bad.join('·')} 동시 배합 불가`) : c.YES();
+    })()],
+  // 2026-57호 신설
+  ['종류', 13, c => !c.hasMeq ? c.NA : (() => {
+      const bad = [];
+      if (/내용액제|경구용\s*액제|시럽/.test(c.form || '')) bad.push('경구용 액제에는 배합 불가');
+      if (c.ra.length) bad.push('라란 한약처방과 동시 배합 불가');
+      return bad.length ? c.NO('메퀴타진 — ' + bad.join('; ')) : c.YES();
+    })()],
+  ['종류', 14, c => !c.n15 ? c.NA : (() => {
+      const bad = [];
+      if (c.ga.length) bad.push('가란 생약');
+      if (c.na_.some(r => r.ingr.includes('감초'))) bad.push('나란 감초');
+      if (c.ra.length) bad.push('라란 한약처방');
+      return bad.length ? c.NO(`ⅩⅤ항(글리시리진산)과 ${bad.join('·')} 동시 배합 불가`) : c.YES();
+    })()],
+
+  // ── 유효성분의 분량 ──
+  ['분량', 1, c => c.anyFail(c.overFail) ? c.NO(c.failNames(c.overFail)) : c.YES()],
+  // 비례합 — 아직 계산하지 않는다. 해당 구성일 때만 보류로 남긴다
+  ['분량', 2, c => (c.n1 >= 2 || (c.ga.length + c.na_.length) >= 2) ? c.HOLD : c.NA],
+  ['분량', 3, c => (c.n1 >= 1 && (c.da.some(r => r.ingr.includes('지룡'))
+                    || c.ra.some(r => /갈근탕|마황탕/.test(r.ingr)))) ? c.HOLD : c.NA],
+  ['분량', 4, c => c.ra.length === 0 ? c.NA : (() => {
+      const p = r => c.ra.some(x => x.ingr === r.ingr) && r.ok === false;
+      return c.anyFail(p) ? c.NO(c.failNames(p)) : c.YES();
+    })()],
+  ['분량', 5, c => c.anyFail(c.underFail) ? c.NO(c.failNames(c.underFail)) : c.YES()],
+  /* 6번은 5번(일반 하한 1/2)과 별개다. 표1 최대가 1,500이면 1/2 = 750이라
+     5번이 더 엄하다. 둘을 묶으면 700mg처럼 600은 넘고 750은 못 넘는 값에서
+     6번까지 잘못 부적합으로 찍힌다. 그래서 600mg 기준으로 따로 센다. */
+  ['분량', 6, c => !(c.n1 === 1 && c.inH('Ⅰ항')[0]?.ingr === '아세트아미노펜') ? c.NA : (() => {
+      const bad = [];
+      c.allVpairs.forEach(({ dr, v }) => {
+        const r = (v.itemResults || []).find(x => x.ingr === '아세트아미노펜');
+        if (!r || r.dailyMin == null) return;
+        const floor = +(600 * (v.coeff ?? 1)).toFixed(4);
+        if (r.dailyMin < floor) {
+          const al = displayAgeLabel(dr.age, '제3장_감기약', c.form) || dr.age;
+          bad.push(`${al}: 1일 ${_num(r.dailyMin)} mg — 하한 ${_num(floor)} mg 미달`);
+        }
+      });
+      return bad.length ? c.NO(bad.join('; ')) : c.YES();
+    })()],
+  ['분량', 7, c => (c.inH('Ⅻ항').length + c.inH('ⅩⅣ항').length) === 0 ? c.NA : (() => {
+      const p = r => /Ⅻ항|ⅩⅣ항/.test(r.gubun || '') && c.underFail(r);
+      return c.anyFail(p) ? c.NO(c.failNames(p)) : c.YES();
+    })()],
+  ['분량', 8, c => !c.n13 ? c.NA : (() => {
+      const p = r => /ⅩⅢ항/.test(r.gubun || '') && c.underFail(r);
+      return c.anyFail(p) ? c.NO(c.failNames(p)) : c.YES();
+    })()],
+  ['분량', 9, c => (c.n15 + c.ga.length + c.na_.length + c.da.length) === 0 ? c.NA : (() => {
+      const p = r => /1\/10/.test(r.reason || '');
+      return c.anyFail(p) ? c.NO(c.failNames(p)) : c.YES();
+    })()],
+  // "근거가 …에만 의할 경우"를 프로그램이 단정하기 어렵다
+  ['분량', 10, c => (c.ga.length + c.na_.length) === 0 ? c.NA
+      : ((c.inH('Ⅳ항').length + c.inH('Ⅴ항').length + c.inH('Ⅶ항').length) === 0 ? c.HOLD : c.NA)],
+  ['분량', 11, c => !(c.isLiquid && c.hasCaf) ? c.NA : (() => {
+      const caf = c.ir0.find(r => r.ingr.includes('카페인'));
+      const per = caf?.dose1 != null ? +caf.dose1 : null;
+      if (per == null) return c.HOLD;
+      return per <= 30 ? c.YES() : c.NO(`1회 카페인 ${per} mg — 30 mg 초과`);
+    })()],
+  ['분량', 12, c => !c.hasAsp ? c.NA
+      : (c.inH('Ⅴ-1항').length ? c.NO('아스피린과 Ⅴ-1항 성분 동시 배합 불가') : c.YES())],
+];
+
+/* 판정에 쓰는 값을 한 번에 만들어 조항 표에 넘긴다 */
+function _ch3Ctx(allVpairs, form, activeRows) {
+  const H      = _ruleStatusHelpers(allVpairs, '제3장_감기약', form);
   const tables = DB['제3장_감기약']?.['표'] ?? {};
   const t1e    = tables['표1_유효성분'] ?? [];
   const t1h    = tables['표1_생약_및_한약처방'] ?? [];
-  const t2     = tables['표2_한방처방_구성'] ?? {};
   const rows   = activeRows.filter(r => r.ingr);
 
-  const isOk      = key => !rules.some(r => r.key === key && r.ok === false);
-  const reasonOf  = key => (rules.find(r => r.key === key) || {}).reason || '';
-  // 어느 연령에서든 한 번이라도 걸리면 부적합으로 본다 (가장 엄격한 쪽)
-  const anyFail   = pred => allVpairs.some(({ v }) => (v.itemResults||[]).some(pred));
-  const failNames = pred => {
-    const out = [];
-    allVpairs.forEach(({ dr, v }) => {
-      const al = displayAgeLabel(dr.age, '제3장_감기약', form) || dr.age;
-      (v.itemResults||[]).filter(pred).forEach(r => out.push(`${r.ingr}(${al}): ${r.reason}`));
-    });
-    return [...new Set(out)].join('; ');
-  };
-
-  // 배합된 성분이 표1의 어느 항인지
   const eOf   = r => t1e.find(t => t['성분명'] === r.ingr);
   const hOf   = r => t1h.find(t => t['성분명'] === r.ingr);
   const inH   = pfx => rows.filter(r => (eOf(r)?.['구분'] ?? '').startsWith(pfx));
   const inLan = lan => rows.filter(r => (hOf(r)?.['구분'] ?? '') === lan);
 
-  const n1 = inH('Ⅰ항').length,   n2 = inH('Ⅱ항').length;
-  const n8 = inH('Ⅷ항').length,   n9 = inH('Ⅸ항').length, n10 = inH('Ⅹ항').length;
-  const n13 = inH('ⅩⅢ항').length;
-  const ga = inLan('가란'), na_ = inLan('나란'), da = inLan('다란'), ra = inLan('라란');
-  const n15     = inH('ⅩⅤ항').length;
-  const hasMeq  = rows.some(r => r.ingr.includes('메퀴타진'));
-  const hasIbu  = rows.some(r => r.ingr.includes('이부프로펜'));
-  const hasAsp  = rows.some(r => r.ingr.includes('아스피린'));
-  const hasCaf  = rows.some(r => r.ingr.includes('카페인'));
-  const isLiquid = /내용액제/.test(form || '');
-  const 미등재  = ir0.filter(r => r.ok === null);
-
-  // 5) "Ⅲ항, Ⅳ항, Ⅴ-1항, Ⅵ항, Ⅶ항, Ⅺ항, Ⅻ항목 … 각 항 또는 라란의 각각 1종으로 한다"
-  // 2026-57호 개정으로 ⅩⅤ항(글리시리진산)이 이 목록에 들어왔다
+  // 각 항 1종 (2026-57호로 ⅩⅤ항이 들어왔다)
   const 단일항 = ['Ⅲ항','Ⅳ항','Ⅴ-1항','Ⅵ항','Ⅶ항','Ⅺ항','Ⅻ항','ⅩⅤ항'];
-  const 초과항 = 단일항.map(h => [h, inH(h).length]).filter(([, c]) => c > 1);
+  const ra = inLan('라란');
+  const 초과항 = 단일항.map(h => [h, inH(h).length]).filter(([, n]) => n > 1);
   if (ra.length > 1) 초과항.push(['라란', ra.length]);
 
-  const kindsSt = [
-    // 1) 배합할 수 있는 유효성분의 종류는 <표1>의 성분으로 한다.
-    미등재.length
-      ? NO(미등재.map(r => `${r.ingr}: 표1에 없음`).join('; '))
-      : YES(),
-    // 2) 한약처방 규격·기초시험자료 제출 — 서류 요건이라 프로그램이 판정할 수 없다
-    ra.length ? HOLD : NA,
-    // 3) 배합하지 않으면 안되는 유효성분은 Ⅰ항과 Ⅱ항 중 1종 이상
-    (n1 + n2) >= 1 ? YES() : NO('Ⅰ항·Ⅱ항 성분이 하나도 없음'),
-    // 4) Ⅰ항의 유효성분은 3종까지
-    n1 <= 3 ? YES() : NO(`Ⅰ항 ${n1}종 — 최대 3종`),
-    // 5) 각 항 1종 (라란도 1종)
-    초과항.length
-      ? NO(초과항.map(([h, c]) => `${h} ${c}종 — 각 1종만`).join('; '))
-      : YES(),
-    // 6) 마황(및 마황 함유 처방) × Ⅴ-1항 배합 불가 — 검증기가 이미 본다
-    isOk('마황×Ⅴ-1항 배합금지') ? YES() : NO(reasonOf('마황×Ⅴ-1항 배합금지')),
-    // 7) 라란의 한약처방 × 가·나·다란 생약 배합 불가
-    ra.length === 0 ? NA
-      : (ga.length + na_.length + da.length) === 0 ? YES()
-      : NO(`라란(${ra.map(r=>r.ingr).join(',')})과 생약 동시 배합`),
-    // 8) 향소산 이외의 한약처방은 엑스에 한하여 배합
-    //    성분명만으로 엑스 여부를 가릴 수 없어 보류한다
-    ra.length === 0 ? NA : HOLD,
-    // 9) 라란 한약처방의 구성생약·분량은 <표2>에 의한다 — 참조 규정
-    ra.length === 0 ? NA : HOLD,
-    // 10) 이부프로펜은 Ⅰ항·Ⅸ항·가란·지룡·라란과 동시 배합 금지
-    !hasIbu ? NA : (() => {
-      const bad = [];
-      if (n1) bad.push('Ⅰ항');
-      if (n9) bad.push('Ⅸ항');
-      if (ga.length) bad.push('가란 생약');
-      if (da.some(r => r.ingr.includes('지룡'))) bad.push('지룡');
-      if (ra.length) bad.push('라란 한약처방');
-      return bad.length ? NO(`이부프로펜과 ${bad.join('·')} 동시 배합 불가`) : YES();
-    })(),
-    // 11) Ⅷ항 × Ⅹ항·가란·라란 동시 배합 불가
-    !n8 ? NA : (() => {
-      const bad = [];
-      if (n10) bad.push('Ⅹ항');
-      if (ga.length) bad.push('가란 생약');
-      if (ra.length) bad.push('라란 한약처방');
-      return bad.length ? NO(`Ⅷ항과 ${bad.join('·')} 동시 배합 불가`) : YES();
-    })(),
-    // 12) Ⅸ항 × Ⅱ항·Ⅹ항·가란·라란 동시 배합 불가
-    !n9 ? NA : (() => {
-      const bad = [];
-      if (n2) bad.push('Ⅱ항');
-      if (n10) bad.push('Ⅹ항');
-      if (ga.length) bad.push('가란 생약');
-      if (ra.length) bad.push('라란 한약처방');
-      return bad.length ? NO(`Ⅸ항과 ${bad.join('·')} 동시 배합 불가`) : YES();
-    })(),
-    // 13) 메퀴타진은 경구용 액제 이외의 제제에만, 라란 한약처방과 배합 불가 (2026-57호 신설)
-    !hasMeq ? NA : (() => {
-      const bad = [];
-      if (/내용액제|경구용\s*액제|시럽/.test(form || '')) bad.push('경구용 액제에는 배합 불가');
-      if (ra.length) bad.push('라란 한약처방과 동시 배합 불가');
-      return bad.length ? NO('메퀴타진 — ' + bad.join('; ')) : YES();
-    })(),
-    // 14) ⅩⅤ항(글리시리진산)은 가란 생약·나란 감초·라란 한약처방과 배합 불가 (2026-57호 신설)
-    !n15 ? NA : (() => {
-      const bad = [];
-      if (ga.length) bad.push('가란 생약');
-      if (na_.some(r => r.ingr.includes('감초'))) bad.push('나란 감초');
-      if (ra.length) bad.push('라란 한약처방');
-      return bad.length ? NO(`ⅩⅤ항(글리시리진산)과 ${bad.join('·')} 동시 배합 불가`) : YES();
-    })(),
-  ];
+  return {
+    NA:   { ok: null, na: true,  reason: '' },
+    HOLD: { ok: null, na: false, reason: '' },
+    YES:  () => ({ ok: true,  na: false, reason: '' }),
+    NO:   r => ({ ok: false, na: false, reason: r }),
+    allVpairs, form, rows, inH, inLan,
+    ir0: H.ir0, isOk: H.isOk, reasonOf: H.reasonOf,
+    anyFail: H.anyFail, failNames: H.failNames,
+    overFail:  r => r.ok === false && /최대/.test(r.reason || ''),
+    underFail: r => r.ok === false && /최소|미달|하한/.test(r.reason || ''),
+    n1: inH('Ⅰ항').length, n2: inH('Ⅱ항').length,
+    n8: inH('Ⅷ항').length, n9: inH('Ⅸ항').length, n10: inH('Ⅹ항').length,
+    n13: inH('ⅩⅢ항').length, n15: inH('ⅩⅤ항').length,
+    ga: inLan('가란'), na_: inLan('나란'), da: inLan('다란'), ra,
+    초과항,
+    hasMeq: rows.some(r => r.ingr.includes('메퀴타진')),
+    hasIbu: rows.some(r => r.ingr.includes('이부프로펜')),
+    hasAsp: rows.some(r => r.ingr.includes('아스피린')),
+    hasCaf: rows.some(r => r.ingr.includes('카페인')),
+    isLiquid: /내용액제/.test(form || ''),
+    미등재: H.ir0.filter(r => r.ok === null),
+  };
+}
 
-  const overFail  = r => r.ok === false && /최대/.test(r.reason || '');
-  const underFail = r => r.ok === false && /최소|미달/.test(r.reason || '');
-
-  const amtsSt = [
-    // 1) 각 유효성분의 1일 최대분량은 <표1>의 양
-    anyFail(overFail) ? NO(failNames(overFail)) : YES(),
-    // 2) Ⅰ항 2종 이상 또는 가·나란 생약 2종 이상일 때 비례합 ≤ 1
-    //    지금 검증기는 이 합산을 계산하지 않는다 → 해당 구성일 때만 보류
-    (n1 >= 2 || (ga.length + na_.length) >= 2) ? HOLD : NA,
-    // 3) Ⅰ항 + 지룡/갈근탕/마황탕 비례합 ≤ 1 — 위와 같은 이유로 보류
-    (n1 >= 1 && (da.some(r => r.ingr.includes('지룡'))
-                 || ra.some(r => /갈근탕|마황탕/.test(r.ingr)))) ? HOLD : NA,
-    // 4) 라란 한약처방 배합분량은 1일 최대분량의 1/5 이상 1/2 미만
-    ra.length === 0 ? NA
-      : (anyFail(r => ra.some(x => x.ingr === r.ingr) && r.ok === false)
-          ? NO(failNames(r => ra.some(x => x.ingr === r.ingr) && r.ok === false)) : YES()),
-    // 5) 각 유효성분 배합량의 하한은 1일 최대분량의 1/2
-    anyFail(underFail) ? NO(failNames(underFail)) : YES(),
-    // 6) Ⅰ항 중 아세트아미노펜만 배합 시 1일 배합량의 하한은 600mg
-    //    5번(일반 하한 1/2)과 별개 조항이므로 600mg 기준으로 따로 본다.
-    //    표1 최대가 1,500이면 1/2 = 750이 되어 5번이 더 엄하다. 그래서
-    //    "5번 위반 = 6번 위반"으로 묶으면 700mg 같은 값에서 6번이 잘못
-    //    부적합으로 찍힌다 (600은 넘었는데 750은 못 넘은 경우).
-    !(n1 === 1 && inH('Ⅰ항')[0]?.ingr === '아세트아미노펜') ? NA
-      : (() => {
-          const bad = [];
-          allVpairs.forEach(({ dr, v }) => {
-            const r = (v.itemResults || []).find(x => x.ingr === '아세트아미노펜');
-            if (!r || r.dailyMin == null) return;
-            const floor = +(600 * (v.coeff ?? 1)).toFixed(4);
-            if (r.dailyMin < floor) {
-              const al = displayAgeLabel(dr.age, '제3장_감기약', form) || dr.age;
-              bad.push(`${al}: 1일 ${_num(r.dailyMin)} mg — 하한 ${_num(floor)} mg 미달`);
-            }
-          });
-          return bad.length ? NO(bad.join('; ')) : YES();
-        })(),
-    // 7) Ⅻ항·ⅩⅣ항 유효성분의 하한은 1일 최대분량의 1/5
-    (inH('Ⅻ항').length + inH('ⅩⅣ항').length) === 0 ? NA
-      : (anyFail(r => /Ⅻ항|ⅩⅣ항/.test(r.gubun || '') && underFail(r))
-          ? NO(failNames(r => /Ⅻ항|ⅩⅣ항/.test(r.gubun || '') && underFail(r))) : YES()),
-    /* 8~12번은 원문 순서다. 예전에 누락 조항을 배열 끝에 덧붙인 탓에
-       카페인·아스피린이 8·9번에 놓여 있었는데, 원문에서는 11·12번이다.
-       이 배열은 자리로 조항을 가리키므로 순서가 어긋나면 판정이
-       엉뚱한 조항에 붙는다. 원문 순서로 되돌렸다. */
-    // 8) ⅩⅢ항 유효성분의 하한은 1일 최대분량 뒤 괄호 안의 양
-    !n13 ? NA
-      : (anyFail(r => /ⅩⅢ항/.test(r.gubun || '') && underFail(r))
-          ? NO(failNames(r => /ⅩⅢ항/.test(r.gubun || '') && underFail(r))) : YES()),
-    // 9) ⅩⅤ항 글리시리진산·가·나·다란 생약의 하한은 1일 최대분량의 1/10
-    (n15 + ga.length + na_.length + da.length) === 0 ? NA
-      : (anyFail(r => /1\/10/.test(r.reason || '')) ? NO(failNames(r => /1\/10/.test(r.reason || ''))) : YES()),
-    // 10) 기침·가래 효능 근거가 가란 또는 나란에만 의할 경우의 하한
-    //     "근거가 …에만 의할 경우"를 프로그램이 단정하기 어려워, 생약이
-    //     있고 다른 진해·거담 성분이 없을 때만 보류로 남긴다
-    (ga.length + na_.length) === 0 ? NA
-      : ((inH('Ⅳ항').length + inH('Ⅴ항').length + inH('Ⅶ항').length) === 0 ? HOLD : NA),
-    // 11) 내용액제의 1회 카페인 30mg 초과 금지
-    !(isLiquid && hasCaf) ? NA : (() => {
-      const caf = ir0.find(r => r.ingr.includes('카페인'));
-      const per = caf?.dose1 != null ? +caf.dose1 : null;
-      if (per == null) return HOLD;
-      return per <= 30 ? YES() : NO(`1회 카페인 ${per} mg — 30 mg 초과`);
-    })(),
-    // 12) 아스피린과 Ⅴ-1항 성분은 배합하지 않는다
-    !hasAsp ? NA
-      : (inH('Ⅴ-1항').length ? NO('아스피린과 Ⅴ-1항 성분 동시 배합 불가') : YES()),
-  ];
-
-  return { kindsSt, amtsSt };
+function computeCh3KindsAmtsStatus(allVpairs, form, activeRows) {
+  if (!allVpairs.length) return { kindsSt: [], amtsSt: [] };
+  const base = DB['제3장_감기약']?.['기준'] ?? {};
+  const out = _runClauseTable(CH3_CLAUSES, _ch3Ctx(allVpairs, form, activeRows), {
+    // 조항 수는 데이터에서 가져온다 — 개정으로 늘면 자동으로 따라간다
+    '종류': (base['유효성분의_종류'] ?? []).length,
+    '분량': (base['유효성분의_분량'] ?? []).length,
+  });
+  return { kindsSt: out['종류'], amtsSt: out['분량'] };
 }
 
 /* 조항별 판정에서 되풀이되는 부분 — 제3·7·9장이 함께 쓴다 */

@@ -563,6 +563,74 @@ async function main() {
     else { results.fail++; renderCase(s3, 'fail', id, c.desc, [{ path: '추정 장', was: c.expectKey, now: actual }]); }
   });
 
+  // 3-a) 조항 표 ↔ 옛 배열 대조
+  //   조항 표로 옮기면서 판정이 달라지지 않았는지 여러 배합으로 견준다.
+  //   옛 함수(_OLD)를 지우면 이 구획도 함께 지운다.
+  const sTbl = section('조항 표 ↔ 옛 방식 대조 (제3장)');
+  if (typeof win.computeCh3KindsAmtsStatus_OLD === 'function') {
+    let diffs = [], n = 0, err = null;
+    try {
+      n = win.eval(`(function(){
+        var T = DB['제3장_감기약']['표'];
+        var t1e = T['표1_유효성분'], t1h = T['표1_생약_및_한약처방'];
+        var cases = [
+          [['아세트아미노펜','클로르페니라민말레산염'],'정제',0.8],
+          [['아세트아미노펜','클로르페니라민말레산염'],'정제',0.1],
+          [['아세트아미노펜','살리실아미드','에텐자미드','아스피린'],'정제',0.8],
+          [['아세트아미노펜','메퀴타진'],'내용액제',0.8],
+          [['아세트아미노펜','메퀴타진'],'정제',0.8],
+          [['이부프로펜','클로르페니라민말레산염'],'정제',0.8],
+          [['아세트아미노펜','카페인무수물'],'내용액제',0.9],
+          [['아세트아미노펜','글리시리진산 및 그 염류(글리시리진산으로서)'],'정제',0.8],
+          [['아스피린','dl-메틸에페드린염산염'],'정제',0.8],
+          [['아세트아미노펜','인삼'],'정제',0.8],
+          [['아세트아미노펜','마황'],'정제',0.8],
+          [['아세트아미노펜','갈근탕'],'정제',0.3],
+          [['아세트아미노펜','비타민B2 및 그 유도체와 염류'],'정제',0.8],
+          [['아세트아미노펜','클로르페니라민말레산염'],'정제',0.8,'만 7세 이상 - 만 11세 미만'],
+          [['브롬헥신염산염','아세트아미노펜'],'정제',0.8],
+          [['L-카르보시스테인','아세트아미노펜'],'정제',0.8]
+        ];
+        var m = function(x){ return x.na?'/':x.ok===true?'O':x.ok===false?'X':'-'; };
+        var sig = function(st){ return st.kindsSt.map(m).join('')+' '+st.amtsSt.map(m).join(''); };
+        var why = function(st){ return st.kindsSt.concat(st.amtsSt).map(function(x){return x.reason||'';}).join('|'); };
+        window.__tblDiffs = [];
+        cases.forEach(function(c){
+          var rows = c[0].map(function(nm,i){
+            var e = t1e.filter(function(x){return x['성분명']===nm;})[0]
+                 || t1h.filter(function(x){return x['성분명']===nm;})[0];
+            if (!e) return null;
+            var isHerb = t1h.indexOf(e) >= 0;
+            var mx = isHerb ? (e['1일최대분량_원생약_g']||1) : (e['1일최대분량_mg']||100);
+            return { id:i+1, ingr:nm, gubun:e['구분'],
+                     dose:String(+(mx*c[2]/3).toFixed(5)), unit:isHerb?'g':'mg' };
+          }).filter(Boolean);
+          var dr = { age:c[3]||'만 15세 이상', freqMin:3, freqMax:3, amtMin:1, amtMax:1 };
+          var v = validateChapter3(T, c[1], dr.age, rows,
+                    {freqMin:3,freqMax:3,amtMin:1,amtMax:1,unit:'mg'});
+          var a = computeCh3KindsAmtsStatus_OLD([{dr:dr,v:v}], c[1], rows);
+          var b = computeCh3KindsAmtsStatus([{dr:dr,v:v}], c[1], rows);
+          if (sig(a)!==sig(b) || why(a)!==why(b))
+            window.__tblDiffs.push(c[0].join('+')+' / '+c[1]+' : 옛 '+sig(a)+' → 새 '+sig(b));
+        });
+        return cases.length;
+      })()`);
+      diffs = win.__tblDiffs || [];
+    } catch (e) { err = e.message; }
+    if (err) { results.err++; renderCase(sTbl, 'err', 'clause-table-parity', '조항 표와 옛 방식이 같은 판정을 내는가', null, '오류: ' + err); }
+    else if (diffs.length) {
+      results.fail++;
+      renderCase(sTbl, 'fail', 'clause-table-parity', `조항 표와 옛 방식이 같은 판정을 내는가 (배합 ${n}가지)`,
+        diffs.slice(0, 5).map(d => ({ path: '판정 차이', was: '같아야 함', now: d })));
+    } else {
+      results.pass++;
+      renderCase(sTbl, 'pass', 'clause-table-parity', `조항 표와 옛 방식이 같은 판정을 내는가 (배합 ${n}가지)`);
+    }
+  } else {
+    results.pass++;
+    renderCase(sTbl, 'pass', 'clause-table-parity', '옛 방식이 제거되어 대조할 것이 없음');
+  }
+
   // 3-b) 조항별 적합여부
   const sRS = section(`조항별 적합여부 — 워드 검토서 확인란 (${(window.RULE_STATUS_CASES ?? []).length}건)`);
   for (const c of (window.RULE_STATUS_CASES ?? [])) {
