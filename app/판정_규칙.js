@@ -1024,10 +1024,13 @@ function validateChapter3(tables, form, ageGroup, rows, dosage) {
   const has마황직접 = rows.some(r => !!table1h.find(t=>t['성분명']===r.ingr&&t['구분']==='가란'));
   const has마황처방 = rows.some(r => { const e=table1h.find(t=>t['성분명']===r.ingr&&t['구분']==='라란'); return e&&마황처방.has(r.ingr); });
 
-  // 아세트아미노펜 단독 배합 여부 (Ⅰ항 1종만, Ⅲ항 없음)
+  /* 분량 6) "<표1> 중 Ⅰ항의 유효성분 중 아세트아미노펜만 배합하는 경우"
+     — "Ⅰ항 중에서" 아세트아미노펜뿐이라는 뜻이다. 다른 항(항히스타민제 등)이
+     함께 있는지는 이 조항과 무관하다.
+     예전에는 Ⅲ항이 없을 때만으로 좁혀 놓아, 항히스타민제를 함께 쓰는
+     보통의 감기약에서 600mg 하한이 적용되지 않았다. */
   const grupI   = rows.filter(r=>r.ingr && table1e.find(t=>t['성분명']===r.ingr && (t['구분']??'').startsWith('Ⅰ항')));
-  const grupIII = rows.filter(r=>r.ingr && table1e.find(t=>t['성분명']===r.ingr && (t['구분']??'').startsWith('Ⅲ항')));
-  const isAcetoAlone = grupI.length===1 && grupIII.length===0 && grupI[0]?.ingr==='아세트아미노펜';
+  const isAcetoAlone = grupI.length===1 && grupI[0]?.ingr==='아세트아미노펜';
 
   const ruleErrors = [];
   if (hasV1항 && (has마황직접 || has마황처방))
@@ -1050,10 +1053,33 @@ function validateChapter3(tables, form, ageGroup, rows, dosage) {
       const dailyMax = +(raw*amtMax*freqMax).toFixed(4);
       const critMax  = eRef['1일최대분량_mg']!=null ? +(eRef['1일최대분량_mg']*coeff).toFixed(4) : null;
       const gubunStr = eRef['구분'] ?? '';
-      const critMinFrac = (gubunStr.includes('Ⅻ') || gubunStr.includes('ⅩⅣ')) ? 1/5 : 1/2;
-      let critMin = critMax!=null ? +(critMax * critMinFrac).toFixed(4) : null;
-      if (isAcetoAlone && row.ingr==='아세트아미노펜' && critMax!=null)
-        critMin = Math.max(critMin ?? 0, +(600 * coeff).toFixed(4));
+      /* 배합량의 하한 — 원문 분량 5)가 기본 1/2이고, 그 아래 조항들이
+         "별도로 정하는 경우"로 이를 대신한다.
+           7) Ⅻ항·ⅩⅣ항          1/5
+           8) ⅩⅢ항               표1 괄호 안의 양 (비율이 아니라 고정값)
+           9) ⅩⅤ항 글리시리진산  1/10  ← 2026-57호로 들어옴
+           6) 아세트아미노펜 단독  600 mg (고정값) */
+      let critMin;
+      const _isX13 = gubunStr.includes('ⅩⅢ');
+      const _paren = _isX13 ? String(eRef['비고'] ?? '').match(/배합\s*최소량\s*([\d.]+)/) : null;
+      if (_paren) {
+        // 표1에 "25(1)"처럼 적힌 괄호 안 값. 어린이는 연령계수를 곱한다.
+        critMin = +(parseFloat(_paren[1]) * coeff).toFixed(4);
+      } else {
+        const critMinFrac =
+            (gubunStr.includes('Ⅻ') || gubunStr.includes('ⅩⅣ')) ? 1/5
+          : (gubunStr.includes('ⅩⅤ'))                            ? 1/10
+          // 분량 6) 뒷부분 — Ⅰ항을 2종 이상 배합하면 각 성분의 하한이 1/5
+          : (gubunStr.startsWith('Ⅰ항') && grupI.length >= 2)     ? 1/5
+          : 1/2;
+        critMin = critMax != null ? +(critMax * critMinFrac).toFixed(4) : null;
+      }
+      /* 분량 6) — 아세트아미노펜만 배합하면 하한이 600 mg이다.
+         분량 5)의 "별도로 정하는 경우"가 바로 이것이므로 1/2(750)을
+         쓰지 않고 600으로 갈음한다. 예전에는 둘 중 큰 값을 써서
+         600~750 사이 제품이 부적합으로 잘못 나왔다. */
+      if (isAcetoAlone && row.ingr === '아세트아미노펜' && critMax != null)
+        critMin = +(600 * coeff).toFixed(4);
       const unit = conv ? `mg ${conv}` : 'mg';
       const issues = [];
       if (critMax!=null && dailyMax>critMax) issues.push(_reasonOver('1일', dailyMax, critMax, unit));
@@ -1088,10 +1114,18 @@ function validateChapter3(tables, form, ageGroup, rows, dosage) {
         return { ...base, dose1:+rawG.toFixed(4), dailyMin, dailyMax, critMin, critMax, unit:'g',
                  ok:issues.length===0, reason:issues.length===0?'적합':issues.join('; ') };
       } else {
-        const critMax=+(maxG*coeff).toFixed(4);
-        const issue = dailyMax>critMax ? [_reasonOver('1일', dailyMax, critMax, 'g')] : [];
-        return { ...base, dose1:+rawG.toFixed(4), dailyMin, dailyMax, critMin:null, critMax, unit:'g',
-                 ok:issue.length===0, reason:issue.length===0?'적합':issue[0] };
+        const critMax = +(maxG*coeff).toFixed(4);
+        /* 분량 9) 가란·나란·다란 생약의 하한은 1일 최대분량의 1/10.
+           예전에는 하한을 아예 두지 않아(critMin:null) 아무리 적게 넣어도
+           통과했고, 워드 검토서의 1일최소 칸도 "—"로 비어 있었다.
+           (분량 10)의 1/2·1/5 예외는 "효능의 근거가 생약에만 의할 경우"라
+            프로그램이 단정할 수 없어 조항별 판정에서 따로 보류로 둔다) */
+        const critMin = +(critMax/10).toFixed(4);
+        const issues = [];
+        if (dailyMax > critMax) issues.push(_reasonOver('1일', dailyMax, critMax, 'g'));
+        if (dailyMin < critMin) issues.push(_reasonUnder('1일', dailyMin, critMin, 'g', ' (1일 최대의 1/10)'));
+        return { ...base, dose1:+rawG.toFixed(4), dailyMin, dailyMax, critMin, critMax, unit:'g',
+                 ok:issues.length===0, reason:issues.length===0?'적합':issues.join('; ') };
       }
     }
 
@@ -3235,8 +3269,8 @@ function _wordPrecautionSection(opts) {
 
   let out = '';
   out += `<p>&nbsp;</p><p>&nbsp;</p>`;
-  out += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[사용상의 주의사항] <span style="${FN}font-size:9pt;font-weight:normal;color:#555;">(해당 부분 하이라이트)</span></p>`;
-  out += `<table style="width:100%;border-collapse:collapse;margin-bottom:12pt;"><thead><tr>`;
+  out += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:16pt 0 5pt;line-height:1.3;">[사용상의 주의사항] <span style="${FN}font-size:9pt;font-weight:normal;color:#555;">(해당 부분 하이라이트)</span></p>`;
+  out += `<table class="tall-rows" style="width:100%;border-collapse:collapse;margin-bottom:12pt;"><thead><tr>`;
   out += `<th style="${TH}width:50%;">의약품 표준제조기준</th>`;
   out += `<th style="${TH}width:50%;">${esc(productName)}</th>`;
   out += `</tr></thead><tbody>`;
@@ -3345,7 +3379,7 @@ function _printAsPdf(productName, body, extraStyle, tail) {
     setStatus('팝업이 막혀 있어 PDF를 열지 못했습니다 — 주소창 오른쪽에서 팝업을 허용해 주세요.', 'error');
     return;
   }
-  const title = `${productName}_표준제조기준검토_${new Date().toISOString().slice(0,10)}`;
+  const title = _reviewFileName(productName);
   win.document.write(`<!doctype html><html lang="ko"><head><meta charset="UTF-8">
 <title>${esc(title)}</title>
 <style>
@@ -3383,6 +3417,14 @@ ${tail || ''}
   win.addEventListener('load', () => setTimeout(() => win.print(), 250));
 }
 
+/* 검토서 파일 이름 — 제품명_표준제조기준_검토서_알피바이오_YYMMDD */
+function _reviewFileName(productName) {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  const ymd = p(d.getFullYear() % 100) + p(d.getMonth() + 1) + p(d.getDate());
+  return `${productName}_표준제조기준_검토서_알피바이오_${ymd}`;
+}
+
 /* 워드 문서 껍데기 + 내려받기 — 세 분기가 똑같이 갖고 있던 부분.
    제1장만 워드 메모(comment)를 쓰므로 extraStyle·tail로 받는다. */
 /* 워드로 내려받을지 PDF(인쇄)로 낼지 — generateFullWordDoc(mode)가 정한다.
@@ -3405,8 +3447,16 @@ function _wordDownload(productName, body, extraStyle, tail) {
   table { border-collapse:collapse; width:100%; table-layout:fixed; }
   td, th { padding:3pt 5pt; border:1px solid #b8c4d4; word-wrap:break-word; overflow-wrap:break-word;
            vertical-align:middle; mso-vertical-align-alt:middle; }
-  /* 표가 페이지에 걸릴 때 아무 데서나 잘리지 않게 한다 */
+  /* 칸 안의 문단이 위로 붙는 것을 막는다 — 워드는 칸의 세로 정렬만으로는
+     문단 여백까지 없애 주지 않아, 글이 한 줄일 때 위쪽에 치우쳐 보인다 */
+  td p, th p { margin-top:0; margin-bottom:0; }
+  /* 페이지 나눔 —
+     한 행이 페이지에 걸쳐 쪼개지면 읽기 어려우므로 행 단위로 막는다.
+     다만 주의사항·용법용량처럼 한 칸에 글이 길게 들어가는 표는
+     행 하나가 한 쪽을 넘길 수 있다. 그런 행까지 통째로 막으면
+     빈 쪽이 생기므로, 그런 표에는 avoid를 걸지 않는다(tall-rows). */
   tr { page-break-inside:avoid; mso-yfti-cnfc:0; }
+  table.tall-rows tr { page-break-inside:auto; }
   thead { display:table-header-group; }      /* 페이지가 넘어가면 머리행을 다시 그린다 */
   table { page-break-inside:auto; }
   /* 절 제목은 바로 아래 내용과 붙여 둔다 — 제목만 남고 표가 넘어가지 않게 */
@@ -3421,7 +3471,7 @@ ${tail || ''}
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href = url;
-  a.download = `${productName}_표준제조기준검토_${new Date().toISOString().slice(0,10)}.doc`;
+  a.download = `${_reviewFileName(productName)}.doc`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -3957,7 +4007,7 @@ function _generateFullWordDoc() {
   const TH   = `${FN}font-size:10pt;padding:4pt 6pt;${BORD}font-weight:bold;text-align:center;background:#E8EEF7;`;
   const TH2  = `${FN}font-size:10pt;padding:4pt 6pt;${BORD}font-weight:bold;text-align:center;background:#d6e4f5;`;
   const TH3  = `${FN}font-size:10pt;padding:4pt 6pt;${BORD}font-weight:bold;text-align:center;background:#d9f0e0;`;
-  const SEC  = `${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;`;
+  const SEC  = `${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:16pt 0 5pt;line-height:1.3;`;
   const fmt  = v => v != null ? (+v).toLocaleString('ko-KR', { maximumFractionDigits: 4 }) : '—';
   const chLabel = ch.label || currentKey;
 
@@ -3974,7 +4024,7 @@ function _generateFullWordDoc() {
     const TH2R   = THRAW + 'background:#d5e2f2;';
     const TH3R   = THRAW + 'background:#daebdd;';
     const TDRAW  = `${FN}font-size:9.5pt;padding:2pt 5pt;${BORD}vertical-align:middle;mso-vertical-align-alt:middle;word-break:keep-all;line-height:1.2;`;
-    body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[원료약품 및 그 분량]</p>`;
+    body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:16pt 0 5pt;line-height:1.3;">[원료약품 및 그 분량]</p>`;
     {
       // 연령별로 각각 표 출력 — 연령계수로 인해 표제기 기준값(1회최대/최소, 1일최대)이
       // 연령마다 다르므로 동일 용법이더라도 병합하지 않음
@@ -4118,18 +4168,18 @@ function _generateFullWordDoc() {
         return s;
       };
       if (kinds2.length) {
-        body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 종류]</p>`;
+        body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:16pt 0 5pt;line-height:1.3;">[유효성분의 종류]</p>`;
         body += renderCheckTable2(kinds2, kSt2);
       }
       if (amts2.length) {
-        body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 분량]</p>`;
+        body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:16pt 0 5pt;line-height:1.3;">[유효성분의 분량]</p>`;
         body += renderCheckTable2(amts2, aSt2);
       }
     }
 
     // (2) [효능효과] — plain text, no table
     body += `<p>&nbsp;</p><p>&nbsp;</p>`;
-    body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[효능효과]</p>`;
+    body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:16pt 0 5pt;line-height:1.3;">[효능효과]</p>`;
     const effDbItems2 = DB['제2장_해열진통제']?.['기준']?.['효능효과'] ?? [];
     body += `<p style="${FN}font-size:10pt;margin:0 0 4pt;">효능 및 효과의 범위는 다음 범위로 한다.</p>`;
     effDbItems2.forEach((t, i) => {
@@ -4138,8 +4188,8 @@ function _generateFullWordDoc() {
     body += `<p>&nbsp;</p><p>&nbsp;</p>`;
 
     // (3) [용법용량] — 2-col table
-    body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[용법용량]</p>`;
-    body += `<table style="width:100%;border-collapse:collapse;margin-bottom:14pt;"><thead><tr>`;
+    body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:16pt 0 5pt;line-height:1.3;">[용법용량]</p>`;
+    body += `<table class="tall-rows" style="width:100%;border-collapse:collapse;margin-bottom:14pt;"><thead><tr>`;
     body += `<th style="${TH}width:50%;">의약품 표준제조기준</th>`;
     body += `<th style="${TH}width:50%;">${esc(productName)}</th>`;
     body += `</tr></thead><tbody><tr>`;
@@ -4295,14 +4345,12 @@ function _generateFullWordDoc() {
         if (v && v.itemResults && v.itemResults.length) {
           let lastGubun = null;
           for (const r of v.itemResults) {
-            // 구분은 맨 앞 칸에 적는다. 같은 항이 이어지면 비워 두어
-            // 같은 글자가 되풀이되지 않게 한다 (묶음 머리행을 없앤 이유).
-            // 괄호 안 설명(항히스타민제 등)은 떼고 항 번호만 적는다.
-            // 열이 좁아 통째로 넣으면 두세 줄로 접혀 행이 다시 높아진다.
-            // 기준 조항이 짚는 것도 "Ⅲ항"이라는 번호다.
+            /* 구분은 행마다 적는다. 같은 항이 이어질 때 비워 두었더니
+               "육계는 다란인데 인삼은 빈칸"으로 보여 빠뜨린 것처럼 읽혔다.
+               괄호 안 설명(항히스타민제 등)은 떼고 항 번호만 남긴다 —
+               열이 좁아 통째로 넣으면 두세 줄로 접힌다. */
             const gubunShort = g => String(g || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
-            const gubunCell = (r.gubun && r.gubun !== lastGubun) ? gubunShort(r.gubun) : '';
-            if (r.gubun) lastGubun = r.gubun;
+            const gubunCell = gubunShort(r.gubun);
             const fail = r.ok === false;
             const rowBg = fail ? 'background:#fff5f5;' : '';
             const ingrRow = activeRows.find(ar => ar.ingr === r.ingr);
@@ -4314,7 +4362,14 @@ function _generateFullWordDoc() {
                        + (r.ok === false ? 'color:#c62828;font-weight:bold;' : r.ok === true ? '' : 'color:#aaa;');
             body += `<tr style="${rowBg}">`;
             body += `<td style="${TDRAW}font-size:8.5pt;color:#3d4d63;">${esc(gubunCell)}</td>`;
-            body += `<td style="${TDRAW}">${esc(r.ingr)}</td>`;
+            /* 실제 성분명을 적어 두었으면 그 이름을 앞세우고 표1 이름을
+               괄호로 남긴다 — 허가사항에는 실제 이름이 들어가고,
+               어느 기준으로 봤는지도 함께 보여야 한다. */
+            const _act = (activeRows.find(a => a.ingr === r.ingr) || {}).actualName;
+            body += `<td style="${TDRAW}">`
+                  + (_act ? `${esc(_act)}<br><span style="font-size:8pt;color:#6a7686;">(${esc(r.ingr)})</span>`
+                          : esc(r.ingr))
+                  + `</td>`;
             body += `<td style="${TDRAW}text-align:right;background:#f2f6fb;">${fmt(r.critMax)}</td>`;
             body += `<td style="${TDRAW}text-align:right;background:#f2f6fb;">${fmt(r.critMin)}</td>`;
             body += `<td style="${TDRAW}text-align:right;background:#f1f8f3;">${fmt(act1)}</td>`;
@@ -4362,11 +4417,16 @@ function _generateFullWordDoc() {
       const renderCheckMx = (items, stList) => {
         if (!items.length) return '';
         let s = `<table style="width:100%;border-collapse:collapse;margin-bottom:10pt;table-layout:fixed;">`;
-        s += `<colgroup><col style="width:80%;mso-width-source:userset;"><col style="width:20%;mso-width-source:userset;"></colgroup>`;
+        // "해당사항 없음"이 한 줄에 들어가도록 확인 열을 넓혔다
+        s += `<colgroup><col style="width:73%;mso-width-source:userset;"><col style="width:27%;mso-width-source:userset;"></colgroup>`;
         s += `<thead><tr><th style="${TH}">세부내용</th><th style="${TH}text-align:center;">확인</th></tr></thead><tbody>`;
         items.forEach((item, i) => {
           const st = (stList || [])[i] || { ok: null, na: false, reason: '' };
-          const mark = st.na ? '/' : st.ok === true ? '적합' : st.ok === false ? '부적합' : '—';
+          // 슬래시 한 글자로는 무슨 뜻인지 알 수 없어 말로 적는다
+          const mark = st.na ? '해당사항 없음'
+                     : st.ok === true ? '적합'
+                     : st.ok === false ? '부적합'
+                     : '직접 확인 필요';
           const cellSt = `${FN}font-size:9pt;text-align:center;padding:3pt;${BORD}word-break:keep-all;`
             + (st.ok === false ? 'color:#c62828;font-weight:bold;'
                : st.ok === true ? '' : 'color:#aaa;');
@@ -4380,19 +4440,19 @@ function _generateFullWordDoc() {
       // 범례는 빼기로 했다 — 표만으로 읽힌다
       const legendMx = '';
       if (kinds3.length) {
-        body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 종류]</p>`;
+        body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:16pt 0 5pt;line-height:1.3;">[유효성분의 종류]</p>`;
         body += legendMx;
         body += renderCheckMx(kinds3, st3.kindsSt);
       }
       if (amts3.length) {
-        body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:14pt 0 4pt;">[유효성분의 분량]</p>`;
+        body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:16pt 0 5pt;line-height:1.3;">[유효성분의 분량]</p>`;
         body += renderCheckMx(amts3, st3.amtsSt);
       }
     }
 
     // (3) [효능효과]
     body += `<p>&nbsp;</p><p>&nbsp;</p>`;
-    body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[효능효과]</p>`;
+    body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:16pt 0 5pt;line-height:1.3;">[효능효과]</p>`;
     if (effResult?.finalTexts?.length) {
       effResult.finalTexts.forEach(t => {
         body += `<p style="${FN}font-size:10pt;margin:0 0 4pt;">${esc(applyEasyTerms(t))}</p>`;
@@ -4428,8 +4488,8 @@ function _generateFullWordDoc() {
     body += `<p>&nbsp;</p><p>&nbsp;</p>`;
 
     // (4) [용법용량] — 2-col
-    body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:0 0 6pt;">[용법용량]</p>`;
-    body += `<table style="width:100%;border-collapse:collapse;margin-bottom:14pt;"><thead><tr>`;
+    body += `<p class="sec-head" style="${FN}font-size:11pt;font-weight:bold;color:#1a4b8c;margin:16pt 0 5pt;line-height:1.3;">[용법용량]</p>`;
+    body += `<table class="tall-rows" style="width:100%;border-collapse:collapse;margin-bottom:14pt;"><thead><tr>`;
     body += `<th style="${TH}width:50%;">의약품 표준제조기준</th>`;
     body += `<th style="${TH}width:50%;">${esc(productName)}</th>`;
     body += `</tr></thead><tbody><tr>`;
@@ -4722,7 +4782,7 @@ function _generateFullWordDoc() {
   // 3. [효능효과]
   // ══════════════════════════════════════════
   body += `<p style="${SEC}">[효능효과]</p>`;
-  body += `<table style="width:100%;border-collapse:collapse;margin-bottom:12pt;">`;
+  body += `<table class="tall-rows" style="width:100%;border-collapse:collapse;margin-bottom:12pt;">`;
   body += `<thead><tr>`;
   body += `<th style="${TH}width:60%;">의약품 표준제조기준</th>`;
   body += `<th style="${TH}width:40%;">${esc(productName)}</th>`;
@@ -4767,7 +4827,7 @@ function _generateFullWordDoc() {
   // 4. [용법용량]
   // ══════════════════════════════════════════
   body += `<p style="${SEC}">[용법용량]</p>`;
-  body += `<table style="width:100%;border-collapse:collapse;margin-bottom:12pt;">`;
+  body += `<table class="tall-rows" style="width:100%;border-collapse:collapse;margin-bottom:12pt;">`;
   body += `<thead><tr>`;
   body += `<th style="${TH}width:60%;">의약품 표준제조기준</th>`;
   body += `<th style="${TH}width:40%;">${esc(productName)}</th>`;
@@ -4826,7 +4886,7 @@ function _generateFullWordDoc() {
   // 5. [사용상의 주의사항]
   // ══════════════════════════════════════════
   body += `<p style="${SEC}">[사용상의 주의사항]</p>`;
-  body += `<table style="width:100%;border-collapse:collapse;margin-bottom:12pt;">`;
+  body += `<table class="tall-rows" style="width:100%;border-collapse:collapse;margin-bottom:12pt;">`;
   body += `<thead><tr>`;
   body += `<th style="${TH}width:60%;">의약품 표준제조기준</th>`;
   body += `<th style="${TH}width:40%;">${esc(productName)}</th>`;

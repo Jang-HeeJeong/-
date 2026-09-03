@@ -417,6 +417,17 @@
       color: #666;
       white-space: nowrap;
     }
+    /* 실제 유효성분명 — 표1 이름 아래 작게 */
+    input.mx-actual-name {
+      display: block; width: 100%; margin-top: 3px; font-family: inherit;
+      font-size: 11px; color: #2f3f55; background: #f7f9fc;
+      border: 1px dashed var(--hairline); border-radius: 3px; padding: 2px 5px;
+    }
+    input.mx-actual-name:focus {
+      background: #fff; border-style: solid; border-color: var(--navy, #1a4b8c); outline: none;
+    }
+    input.mx-actual-name::placeholder { color: #a8b6c9; }
+
     /* 생약 기준 선택 — 성분명 아래 작게 */
     select.mx-herb-basis {
       display: block; margin-top: 3px; font-family: inherit; font-size: 10.5px;
@@ -1804,7 +1815,8 @@ function buildMatrixRows(chapterKey) {
       const gPow  = ref['1일최대분량_분말_g'];
       const gval  = gRaw ?? gPow;
       const max1d = gval != null ? +(gval * 1000).toFixed(4) : null;
-      const frac  = g === '라란' ? 1/5 : 1/2;
+      // 라란 한약처방은 1/5 (분량 4), 가·나·다란 생약은 1/10 (분량 9)
+      const frac  = g === '라란' ? 1/5 : 1/10;
       const min1d = max1d != null ? +(max1d * frac).toFixed(4) : null;
       const r = mk(ref['성분명'], g, { min1: null, max1: null, min1d, max1d });
       // 생약은 원생약(처방환산량)과 분말의 1일 최대분량이 다르다.
@@ -1887,7 +1899,12 @@ function confirmMatrixAdd() {
 function getMatrixActiveRows() {
   return matrixRows
     .filter(r => r.dose !== '' && !isNaN(+r.dose) && +r.dose > 0)
-    .map(r => ({ id: r.id, ingr: r.ingr || '(미입력)', gubun: r.gubun, dose: String(r.dose), unit: r.unit || 'mg' }));
+    /* actualName(허가사항에 쓰는 실제 성분명)과 herbBasis(원생약/분말)도
+       함께 넘긴다. 검토서와 판정이 이 값을 봐야 하는데, 예전에는 여기서
+       떨어져 나가 화면에만 남고 검토서에는 반영되지 않았다. */
+    .map(r => ({ id: r.id, ingr: r.ingr || '(미입력)', gubun: r.gubun,
+                 dose: String(r.dose), unit: r.unit || 'mg',
+                 actualName: r.actualName || '', herbBasis: r.herbBasis }));
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -3469,9 +3486,17 @@ function renderCh2Integrated() {
           + `<option value="분말"${row.herbBasis==='분말'?' selected':''}>분말 ${row.herbPowG}g</option>`
           + `</select>`
         : '';
+      /* 표1의 이름이 묶음일 때(비타민B1 및 그 유도체와 염류, 육계 …)
+         허가사항에 쓰는 실제 성분명을 따로 적을 수 있게 한다.
+         적어 두면 검토서에는 그 이름이 나가고, 표1 이름은 괄호로 남는다.
+         판정은 표1 이름으로 하므로 기준값은 그대로다. */
       const nameCell = (row.isCustom
         ? `<input class="mx-custom-name" data-id="${row.id}" value="${esc(row.ingr)}" placeholder="성분명 입력">`
-        : esc(row.ingr)) + herbPick;
+        : esc(row.ingr))
+        + `<input class="mx-actual-name" data-id="${row.id}" value="${esc(row.actualName || '')}"
+                 placeholder="실제 성분명 (예: 티아민질산염)"
+                 title="허가사항에 쓰는 실제 성분명입니다. 비워 두면 왼쪽 이름을 그대로 씁니다.">`
+        + herbPick;
 
       rows += `<tr class="${rowCls}" data-id="${row.id}">`;
       rows += `<td class="mx-gubun-cell">${canRemove?`<button class="mx-remove-btn" data-id="${row.id}" title="제거">×</button>`:''}</td>`;
@@ -3618,6 +3643,10 @@ function renderCh2Integrated() {
   // 단위당 함량 입력 → 모든 블록 제품함량 실시간 갱신 (포커스 유지, DOM 최소 업데이트)
   /* 생약 기준(원생약·처방환산량 / 분말)을 고르면 그 기준으로 다시 잡는다.
      성분마다 두 값이 달라, 잘못 잡으면 한도가 몇 배까지 어긋난다. */
+  wrap.querySelectorAll('.mx-actual-name').forEach(el => el.addEventListener('input', e => {
+    const row = matrixRows.find(r => r.id === +e.target.dataset.id);
+    if (row) { row.actualName = e.target.value.trim(); updateLiveSummary(); }
+  }));
   wrap.querySelectorAll('.mx-herb-basis').forEach(el => el.addEventListener('change', e => {
     const row = matrixRows.find(r => r.id === +e.target.dataset.id);
     if (!row) return;
@@ -5559,6 +5588,9 @@ function saveDraftNow() {
           .filter(r => (r.isMain || r.isShown) && !r.isCustom && r.dose !== '' && r.dose != null)
           .map(r => [r.ingr, r.dose])),
         shown:  matrixRows.filter(r => !r.isMain && r.isShown && !r.isCustom).map(r => r.ingr),
+      // 실제 성분명·생약 기준도 함께 저장한다 (적어 둔 것만)
+      actualNames: Object.fromEntries(matrixRows.filter(r => r.actualName).map(r => [r.ingr, r.actualName])),
+      herbBases:   Object.fromEntries(matrixRows.filter(r => r.isHerb && r.herbBasis === '분말').map(r => [r.ingr, '분말'])),
         custom: matrixRows.filter(r => r.isCustom)
           .map(r => ({ gubun: r.gubun, ingr: r.ingr, dose: r.dose ?? '', unit: r.unit ?? 'mg' })),
       };
@@ -5712,6 +5744,22 @@ function restoreProductState(product) {
       matrixRows.push({ id: ++mxRowIdSeq, gubun: c.gubun, ingr: c.ingr, unit: c.unit || 'mg',
         std: { min1: null, max1: null, min1d: null, max1d: null },
         dose: c.dose, isCustom: true, isMain: false, isShown: true });
+    });
+    // 적어 두었던 실제 성분명을 되살린다
+    Object.entries(mx.actualNames || {}).forEach(([ingr, nm]) => {
+      const row = matrixRows.find(r => r.ingr === ingr);
+      if (row) row.actualName = nm;
+    });
+    /* 생약 기준(원생약/분말)도 되살린다 — 분말로 고른 것만 저장돼 있다.
+       기준이 바뀌면 1일 최대·최소를 그 기준으로 다시 잡아야 한다. */
+    Object.entries(mx.herbBases || {}).forEach(([ingr, basis]) => {
+      const row = matrixRows.find(r => r.ingr === ingr && r.isHerb);
+      if (!row) return;
+      row.herbBasis = basis;
+      const g = basis === '분말' ? row.herbPowG : row.herbRawG;
+      row.std.max1d = g != null ? +(g * 1000).toFixed(4) : null;
+      const frac = row.gubun === '라란' ? 1/5 : 1/10;
+      row.std.min1d = row.std.max1d != null ? +(row.std.max1d * frac).toFixed(4) : null;
     });
     if (currentKey === '제2장_해열진통제') {
       // ch2: dose를 먼저 모두 주입한 뒤 한 번에 렌더링
