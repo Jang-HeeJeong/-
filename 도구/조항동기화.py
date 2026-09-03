@@ -27,22 +27,30 @@ BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(BASE, 'app', '표제기_데이터.js')
 OUT  = os.path.join(BASE, '도구', '조항동기화_결과.txt')
 
-# 이 도구가 다루는 장 — 조항이 "n)" 형식으로 붙는 장만.
-# 제1장은 "(n)" 형식이라 구조가 달라 아직 다루지 않는다.
+# 장마다 조항 매기는 방식이 다르다.
+#   제2·3·7·9장 :  1) 2) 3)   … 소제목은 (1) (2) 또는 (가) (나)
+#   제1장        : (1) (2) (3) … 소제목은 1) 2) 3)
+# 그래서 "조항 표시"와 "다음 소제목 표시"를 장마다 따로 준다.
+NUM   = dict(item=r'^(\d+)\)\s*(.*)$',    nexthead=r'\n\s*\((?:\d+|[가-힣])\)\s*\S')
+PAREN = dict(item=r'^\((\d+)\)\s*(.*)$',  nexthead=r'\n\s*\d\)\s*[가-힣]')
+
 CHAPTERS = [
-    ('제2장_해열진통제',   2),
-    ('제3장_감기약',       3),
-    ('제7장_진해거담제',   7),
-    ('제9장_비염용경구제', 9),
+    ('제1장_비타민미네랄', 1, PAREN),
+    ('제2장_해열진통제',   2, NUM),
+    ('제3장_감기약',       3, NUM),
+    ('제7장_진해거담제',   7, NUM),
+    ('제9장_비염용경구제', 9, NUM),
 ]
 
 SECTIONS = [
-    ('유효성분의 종류', r'유효성분의\s*종류', '유효성분의_종류'),
-    ('유효성분의 분량', r'유효성분의\s*분량', '유효성분의_분량'),
-    ('용법·용량',       r'용법\s*·?\s*용량', '용법용량'),
+    ('유효성분의 종류',   r'유효성분의\s*종류',                 '유효성분의_종류'),
+    ('유효성분의 분량',   r'유효성분의\s*분량',                 '유효성분의_분량'),
+    # 제1장은 이 이름으로 조항을 담는다
+    ('배합성분의 종류',   r'배합성분의\s*종류\s*및\s*배합한도', '배합성분의_종류_및_배합한도'),
+    ('용법·용량',         r'용법\s*·?\s*용량',                  '용법용량'),
 ]
 
-NEXT_HEAD = re.compile(r'\n\s*\((?:\d+|[가-힣])\)\s*\S')
+NEXT_HEAD = re.compile(NUM['nexthead'])
 
 
 def load(path):
@@ -64,20 +72,24 @@ def chapter_span(text, num):
     return None
 
 
-def section_items(seg, title_re):
-    """소제목 다음의 'n)' 조항을 번호별로 모은다. 이어지는 줄은 붙인다."""
+def section_items(seg, title_re, fmt=None):
+    """소제목 다음의 조항을 번호별로 모은다. 이어지는 줄은 앞 조항에 붙인다.
+
+    조항에 딸린 예시("예) …")도 번호가 없으므로 앞 조항에 붙는다 —
+    원문이 한 조항으로 적은 것을 둘로 쪼개지 않으려는 것이다."""
+    fmt = fmt or NUM
     m = re.search(title_re, seg)
     if not m:
         return {}
     after = seg[m.end():]
-    stop = NEXT_HEAD.search(after)
+    stop = re.compile(fmt['nexthead']).search(after)
     blk = after[:stop.start()] if stop else after
     out, cur, num = {}, [], None
     for ln in blk.split('\n'):
         s = ln.strip()
         if not s:
             continue
-        m2 = re.match(r'^(\d+)\)\s*(.*)$', s)
+        m2 = re.match(fmt['item'], s)
         if m2:
             if num is not None:
                 out[num] = ' '.join(cur).strip()
@@ -119,7 +131,7 @@ def main():
     w('조항 동기화 %s' % ('— 실제 반영' if apply else '— 미리보기 (파일은 그대로)'))
     w('=' * 78)
 
-    for key, num in CHAPTERS:
+    for key, num, fmt in CHAPTERS:
         span = chapter_span(orig, num)
         if not span:
             w('')
@@ -132,7 +144,7 @@ def main():
         w('─' * 78)
 
         for label, title_re, dbkey in SECTIONS:
-            src = section_items(seg, title_re)
+            src = section_items(seg, title_re, fmt)
             if not src:
                 w('  %-14s 원문에서 못 읽음 — 건너뜀' % label)
                 continue

@@ -3530,6 +3530,80 @@ function _runClauseTable(rules, ctx, counts) {
   return out;
 }
 
+/* ══════════ 제1장(비타민·미네랄) 조항 표 ══════════
+   다른 장은 "유효성분의 종류/분량"으로 나뉘는데, 제1장은
+   "배합성분의 종류 및 배합한도" 하나에 세 조항이 들어 있다.
+   그래서 절 이름이 '배합'이다. */
+const CH1_CLAUSES = [
+  /* (1) 배합가능한 성분의 종류는 <표1>~<표4>에 기재된 것 */
+  ['배합', 1, c => {
+      const notFound = c.ir0.filter(r => r.ok === null);
+      return notFound.length
+        ? c.NO(notFound.map(r => `${r.ingr}: 표1~표4에 없음`).join('; '))
+        : c.YES();
+    },
+    { 사유: /표\s*1|표1~표4에 없음|찾을 수 없음/, 우선: 10 }],
+
+  /* (2) 같은 항목의 성분을 여러 개 넣으면 그 합이 1일 최대량을 넘을 수 없다.
+         예) 레티놀아세테이트 + 레티놀팔미테이트 ≤ 10,000 IU
+         검증기가 sumResults로 항목별 합을 이미 세고 있다. */
+  ['배합', 2, c => {
+      const sums = [];
+      c.allVpairs.forEach(({ v }) => (v.sumResults || []).forEach(x => sums.push(x)));
+      const bad = sums.filter(x => x.ok === false);
+      if (bad.length) return c.NO(bad.map(x => x.reason || x.key).join('; '));
+      const hold = sums.filter(x => x.ok === null);
+      if (hold.length) return { ok: null, na: false, reason: hold[0].reason || '' };
+      /* 한 항목에 성분이 하나뿐이면 합칠 것이 없지만, 그 성분의 양이 곧
+         항목의 총량이고 성분별 판정에서 이미 확인했다. 그러니 "해당없음"이
+         아니라 "적합"이다. 성분이 아예 없을 때만 볼 것이 없다. */
+      if (!c.rows.length) return c.NA;
+      const anyBad = c.anyFail(r => r.ok === false);
+      return anyBad ? c.NO(c.failNames(r => r.ok === false)) : c.YES();
+    },
+    { 사유: /합계|총량|합이/, 우선: 9 }],
+
+  /* (3) 만 8세 미만이 복용하는 제제에는 이 미네랄들을 넣을 수 없다 */
+  ['배합', 3, c => {
+      if (!c.under8) return c.NA;                    // 어린이 용법이 없으면 볼 것이 없다
+      const 금지 = ['염소', '크롬', '망간', '몰리브덴', '칼륨', '나트륨', '황'];
+      const hit = c.rows.filter(r => {
+        const nm = String(r.ingr || '');
+        // 표2 미네랄은 "칼륨으로서"처럼 적힌다. 낱말이 맞아떨어질 때만 잡는다
+        return 금지.some(k => nm === k || nm.startsWith(k + '으로서') || nm.startsWith(k + '로서'));
+      });
+      return hit.length
+        ? c.NO(`만 8세 미만 용법에는 배합할 수 없는 성분: ${hit.map(r => r.ingr).join(', ')}`)
+        : c.YES();
+    }],
+];
+
+function _ch1Ctx(allVpairs, form, activeRows) {
+  const H    = _ruleStatusHelpers(allVpairs, '제1장_비타민미네랄', form);
+  const v0   = allVpairs[0].v;
+  const rows = activeRows.filter(r => r.ingr);
+  return {
+    NA:   { ok: null, na: true,  reason: '' },
+    HOLD: { ok: null, na: false, reason: '' },
+    YES:  () => ({ ok: true,  na: false, reason: '' }),
+    NO:   r => ({ ok: false, na: false, reason: r }),
+    allVpairs, form, rows,
+    ir0: H.ir0, anyFail: H.anyFail, failNames: H.failNames,
+    // 어느 연령에서든 만 8세 미만이 있으면 (3)을 본다
+    under8: allVpairs.some(({ v }) => v.under8),
+  };
+}
+
+function computeCh1KindsAmtsStatus(allVpairs, form, activeRows) {
+  if (!allVpairs.length) return { kindsSt: [], amtsSt: [] };
+  const base = DB['제1장_비타민미네랄']?.['기준'] ?? {};
+  const out = _runClauseTable(CH1_CLAUSES, _ch1Ctx(allVpairs, form, activeRows), {
+    '배합': (base['배합성분의_종류_및_배합한도'] ?? []).length,
+  });
+  // 제1장은 절이 하나다 — 다른 장과 모양을 맞추려고 kindsSt에 담는다
+  return { kindsSt: out['배합'], amtsSt: [] };
+}
+
 /* ══════════ 제3장 조항 표 ══════════
    [절, 조항번호, 판정] — 번호를 값으로 적으므로 순서가 어긋날 수 없다. */
 const CH3_CLAUSES = [
@@ -4076,6 +4150,7 @@ function _ruleStatusHelpers(allVpairs, chapterKey, form) {
    ★ 짚을 수 없는 사유는 아무것도 돌려주지 않는다.
      엉뚱한 조항을 갖다 붙이면 없느니만 못하다. */
 const _CLAUSE_TABLES = {
+  '제1장_비타민미네랄': () => (typeof CH1_CLAUSES !== 'undefined' ? CH1_CLAUSES : null),
   '제3장_감기약':       () => (typeof CH3_CLAUSES !== 'undefined' ? CH3_CLAUSES : null),
   '제7장_진해거담제':   () => (typeof CH7_CLAUSES !== 'undefined' ? CH7_CLAUSES : null),
   '제9장_비염용경구제': () => (typeof CH9_CLAUSES !== 'undefined' ? CH9_CLAUSES : null),
@@ -4096,9 +4171,13 @@ function _clauseForReason(chapterKey, reason, gubun) {
   for (const { sec, no, c } of cands) {
     if (c.구분 && !c.구분.test(g)) continue;
     if (c.사유 && !c.사유.test(r)) continue;
-    const arr = DB[chapterKey]?.['기준']?.[sec === '종류' ? '유효성분의_종류' : '유효성분의_분량'];
+    const SEC_KEY = { '종류': '유효성분의_종류', '분량': '유효성분의_분량',
+                      '배합': '배합성분의_종류_및_배합한도' };
+    const arr = DB[chapterKey]?.['기준']?.[SEC_KEY[sec]];
     if (!Array.isArray(arr) || !arr[no - 1]) continue;
-    return { label: `유효성분의 ${sec} ${no})`, text: arr[no - 1] };
+    const LABEL = { '종류': '유효성분의 종류', '분량': '유효성분의 분량',
+                    '배합': '배합성분의 종류 및 배합한도' };
+    return { label: `${LABEL[sec]} ${no})`, text: arr[no - 1] };
   }
   return null;
 }
@@ -4868,52 +4947,15 @@ function _generateFullWordDoc() {
       return s;
     };
 
-    body += `<p style="${SEC}">[유효성분의 종류 및 배합한도]</p>`;
+    if (currentKey !== '제1장_비타민미네랄')
+      body += `<p style="${SEC}">[유효성분의 종류 및 배합한도]</p>`;
 
+    /* 제1장 조항별 적합여부는 아래 "2. [배합성분의 종류 및 배합한도]"에서
+       조항 표로 낸다. 여기서 손으로 O/X를 매기던 것을 걷어냈다 —
+       그 코드는 "예)"가 별도 조항으로 잘못 들어가 있던 것을 걸러 내는
+       임시방편까지 안고 있었는데, 데이터를 원문에 맞추면서 필요 없어졌다. */
     if (currentKey === '제1장_비타민미네랄') {
-      // ch1 전용: O/X 확인 열이 있는 3항목 표
-      const items1c = chDbObj2?.['기준']?.['배합성분의_종류_및_배합한도'] ?? [];
-      const hasV1   = allValidations.length > 0;
-      // 각 항목별 O/X 판정
-      // 항목1: 모든 성분이 표1~4에 있는지
-      const st1ok = hasV1 ? allValidations.every(({v}) =>
-        (v.itemResults ?? []).every(r => r.reason !== '표1~표4에서 성분을 찾을 수 없음')
-      ) : null;
-      // 항목2: 각 항목 배합 총량이 1일 최대를 넘지 않는지 (개별 + 합산)
-      const st2ok = hasV1 ? allValidations.every(({v}) =>
-        (v.itemResults ?? []).every(r => r.ok === true) &&
-        (v.sumResults  ?? []).every(r => r.ok !== false)
-      ) : null;
-      // 항목3: 만 8세 미만 금지 미네랄 미포함
-      const st3ok = hasV1 ? allValidations.every(({v}) =>
-        (v.itemResults ?? []).every(r => !r.reason?.includes('만 8세 미만 배합 금지'))
-      ) : null;
-      const ch1Statuses = [st1ok, st2ok, st3ok];
-      const OKST1c = `${FN}font-size:13pt;font-weight:bold;color:#2e7d32;text-align:center;padding:2pt 3pt;${BORD}`;
-      const NGST1c = `${FN}font-size:13pt;font-weight:bold;color:#c62828;text-align:center;padding:2pt 3pt;${BORD}`;
-      const NAST1c = `${FN}font-size:10pt;color:#aaa;text-align:center;padding:2pt 3pt;${BORD}`;
-      if (items1c.length) {
-        let s1c = `<table style="width:100%;border-collapse:collapse;margin-bottom:10pt;table-layout:fixed;">`;
-        s1c += `<colgroup><col style="width:87%;mso-width-source:userset;"><col style="width:13%;mso-width-source:userset;"></colgroup>`;
-        s1c += `<thead><tr>`;
-        s1c += `<th style="${TH}">세부내용</th>`;
-        s1c += `<th style="${TH}text-align:center;">확인<br>(적합&amp;부적합)</th>`;
-        s1c += `</tr></thead><tbody>`;
-        const filteredItems1c = items1c.filter(item => !item.trim().match(/^예\s*\)/));
-        filteredItems1c.forEach((item, i) => {
-          const ok = ch1Statuses[i] ?? null;
-          let mark = '—', cellSt = NAST1c;
-          if (ok === true)  { mark = 'O'; cellSt = OKST1c; }
-          else if (ok === false) { mark = 'X'; cellSt = NGST1c; }
-          const rowBg1c = ok === false ? 'background:#fff5f5;' : '';
-          s1c += `<tr style="${rowBg1c}">`;
-          s1c += `<td style="${TD}">${i+1}) ${esc(item)}</td>`;
-          s1c += `<td style="${cellSt}">${mark}</td>`;
-          s1c += `</tr>`;
-        });
-        s1c += `</tbody></table>`;
-        body += s1c;
-      }
+      // 제목만 두고 표는 아래 조항 표가 그린다
     } else {
       const kinds = chDbObj2?.['기준']?.['유효성분의_종류'] ?? [];
       const amts  = chDbObj2?.['기준']?.['유효성분의_분량'] ?? [];
@@ -4932,6 +4974,33 @@ function _generateFullWordDoc() {
         ...failedItems.map(r => `${r.ingr}: ${r.reason}`),
       ];
       body += `<p style="${FN}font-size:9pt;color:#c62828;margin:0 0 8pt;"><b>부적합 항목:</b> ${msgs.map(esc).join(' / ')}</p>`;
+    }
+  }
+
+  // ══════════════════════════════════════════
+  // 2. [배합성분의 종류 및 배합한도] — 조항별 적합여부
+  // ══════════════════════════════════════════
+  if (currentKey === '제1장_비타민미네랄' && typeof computeCh1KindsAmtsStatus === 'function') {
+    const mixItems = DB[currentKey]?.['기준']?.['배합성분의_종류_및_배합한도'] ?? [];
+    if (mixItems.length) {
+      const st1 = computeCh1KindsAmtsStatus(allValidations, form, activeRows);
+      body += `<p class="sec-head" style="${SEC}">[배합성분의 종류 및 배합한도]</p>`;
+      body += `<table style="width:100%;border-collapse:collapse;margin-bottom:10pt;table-layout:fixed;">`;
+      body += `<colgroup><col style="width:73%;"><col style="width:27%;"></colgroup>`;
+      body += `<thead><tr><th style="${TH}">세부내용</th><th style="${TH}text-align:center;">확인</th></tr></thead><tbody>`;
+      mixItems.forEach((item, i) => {
+        const st = (st1.kindsSt || [])[i] || { ok: null, na: false, reason: '' };
+        const mark = st.na ? '해당사항 없음'
+                   : st.ok === true ? '적합'
+                   : st.ok === false ? '부적합'
+                   : '직접 확인 필요';
+        const cst = `${FN}font-size:9pt;text-align:center;padding:3pt;${BORD}word-break:keep-all;`
+                  + (st.ok === false ? 'color:#b3261e;font-weight:bold;' : st.ok === true ? '' : 'color:#8a8f98;');
+        const why = (st.ok === false && st.reason)
+          ? `<br><span style="font-size:8pt;color:#b3261e;">↳ ${esc(st.reason)}</span>` : '';
+        body += `<tr><td style="${TD}">${i + 1}) ${esc(item)}${why}</td><td style="${cst}">${mark}</td></tr>`;
+      });
+      body += `</tbody></table>`;
     }
   }
 

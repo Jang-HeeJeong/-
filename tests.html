@@ -295,6 +295,18 @@ function flowSnapshot(win) {
         return (d.ingredients || []).length;
       } catch (e) { return -1; }
     })()`),
+    // 제1장 조항별 적합여부 (배합성분의 종류 및 배합한도)
+    ch1Clauses: win.eval(`(function(){
+      if (currentKey !== '제1장_비타민미네랄'
+          || typeof computeCh1KindsAmtsStatus !== 'function') return '';
+      var rows = getCh1ActiveRows(); var dr = dosageRows.filter(function(x){return x.age;})[0];
+      if (!dr || !rows.length) return '';
+      var v = validateChapter1(DB['제1장_비타민미네랄']['표'], currentForm, dr.age, rows,
+        {freqMin:dr.freqMin,freqMax:dr.freqMax,amtMin:dr.amtMin,amtMax:dr.amtMax,unit:dosageUnit});
+      var st = computeCh1KindsAmtsStatus([{dr:dr, v:v}], currentForm, rows);
+      var m = function(x){ return x.na ? '/' : x.ok === true ? 'O' : x.ok === false ? 'X' : '-'; };
+      return st.kindsSt.map(m).join('');
+    })()`),
     // 제3장 조항별 적합여부 — "적합/부적합//(해당없음)/—(보류)"를 한 줄로
     ch3Status: win.eval(`(function(){
       if (currentKey !== '제3장_감기약' || typeof computeCh3KindsAmtsStatus !== 'function') return '';
@@ -442,6 +454,9 @@ function flowCheck(expect, snap) {
       const r = snap.dosageRows?.[0];
       const got = r ? `${r.amtMin}~${r.amtMax}` : '(행 없음)';
       if (got !== want) diffs.push({ path: '1회량 범위', was: want, now: got });
+    } else if (k === 'ch1Clauses') {
+      if (snap.ch1Clauses !== want)
+        diffs.push({ path: '제1장 조항 판정', was: want, now: snap.ch1Clauses || '(없음)' });
     } else if (k === 'statusHas') {
       if (!snap.statusText.includes(want))
         diffs.push({ path: '하단 문구', was: '…' + want + '…', now: snap.statusText || '(빈칸)' });

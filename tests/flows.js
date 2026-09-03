@@ -222,4 +222,14 @@ window.FLOW_CASES = [
       { runValidation: true, expect: { statusHasNot: '검토 완료' } },
     ],
   },
+  {
+    id: 'flow-ch1-clause-table',
+    desc: '제1장 조항별 적합여부 — 배합성분의 종류 및 배합한도 3개 조항',
+    steps: [
+      /* 제1장은 조항이 "(1) (2) (3)" 형식이라 오랫동안 조항 표가 없었다.
+         원문에는 3개인데 데이터에 "예)"가 조항으로 잘못 들어가 4개였고,
+         검토서는 그 "예)"를 걸러 내는 임시방편으로 버티고 있었다. */
+      { pick: '부스트젤리', expect: { ch1Clauses: 'OOO' } },
+    ],
+  },
 ];
