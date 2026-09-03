@@ -208,7 +208,9 @@ function runRuleStatusCase(win, scope, c) {
     if (!e) throw new Error('표1에서 못 찾음: ' + p.v);
     const max = typeof e['1일최대분량_mg'] === 'number' ? e['1일최대분량_mg'] : 90;
     return { id: i + 1, ingr: e['성분명'], gubun: e['구분'],
-             dose: String(+(max * 0.8 / 3).toFixed(4)), unit: 'mg' };
+             // frac을 주면 성분마다 다른 비율로 넣는다 (비례합 시험용)
+             dose: String(+(max * (Array.isArray(c.frac) ? (c.frac[i] ?? 0.8) : 0.8) / 3).toFixed(4)),
+             unit: 'mg' };
   });
   const dr = { age: '만 15세 이상', freqMin: 3, freqMax: 3, amtMin: 1, amtMax: 1 };
   const v = win[vFn](tabs, c.form, dr.age, rows,

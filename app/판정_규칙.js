@@ -3591,11 +3591,38 @@ const CH3_CLAUSES = [
     })()],
 
   // ── 유효성분의 분량 ──
-  ['분량', 1, c => c.anyFail(c.overFail) ? c.NO(c.failNames(c.overFail)) : c.YES()],
-  // 비례합 — 아직 계산하지 않는다. 해당 구성일 때만 보류로 남긴다
-  ['분량', 2, c => (c.n1 >= 2 || (c.ga.length + c.na_.length) >= 2) ? c.HOLD : c.NA],
-  ['분량', 3, c => (c.n1 >= 1 && (c.da.some(r => r.ingr.includes('지룡'))
-                    || c.ra.some(r => /갈근탕|마황탕/.test(r.ingr)))) ? c.HOLD : c.NA],
+  /* 1) 각 성분의 1일 최대분량은 <표1>의 양.
+        다만 Ⅴ-1항 또는 가란에 Ⅻ항을 배합하면 그 합이 3/2을 넘을 수 없다. */
+  ['분량', 1, c => {
+      if (c.anyFail(c.overFail)) return c.NO(c.failNames(c.overFail));
+      const hasV1Ga = c.inH('Ⅴ-1항').length + c.ga.length;
+      const has12   = c.inH('Ⅻ항').length;
+      if (!(hasV1Ga && has12)) return c.YES();      // 다만 조건이 아니면 앞부분만 본다
+      const res = c.propSum(r => /^(Ⅴ-1항|Ⅻ항)/.test(r.gubun || '')
+                              || c.ga.some(x => x.ingr === r.ingr));
+      const vd = _propVerdict(res, { max: 1.5 }, 'Ⅴ-1항·가란+Ⅻ항');
+      return vd.na ? c.YES() : vd;
+    }],
+  /* 2) Ⅰ항 2종 이상, 또는 가란·나란 생약 2종 이상 — 각 묶음의 합이 1 이하.
+        조건이 "또는"으로 갈려 있으므로 두 묶음을 따로 센다. */
+  ['분량', 2, c => {
+      const out = [];
+      if (c.n1 >= 2) out.push(_propVerdict(
+        c.propSum(r => (r.gubun || '').startsWith('Ⅰ항')), { max: 1 }, 'Ⅰ항'));
+      if ((c.ga.length + c.na_.length) >= 2) out.push(_propVerdict(
+        c.propSum(r => c.ga.some(x => x.ingr === r.ingr) || c.na_.some(x => x.ingr === r.ingr)),
+        { max: 1 }, '가란·나란 생약'));
+      return c.mergeVerdicts(out);
+    }],
+  /* 3) Ⅰ항에 지룡·갈근탕·마황탕을 배합하면 그 합이 1 이하 */
+  ['분량', 3, c => {
+      const extra = c.da.filter(r => r.ingr.includes('지룡'))
+                     .concat(c.ra.filter(r => /갈근탕|마황탕/.test(r.ingr)));
+      if (!(c.n1 >= 1 && extra.length)) return c.NA;
+      return _propVerdict(
+        c.propSum(r => (r.gubun || '').startsWith('Ⅰ항') || extra.some(x => x.ingr === r.ingr)),
+        { max: 1 }, 'Ⅰ항+지룡·갈근탕·마황탕');
+    }],
   ['분량', 4, c => c.ra.length === 0 ? c.NA : (() => {
       const p = r => c.ra.some(x => x.ingr === r.ingr) && r.ok === false;
       return c.anyFail(p) ? c.NO(c.failNames(p)) : c.YES();
@@ -3615,7 +3642,15 @@ const CH3_CLAUSES = [
           bad.push(`${al}: 1일 ${_num(r.dailyMin)} mg — 하한 ${_num(floor)} mg 미달`);
         }
       });
-      return bad.length ? c.NO(bad.join('; ')) : c.YES();
+      /* 뒷부분 — Ⅰ항을 2종 이상 배합하면 그 합이 1/2 이상이어야 한다.
+         (하한 1/5은 성분별 판정에서 이미 본다) */
+      if (bad.length) return c.NO(bad.join('; '));
+      if (c.n1 >= 2) {
+        const vd = _propVerdict(c.propSum(r => (r.gubun || '').startsWith('Ⅰ항')),
+                                { min: 0.5 }, 'Ⅰ항');
+        if (!vd.na) return vd;
+      }
+      return c.YES();
     })()],
   ['분량', 7, c => (c.inH('Ⅻ항').length + c.inH('ⅩⅣ항').length) === 0 ? c.NA : (() => {
       const p = r => /Ⅻ항|ⅩⅣ항/.test(r.gubun || '') && c.underFail(r);
@@ -3629,9 +3664,21 @@ const CH3_CLAUSES = [
       const p = r => /1\/10/.test(r.reason || '');
       return c.anyFail(p) ? c.NO(c.failNames(p)) : c.YES();
     })()],
-  // "근거가 …에만 의할 경우"를 프로그램이 단정하기 어렵다
-  ['분량', 10, c => (c.ga.length + c.na_.length) === 0 ? c.NA
-      : ((c.inH('Ⅳ항').length + c.inH('Ⅴ항').length + c.inH('Ⅶ항').length) === 0 ? c.HOLD : c.NA)],
+  /* 10) "효능의 근거가 가란·나란에만 의할 경우"의 하한 1/2.
+         무엇을 근거로 효능을 냈는지는 프로그램이 단정할 수 없다.
+         다만 그 경우에 해당하는 "나란 2종 이상일 때 합 1/2 이상"은
+         셀 수 있으므로 계산해 보여 준다. */
+  ['분량', 10, c => {
+      if ((c.ga.length + c.na_.length) === 0) return c.NA;
+      const soleHerb = (c.inH('Ⅳ항').length + c.inH('Ⅴ항').length + c.inH('Ⅶ항').length) === 0;
+      if (!soleHerb) return c.NA;
+      if (c.na_.length >= 2) {
+        const vd = _propVerdict(c.propSum(r => c.na_.some(x => x.ingr === r.ingr)),
+                                { min: 0.5 }, '나란 생약');
+        if (!vd.na) return vd;
+      }
+      return c.HOLD;
+    }],
   ['분량', 11, c => !(c.isLiquid && c.hasCaf) ? c.NA : (() => {
       const caf = c.ir0.find(r => r.ingr.includes('카페인'));
       const per = caf?.dose1 != null ? +caf.dose1 : null;
@@ -3666,6 +3713,18 @@ function _ch3Ctx(allVpairs, form, activeRows) {
     HOLD: { ok: null, na: false, reason: '' },
     YES:  () => ({ ok: true,  na: false, reason: '' }),
     NO:   r => ({ ok: false, na: false, reason: r }),
+    propSum: pick => _propSum(allVpairs, pick, '제3장_감기약', form),
+    /* 한 조항이 여러 묶음을 따로 세는 경우 — 하나라도 걸리면 부적합,
+       못 센 것이 있으면 판정보류, 다 통과해야 적합. */
+    mergeVerdicts: list => {
+      const v = list.filter(x => x && !x.na);
+      if (!v.length) return { ok: null, na: true, reason: '' };
+      const no = v.find(x => x.ok === false);
+      if (no) return no;
+      const hold = v.find(x => x.ok === null);
+      if (hold) return hold;
+      return { ok: true, na: false, reason: v.map(x => x.reason).filter(Boolean).join('  /  ') };
+    },
     allVpairs, form, rows, inH, inLan,
     ir0: H.ir0, isOk: H.isOk, reasonOf: H.reasonOf,
     anyFail: H.anyFail, failNames: H.failNames,
@@ -3730,8 +3789,17 @@ const CH7_CLAUSES = [
           ? c.YES() : c.NO(c.reasonOf('가란(마황)×2항/4항 배합금지')))],
 
   ['분량', 1, c => c.anyFail(c.overFail) ? c.NO(c.failNames(c.overFail)) : c.YES()],
-  // 비례합 — 아직 계산하지 않는다
-  ['분량', 2, c => ((c.n2 && c.n4) || (c.ga.length + c.naL.length) >= 2) ? c.HOLD : c.NA],
+  /* 2) 2항과 4항을 함께 배합하는 경우, 그리고 가란·나란을 2종 이상
+        배합하는 경우 — 각 묶음의 합이 1 이하 (제3장과 같은 읽기) */
+  ['분량', 2, c => {
+      const out = [];
+      if (c.n2 && c.n4) out.push(_propVerdict(
+        c.propSum(r => /^(2항|4항)/.test(r.gubun || '')), { max: 1 }, '2항+4항'));
+      if ((c.ga.length + c.naL.length) >= 2) out.push(_propVerdict(
+        c.propSum(r => c.ga.some(x => x.ingr === r.ingr) || c.naL.some(x => x.ingr === r.ingr)),
+        { max: 1 }, '가란·나란 생약'));
+      return c.mergeVerdicts(out);
+    }],
   ['분량', 3, c => c.anyFail(c.underFail) ? c.NO(c.failNames(c.underFail)) : c.YES()],
   // "무엇으로 효능을 내는지"는 프로그램이 단정할 수 없다
   ['분량', 4, c => (c.n2 && c.n4) ? c.HOLD : c.NA],
@@ -3764,6 +3832,18 @@ function _ch7Ctx(allVpairs, form, activeRows) {
     HOLD: { ok: null, na: false, reason: '' },
     YES:  () => ({ ok: true,  na: false, reason: '' }),
     NO:   r => ({ ok: false, na: false, reason: r }),
+    propSum: pick => _propSum(allVpairs, pick, '제7장_진해거담제', form),
+    /* 한 조항이 여러 묶음을 따로 세는 경우 — 하나라도 걸리면 부적합,
+       못 센 것이 있으면 판정보류, 다 통과해야 적합. */
+    mergeVerdicts: list => {
+      const v = list.filter(x => x && !x.na);
+      if (!v.length) return { ok: null, na: true, reason: '' };
+      const no = v.find(x => x.ok === false);
+      if (no) return no;
+      const hold = v.find(x => x.ok === null);
+      if (hold) return hold;
+      return { ok: true, na: false, reason: v.map(x => x.reason).filter(Boolean).join('  /  ') };
+    },
     allVpairs, form, rows, eOf, inH,
     isOk: H.isOk, reasonOf: H.reasonOf, anyFail: H.anyFail, failNames: H.failNames,
     overFail:  r => r.ok === false && /최대/.test(r.reason || ''),
@@ -3857,6 +3937,18 @@ function _ch9Ctx(allVpairs, form, activeRows) {
     HOLD: { ok: null, na: false, reason: '' },
     YES:  () => ({ ok: true,  na: false, reason: '' }),
     NO:   r => ({ ok: false, na: false, reason: r }),
+    propSum: pick => _propSum(allVpairs, pick, '제9장_비염용경구제', form),
+    /* 한 조항이 여러 묶음을 따로 세는 경우 — 하나라도 걸리면 부적합,
+       못 센 것이 있으면 판정보류, 다 통과해야 적합. */
+    mergeVerdicts: list => {
+      const v = list.filter(x => x && !x.na);
+      if (!v.length) return { ok: null, na: true, reason: '' };
+      const no = v.find(x => x.ok === false);
+      if (no) return no;
+      const hold = v.find(x => x.ok === null);
+      if (hold) return hold;
+      return { ok: true, na: false, reason: v.map(x => x.reason).filter(Boolean).join('  /  ') };
+    },
     allVpairs, form, rows,
     isOk: H.isOk, reasonOf: H.reasonOf, anyFail: H.anyFail, failNames: H.failNames,
     overFail:  r => r.ok === false && /최대/.test(r.reason || ''),
@@ -3879,6 +3971,59 @@ function computeCh9KindsAmtsStatus(allVpairs, form, activeRows) {
     '분량': (base['유효성분의_분량'] ?? []).length,
   });
   return { kindsSt: out['종류'], amtsSt: out['분량'] };
+}
+
+/* ══════════ 비례합 ══════════
+   "각각의 1일 최대분량으로 나누어 얻은 수치의 합"을 구한다.
+
+   나누는 값(1일 최대분량)은 itemResults의 critMax를 그대로 쓴다 —
+   거기에는 연령구분계수와 생약 기준(원생약/분말)이 이미 반영돼 있어,
+   여기서 다시 계산하면 두 곳이 어긋날 수 있다.
+
+   연령이 여럿이면 연령마다 따로 세고 가장 큰 합(가장 엄한 쪽)을 쓴다.
+   어린이는 분모가 작아져 같은 배합량이라도 합이 커진다.
+
+   ★ 하나라도 못 세면 합을 내지 않는다.
+     못 세는 성분을 빼고 더하면 합이 작아져 잘못된 "적합"이 된다. */
+function _propSum(allVpairs, pick, chapterKey, form) {
+  let worst = null;
+  for (const { dr, v } of allVpairs) {
+    const rows = (v.itemResults || []).filter(pick);
+    if (!rows.length) continue;
+    const bad = [], parts = [];
+    let sum = 0;
+    for (const r of rows) {
+      const denom = r.critMax;
+      const num   = r.dailyMax;
+      if (denom == null || num == null || !(denom > 0)) { bad.push(r.ingr); continue; }
+      const ratio = num / denom;
+      sum += ratio;
+      parts.push(`${r.ingr} ${_num(num)}/${_num(denom)}=${ratio.toFixed(3)}`);
+    }
+    const age = displayAgeLabel(dr.age, chapterKey, form) || dr.age;
+    const cur = { age, sum: +sum.toFixed(4), parts, bad, n: rows.length };
+    if (bad.length) return cur;                       // 못 세면 그 자리에서 멈춘다
+    if (!worst || cur.sum > worst.sum) worst = cur;    // 합이 가장 큰 연령
+  }
+  return worst;
+}
+
+/* 조항 표에서 쓰는 껍데기 — 한도를 넘었는지/못 미쳤는지까지 판정한다.
+   opts.max 이하여야 하는 조항, opts.min 이상이어야 하는 조항 둘 다 쓴다. */
+function _propVerdict(res, opts, label) {
+  const NA   = { ok: null, na: true,  reason: '' };
+  if (!res) return NA;                                  // 해당 구성이 아님
+  if (res.bad.length) {
+    return { ok: null, na: false,
+      reason: `합을 계산할 수 없습니다 — ${res.bad.join(', ')}의 1일 최대분량을 알 수 없습니다. 직접 확인해 주세요.` };
+  }
+  const detail = `${label} 합 ${res.sum}` + (res.age ? ` (${res.age})` : '')
+               + `  [${res.parts.join(', ')}]`;
+  if (opts.max != null && res.sum > opts.max)
+    return { ok: false, na: false, reason: `${detail} — 기준 ${opts.max} 이하` };
+  if (opts.min != null && res.sum < opts.min)
+    return { ok: false, na: false, reason: `${detail} — 기준 ${opts.min} 이상` };
+  return { ok: true, na: false, reason: detail };
 }
 
 /* 조항별 판정에서 되풀이되는 부분 — 제3·7·9장이 함께 쓴다 */
