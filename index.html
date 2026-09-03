@@ -4526,7 +4526,12 @@ function resCopyText(btn, varName) {
 
 function renderChapter1Results(validation, form, ageGroup) {
   const { itemResults, sumResults, coeff, under8, vitAD } = validation;
-  const allOk = itemResults.every(r => r.ok !== false) && sumResults.every(r => r.ok !== false);
+  /* ok 는 셋이다 — true(적합) · false(부적합) · null(판정 못 함).
+     "부적합만 아니면 적합"(ok !== false)으로 보면 판정하지 못한 성분이
+     있어도 "기준에 맞습니다"가 뜬다. 표에 없는 성분을 직접 넣었을 때
+     실제로 그랬다. 전체 적합은 "확인한 것만"(ok === true)으로 따진다.
+     ruleErrors 는 위반만 담기므로 종전대로 !== false 로 본다. */
+  const allOk = itemResults.every(r => r.ok === true) && sumResults.every(r => r.ok !== false);
 
   const td = 'padding:5px 8px;border:1px solid #dde3ef;font-size:11px;';
   const tdR = td + 'text-align:right;';
@@ -4684,7 +4689,7 @@ function renderChapter2Results(validation, form, ageGroup) {
   const { itemResults, ruleErrors, propResult, coeff, freq,
           amtMin = 1, amtMax = 1, freqMin = freq, freqMax = freq } = validation;
   const allOk = ruleErrors.every(r => r.ok !== false)
-             && itemResults.every(r => r.ok !== false)
+             && itemResults.every(r => r.ok === true)
              && (propResult == null || propResult.ok === true);
   const amtStr = amtMin === amtMax ? `${amtMax}` : `${amtMin}~${amtMax}`;
   const unit   = dosageUnit || '정';
@@ -4882,7 +4887,7 @@ function mkResultBlock7(allOk, form, ageGroup, freqMin, freqMax, amtMax, coeff, 
 
 function renderChapter3Results(v, form, ageGroup) {
   const { itemResults, ruleErrors, coeff, freqMin, freqMax, amtMax } = v;
-  const allOk = ruleErrors.every(r=>r.ok!==false) && itemResults.every(r=>r.ok!==false);
+  const allOk = ruleErrors.every(r=>r.ok!==false) && itemResults.every(r=>r.ok===true);
   const ts = 'padding:5px 8px;border:1px solid #dde3ef;';
   const bodyRows =
     (ruleErrors.length>0 ? mkDivRow7(ts,'성분 선택 규칙')+ruleErrors.map(r=>mkRuleRow7(ts,r.ok,r.key,r.reason)).join('') : '')
@@ -4900,7 +4905,7 @@ function renderChapter3Results(v, form, ageGroup) {
 
 function renderChapter7Results(v, form, ageGroup) {
   const { itemResults, ruleErrors, coeff, freqMin, freqMax, amtMax } = v;
-  const allOk = ruleErrors.every(r=>r.ok!==false) && itemResults.every(r=>r.ok!==false);
+  const allOk = ruleErrors.every(r=>r.ok!==false) && itemResults.every(r=>r.ok===true);
   const ts = 'padding:5px 8px;border:1px solid #dde3ef;';
   const bodyRows =
     (ruleErrors.length>0 ? mkDivRow7(ts,'성분 선택 규칙')+ruleErrors.map(r=>mkRuleRow7(ts,r.ok,r.key,r.reason)).join('') : '')
@@ -4981,8 +4986,8 @@ function mkResultBlock9(allOk, form, ageGroup, freqMin, freqMax, amtMax, coeff, 
 
 function renderChapter9Results(v, form, ageGroup) {
   const { itemResults, ruleErrors, prop2Result, coeff, freqMin, freqMax, amtMax, Ⅴ란감소, dose1MaxFactor } = v;
-  const allOk = ruleErrors.every(r=>r.ok!==false) && itemResults.every(r=>r.ok!==false)
-             && (prop2Result==null||prop2Result.ok!==false);
+  const allOk = ruleErrors.every(r=>r.ok!==false) && itemResults.every(r=>r.ok===true)
+             && (prop2Result==null||prop2Result.ok===true);
   const ts    = 'padding:5px 8px;border:1px solid #dde3ef;';
   const extra = Ⅴ란감소 ? `&nbsp;|&nbsp; <span style="color:#c65a00;">Ⅴ란+Ⅱ란1항 동시 → Ⅴ란 최대 1/2 적용</span>` : '';
   const prop2Rows = prop2Result

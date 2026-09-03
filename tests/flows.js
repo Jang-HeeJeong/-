@@ -203,4 +203,18 @@ window.FLOW_CASES = [
       { setDoseByName: { '아세트아미노펜': 150 }, expect: { visibleHas: ['인삼'] } },
     ],
   },
+  {
+    id: 'flow-unjudged-not-ok',
+    desc: '판정하지 못한 성분이 있으면 "기준에 맞습니다"가 뜨면 안 됨',
+    steps: [
+      { pick: '캐롤비콜드연질캡슐' },
+      // 정상 상태에서는 종전대로 적합
+      { setAmt: 2 },
+      { runValidation: true, expect: { statusHas: '적합', statusHasNot: '부적합' } },
+      /* 표에 없는 성분을 직접 넣으면 그 행은 "판정할 수 없음"이 된다.
+         예전에는 "부적합만 아니면 적합"으로 봐서 전체가 적합으로 나왔다. */
+      { addCustomIngr: { name: '표에없는성분', dose: 50 } },
+      { runValidation: true, expect: { statusHasNot: '검토 완료' } },
+    ],
+  },
 ];

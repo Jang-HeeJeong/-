@@ -3042,35 +3042,40 @@ function runValidation() {
     if (currentKey === '제1장_비타민미네랄') {
       if (validDosageRows.length > 1) html += renderAgeHeader(dr);
       const v = validateChapter1(DB['제1장_비타민미네랄']['표'], form, dr.age, activeRows, dosage);
-      if (!v.itemResults.every(r => r.ok !== false) || !v.sumResults.every(r => r.ok !== false))
+      /* ok 는 셋이다 — true(적합) · false(부적합) · null(판정 못 함).
+         "부적합만 아니면 적합"(ok !== false)으로 보면 판정하지 못한 성분이
+         있어도 "기준에 맞습니다"가 뜬다. 표에 없는 성분을 직접 넣었을 때
+         실제로 그랬다. 전체 적합은 "확인한 것만"(ok === true)으로 따진다.
+         ruleErrors 는 위반만 담기므로 종전대로 !== false 로 본다. */
+      if (!v.itemResults.every(r => r.ok === true) || !v.sumResults.every(r => r.ok !== false))
         anyFail = true;
       html += renderChapter1Results(v, form, dr.age);
       validations.push(v);
     } else if (currentKey === '제2장_해열진통제') {
       if (validDosageRows.length > 1) html += renderAgeHeader(dr);
       const v = validateChapter2(DB['제2장_해열진통제']['표'], form, dr.age, activeRows, dosage);
-      if (!v.itemResults.every(r => r.ok !== false) || !v.ruleErrors.every(r => r.ok !== false))
+      if (!v.itemResults.every(r => r.ok === true) || !v.ruleErrors.every(r => r.ok !== false))
         anyFail = true;
       html += renderChapter2Results(v, form, dr.age);
       validations.push(v);
     } else if (currentKey === '제3장_감기약') {
       if (validDosageRows.length > 1) html += renderAgeHeader(dr);
       const v = validateChapter3(DB['제3장_감기약']['표'], form, dr.age, activeRows, dosage);
-      if (!v.itemResults.every(r => r.ok !== false) || !v.ruleErrors.every(r => r.ok !== false))
+      if (!v.itemResults.every(r => r.ok === true) || !v.ruleErrors.every(r => r.ok !== false))
         anyFail = true;
       html += renderChapter3Results(v, form, dr.age);
       validations.push(v);
     } else if (currentKey === '제7장_진해거담제') {
       if (validDosageRows.length > 1) html += renderAgeHeader(dr);
       const v = validateChapter7(DB['제7장_진해거담제']['표'], form, dr.age, activeRows, dosage);
-      if (!v.itemResults.every(r => r.ok !== false) || !v.ruleErrors.every(r => r.ok !== false))
+      if (!v.itemResults.every(r => r.ok === true) || !v.ruleErrors.every(r => r.ok !== false))
         anyFail = true;
       html += renderChapter7Results(v, form, dr.age);
       validations.push(v);
     } else if (currentKey === '제9장_비염용경구제') {
       if (validDosageRows.length > 1) html += renderAgeHeader(dr);
       const v = validateChapter9(DB['제9장_비염용경구제']['표'], form, dr.age, activeRows, dosage);
-      if (!v.itemResults.every(r => r.ok !== false) || !v.ruleErrors.every(r => r.ok !== false))
+      if (!v.itemResults.every(r => r.ok === true) || !v.ruleErrors.every(r => r.ok !== false))
         anyFail = true;
       html += renderChapter9Results(v, form, dr.age);
       validations.push(v);
@@ -4659,7 +4664,7 @@ function _generateFullWordDoc() {
       ) : null;
       // 항목2: 각 항목 배합 총량이 1일 최대를 넘지 않는지 (개별 + 합산)
       const st2ok = hasV1 ? allValidations.every(({v}) =>
-        (v.itemResults ?? []).every(r => r.ok !== false) &&
+        (v.itemResults ?? []).every(r => r.ok === true) &&
         (v.sumResults  ?? []).every(r => r.ok !== false)
       ) : null;
       // 항목3: 만 8세 미만 금지 미네랄 미포함

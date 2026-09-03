@@ -376,6 +376,20 @@ function flowStep(win, step) {
     if (!opt) throw new Error('목록에 없는 성분: ' + step.addMxIngr);
     sel.value = opt.value;
     sel.dispatchEvent(new win.Event('change', { bubbles: true }));
+  } else if (step.addCustomIngr != null) {
+    // 표에 없는 성분을 직접 입력해 넣는다 (판정할 수 없는 행이 된다)
+    win.openCh2AddIngrPanel();
+    const sel = d.getElementById('ch2-add-ingr-select');
+    if (!sel) throw new Error('성분 추가 목록 없음');
+    sel.value = 'custom';
+    sel.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const ni = [...d.querySelectorAll('.mx-custom-name')].pop();
+    if (!ni) throw new Error('직접 입력 칸 없음');
+    ni.value = step.addCustomIngr.name;
+    ni.dispatchEvent(new win.Event('input', { bubbles: true }));
+    const di = ni.closest('tr').querySelector('.mx-dose-input');
+    di.value = String(step.addCustomIngr.dose);
+    di.dispatchEvent(new win.Event('input', { bubbles: true }));
   } else if (step.flushDraft) {
     // 임시저장은 입력이 멈춘 뒤 한 번 담긴다. 시험에서는 기다리지 않고
     // 바로 담게 해서 저장되는 내용만 확인한다.
