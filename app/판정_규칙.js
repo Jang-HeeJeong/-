@@ -3331,9 +3331,63 @@ function _wordPrecautionSection(opts) {
   return out;
 }
 
+/* 같은 내용을 새 창에 그려 인쇄 창을 띄운다.
+   브라우저의 인쇄 창에서 "대상"을 "PDF로 저장"으로 고르면 PDF가 된다.
+   워드용 mso-* 설정은 브라우저가 무시하므로 그대로 둬도 해가 없다. */
+function _printAsPdf(productName, body, extraStyle, tail) {
+  const win = window.open('', '_blank');
+  if (!win) {
+    setStatus('팝업이 막혀 있어 PDF를 열지 못했습니다 — 주소창 오른쪽에서 팝업을 허용해 주세요.', 'error');
+    return;
+  }
+  const title = `${productName}_표준제조기준검토_${new Date().toISOString().slice(0,10)}`;
+  win.document.write(`<!doctype html><html lang="ko"><head><meta charset="UTF-8">
+<title>${esc(title)}</title>
+<style>
+  @page { size: A4 portrait; margin: 15mm 12mm; }
+  body { font-family:'맑은 고딕','Malgun Gothic',Arial,sans-serif; margin:0; font-size:9.5pt;
+         color:#111; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  p { margin:0; padding:1pt 0; line-height:1.4; }
+  table { border-collapse:collapse; width:100%; table-layout:fixed; }
+  td, th { padding:3pt 5pt; border:1px solid #b8c4d4; word-wrap:break-word;
+           overflow-wrap:break-word; vertical-align:middle; }
+  /* 표가 페이지에 걸려 아무 데서나 잘리지 않게 */
+  tr { page-break-inside:avoid; }
+  thead { display:table-header-group; }
+  p.sec-head { page-break-after:avoid; page-break-inside:avoid; }
+${extraStyle || ''}
+  /* 화면에서만 보이는 안내 — 인쇄물에는 나오지 않는다 */
+  #pdf-help { position:fixed; top:0; left:0; right:0; z-index:9;
+              background:#1a4b8c; color:#fff; font-size:13px; padding:9px 16px;
+              display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  #pdf-help button { font:inherit; font-weight:600; padding:4px 14px; border:none;
+                     border-radius:4px; background:#fff; color:#1a4b8c; cursor:pointer; }
+  #pdf-body { padding-top:46px; }
+  @media print { #pdf-help { display:none; } #pdf-body { padding-top:0; } }
+</style></head><body>
+<div id="pdf-help">
+  <span>인쇄 창에서 <b>대상</b>을 <b>"PDF로 저장"</b>으로 고르면 PDF 파일이 됩니다.</span>
+  <button type="button" onclick="window.print()">인쇄 창 열기</button>
+</div>
+<div id="pdf-body">
+${body}
+${tail || ''}
+</div></body></html>`);
+  win.document.close();
+  // 글꼴과 표가 다 그려진 뒤에 인쇄 창을 띄운다
+  win.addEventListener('load', () => setTimeout(() => win.print(), 250));
+}
+
 /* 워드 문서 껍데기 + 내려받기 — 세 분기가 똑같이 갖고 있던 부분.
    제1장만 워드 메모(comment)를 쓰므로 extraStyle·tail로 받는다. */
+/* 워드로 내려받을지 PDF(인쇄)로 낼지 — generateFullWordDoc(mode)가 정한다.
+   전역으로 두는 이유: 문서를 만드는 함수가 세 갈래(제1·2장·매트릭스)로
+   나뉘어 있어 인자를 끝까지 들고 다니려면 여러 곳을 고쳐야 한다.
+   내보내는 순간에만 쓰고 바로 되돌린다. */
+let _exportMode = 'word';
+
 function _wordDownload(productName, body, extraStyle, tail) {
+  if (_exportMode === 'pdf') return _printAsPdf(productName, body, extraStyle, tail);
   const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office'`
     + ` xmlns:w='urn:schemas-microsoft-com:office:word'`
     + ` xmlns='http://www.w3.org/TR/REC-html40'>
@@ -3837,7 +3891,13 @@ function _clauseForReason(chapterKey, reason, gubun) {
   return null;
 }
 
-function generateFullWordDoc() {
+function generateFullWordDoc(mode) {
+  _exportMode = (mode === 'pdf') ? 'pdf' : 'word';
+  try { return _generateFullWordDoc(); }
+  finally { _exportMode = 'word'; }   // 다음 호출에 영향이 남지 않게
+}
+
+function _generateFullWordDoc() {
   const rawProductName = ($('product-name')?.value || '').trim() || '(제품명)';
   const ch = chaptersMap[currentKey];
   const form = $('sel-dosage-form').value;

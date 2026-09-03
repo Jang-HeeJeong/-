@@ -1066,7 +1066,10 @@
              oninput="this.dataset.touched='1';"
              onkeydown="if(event.key==='Enter')saveProduct();">
       <button class="btn btn-add" onclick="saveProduct()" title="이 검토 내용을 제품명으로 저장">저장</button>
-      <button class="btn btn-primary" id="btn-word" onclick="generateFullWordDoc()"
+      <button class="btn" id="btn-pdf" onclick="generateFullWordDoc('pdf')"
+              title="같은 내용을 인쇄 창으로 엽니다. 대상을 'PDF로 저장'으로 고르면 됩니다."
+              style="white-space:nowrap;">🖨 PDF</button>
+      <button class="btn btn-primary" id="btn-word" onclick="generateFullWordDoc('word')"
               title="원료약품·효능효과·주의사항을 담은 워드 파일을 내려받습니다"
               style="white-space:nowrap;">⬇ 표제기 검토서 다운받기</button>
     </div>
