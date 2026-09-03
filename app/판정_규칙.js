@@ -3602,7 +3602,8 @@ const CH3_CLAUSES = [
                               || c.ga.some(x => x.ingr === r.ingr));
       const vd = _propVerdict(res, { max: 1.5 }, 'Ⅴ-1항·가란+Ⅻ항');
       return vd.na ? c.YES() : vd;
-    }],
+    },
+      { 사유: /최대.*(넘음|초과)/, 우선: 10 }],
   /* 2) Ⅰ항 2종 이상, 또는 가란·나란 생약 2종 이상 — 각 묶음의 합이 1 이하.
         조건이 "또는"으로 갈려 있으므로 두 묶음을 따로 센다. */
   ['분량', 2, c => {
@@ -3626,8 +3627,11 @@ const CH3_CLAUSES = [
   ['분량', 4, c => c.ra.length === 0 ? c.NA : (() => {
       const p = r => c.ra.some(x => x.ingr === r.ingr) && r.ok === false;
       return c.anyFail(p) ? c.NO(c.failNames(p)) : c.YES();
-    })()],
-  ['분량', 5, c => c.anyFail(c.underFail) ? c.NO(c.failNames(c.underFail)) : c.YES()],
+    })(),
+      { 구분: /라란/, 사유: /최소|미달|하한/, 우선: 8 }],
+  ['분량', 5, c => c.anyFail(c.underFail) ? c.NO(c.failNames(c.underFail)) : c.YES(),
+      // 짚을 조항이 따로 없을 때의 일반 하한
+      { 사유: /최소|미달|하한/, 우선: 0 }],
   /* 6번은 5번(일반 하한 1/2)과 별개다. 표1 최대가 1,500이면 1/2 = 750이라
      5번이 더 엄하다. 둘을 묶으면 700mg처럼 600은 넘고 750은 못 넘는 값에서
      6번까지 잘못 부적합으로 찍힌다. 그래서 600mg 기준으로 따로 센다. */
@@ -3651,19 +3655,23 @@ const CH3_CLAUSES = [
         if (!vd.na) return vd;
       }
       return c.YES();
-    })()],
+    })(),
+      { 사유: /하한\s*600|600\s*mg\s*미달/, 우선: 9 }],
   ['분량', 7, c => (c.inH('Ⅻ항').length + c.inH('ⅩⅣ항').length) === 0 ? c.NA : (() => {
       const p = r => /Ⅻ항|ⅩⅣ항/.test(r.gubun || '') && c.underFail(r);
       return c.anyFail(p) ? c.NO(c.failNames(p)) : c.YES();
-    })()],
+    })(),
+      { 구분: /Ⅻ항|ⅩⅣ항/, 사유: /최소|미달|하한/, 우선: 8 }],
   ['분량', 8, c => !c.n13 ? c.NA : (() => {
       const p = r => /ⅩⅢ항/.test(r.gubun || '') && c.underFail(r);
       return c.anyFail(p) ? c.NO(c.failNames(p)) : c.YES();
-    })()],
+    })(),
+      { 구분: /ⅩⅢ항/, 사유: /최소|미달|하한/, 우선: 8 }],
   ['분량', 9, c => (c.n15 + c.ga.length + c.na_.length + c.da.length) === 0 ? c.NA : (() => {
       const p = r => /1\/10/.test(r.reason || '');
       return c.anyFail(p) ? c.NO(c.failNames(p)) : c.YES();
-    })()],
+    })(),
+      { 구분: /ⅩⅤ항|가란|나란|다란/, 사유: /최소|미달|하한/, 우선: 8 }],
   /* 10) "효능의 근거가 가란·나란에만 의할 경우"의 하한 1/2.
          무엇을 근거로 효능을 냈는지는 프로그램이 단정할 수 없다.
          다만 그 경우에 해당하는 "나란 2종 이상일 때 합 1/2 이상"은
@@ -3788,7 +3796,8 @@ const CH7_CLAUSES = [
       : (c.isOk('가란(마황)×2항/4항 배합금지')
           ? c.YES() : c.NO(c.reasonOf('가란(마황)×2항/4항 배합금지')))],
 
-  ['분량', 1, c => c.anyFail(c.overFail) ? c.NO(c.failNames(c.overFail)) : c.YES()],
+  ['분량', 1, c => c.anyFail(c.overFail) ? c.NO(c.failNames(c.overFail)) : c.YES(),
+      { 사유: /최대.*(넘음|초과)/, 우선: 10 }],
   /* 2) 2항과 4항을 함께 배합하는 경우, 그리고 가란·나란을 2종 이상
         배합하는 경우 — 각 묶음의 합이 1 이하 (제3장과 같은 읽기) */
   ['분량', 2, c => {
@@ -3800,20 +3809,24 @@ const CH7_CLAUSES = [
         { max: 1 }, '가란·나란 생약'));
       return c.mergeVerdicts(out);
     }],
-  ['분량', 3, c => c.anyFail(c.underFail) ? c.NO(c.failNames(c.underFail)) : c.YES()],
+  ['분량', 3, c => c.anyFail(c.underFail) ? c.NO(c.failNames(c.underFail)) : c.YES(),
+      // 일반 하한 1/2 (8항은 1/5)
+      { 사유: /최소|미달|하한/, 우선: 0 }],
   // "무엇으로 효능을 내는지"는 프로그램이 단정할 수 없다
   ['분량', 4, c => (c.n2 && c.n4) ? c.HOLD : c.NA],
   ['분량', 5, c => (c.ga.length + c.naL.length + c.da.length) === 0 ? c.NA : (() => {
       const p = r => r.ok === false && /1\/10|1\/2/.test(r.reason || '');
       return c.anyFail(p) ? c.NO(c.failNames(p)) : c.YES();
-    })()],
+    })(),
+      { 구분: /가란|나란|다란/, 사유: /최소|미달|하한/, 우선: 8 }],
   ['분량', 6, c => !(c.isTroki && c.n9) ? c.NA : c.HOLD],
   ['분량', 7, c => !c.isTroki ? c.NA
       : (c.allVpairs.some(({ dr }) => (dr.freqMax ?? 0) >= 5) ? c.HOLD : c.NA)],
   ['분량', 8, c => !c.n10 ? c.NA : (() => {
       const p = r => /10항/.test(r.gubun || '') && c.underFail(r);
       return c.anyFail(p) ? c.NO(c.failNames(p)) : c.YES();
-    })()],
+    })(),
+      { 구분: /10항/, 사유: /최소|미달|하한/, 우선: 8 }],
 ];
 
 function _ch7Ctx(allVpairs, form, activeRows) {
@@ -3895,7 +3908,8 @@ const CH9_CLAUSES = [
       return bad.length ? c.NO(bad.join('; ')) : c.YES();
     })()],
 
-  ['분량', 1, c => c.anyFail(c.overFail) ? c.NO(c.failNames(c.overFail)) : c.YES()],
+  ['분량', 1, c => c.anyFail(c.overFail) ? c.NO(c.failNames(c.overFail)) : c.YES(),
+      { 사유: /최대.*(넘음|초과)/, 우선: 10 }],
   ['분량', 2, c => !(c.n21 && c.n5) ? c.NA : (() => {
       const p = r => (r.gubun || '').startsWith('Ⅴ란') && c.overFail(r);
       return c.anyFail(p) ? c.NO(c.failNames(p)) : c.YES();
@@ -3910,15 +3924,18 @@ const CH9_CLAUSES = [
   ['분량', 4, c => !c.n1 ? c.NA : (() => {
       const p = r => (r.gubun || '').startsWith('Ⅰ란') && c.underFail(r);
       return c.anyFail(p) ? c.NO(c.failNames(p)) : c.YES();
-    })()],
+    })(),
+      { 구분: /^Ⅰ란/, 사유: /최소|미달|하한/, 우선: 8 }],
   ['분량', 5, c => (c.n21 + c.n22 + c.n3 + c.n5) === 0 ? c.NA : (() => {
       const p = r => /^(Ⅱ란|Ⅲ란|Ⅴ란)/.test(r.gubun || '') && c.underFail(r);
       return c.anyFail(p) ? c.NO(c.failNames(p)) : c.YES();
-    })()],
+    })(),
+      { 구분: /^(Ⅱ란|Ⅲ란|Ⅴ란)/, 사유: /최소|미달|하한/, 우선: 8 }],
   ['분량', 6, c => (c.n4 + (c.has6 ? 1 : 0)) === 0 ? c.NA : (() => {
       const p = r => /^(Ⅳ란|Ⅵ란)/.test(r.gubun || '') && c.underFail(r);
       return c.anyFail(p) ? c.NO(c.failNames(p)) : c.YES();
-    })()],
+    })(),
+      { 구분: /^(Ⅳ란|Ⅵ란)/, 사유: /최소|미달|하한/, 우선: 8 }],
   // 배합법·배합계수는 <표2>를 참고한다 — 참조 안내라 판정 대상이 아니다
   ['분량', 7, c => c.NA],
 ];
@@ -4052,41 +4069,36 @@ function _ruleStatusHelpers(allVpairs, chapterKey, form) {
    "1일 540 mg — 기준 최소 750 mg에 미달"만 보여 주면 무엇을 근거로
    그렇게 판정했는지 알 수 없다. 해당 조항의 원문을 함께 싣는다.
 
+   조항 번호는 조항 표에만 있다. 예전에는 여기에도 번호를 따로 적어
+   두어, 개정으로 조항이 밀리면 엉뚱한 조항이 근거로 붙었다.
+   이제 표를 훑어 번호를 스스로 찾으므로 어긋날 자리가 없다.
+
    ★ 짚을 수 없는 사유는 아무것도 돌려주지 않는다.
      엉뚱한 조항을 갖다 붙이면 없느니만 못하다. */
+const _CLAUSE_TABLES = {
+  '제3장_감기약':       () => (typeof CH3_CLAUSES !== 'undefined' ? CH3_CLAUSES : null),
+  '제7장_진해거담제':   () => (typeof CH7_CLAUSES !== 'undefined' ? CH7_CLAUSES : null),
+  '제9장_비염용경구제': () => (typeof CH9_CLAUSES !== 'undefined' ? CH9_CLAUSES : null),
+};
+
 function _clauseForReason(chapterKey, reason, gubun) {
+  const table = _CLAUSE_TABLES[chapterKey]?.();
+  if (!table) return null;
   const r = String(reason || '');
   const g = String(gubun || '');
-  const base = DB[chapterKey]?.['기준'] ?? {};
-  const pick = (sec, n) => {
-    const arr = base[sec === '종류' ? '유효성분의_종류' : '유효성분의_분량'];
-    if (!Array.isArray(arr) || !arr[n - 1]) return null;
-    return { label: `유효성분의 ${sec} ${n})`, text: arr[n - 1] };
-  };
 
-  if (chapterKey === '제3장_감기약') {
-    if (/최대.*(넘음|초과)/.test(r))            return pick('분량', 1);
-    if (/1\/10/.test(r))                        return pick('분량', 9);   // ⅩⅤ항·생약 1/10
-    if (/라란/.test(g) || /1\/5\s*이상/.test(r)) return pick('분량', 4);
-    if (/Ⅻ항|ⅩⅣ항/.test(g))                    return pick('분량', 7);
-    if (/ⅩⅢ항/.test(g))                        return pick('분량', 8);   // ⅩⅢ항 괄호값
-    if (/600/.test(r))                          return pick('분량', 6);
-    if (/최소|미달|하한/.test(r))               return pick('분량', 5);
-    return null;
-  }
-  if (chapterKey === '제7장_진해거담제') {
-    if (/최대.*(넘음|초과)/.test(r))  return pick('분량', 1);
-    if (/10항/.test(g))               return pick('분량', 8);
-    if (/1\/10/.test(r))              return pick('분량', 5);
-    if (/최소|미달|하한/.test(r))     return pick('분량', 3);
-    return null;
-  }
-  if (chapterKey === '제9장_비염용경구제') {
-    if (/최대.*(넘음|초과)/.test(r))     return pick('분량', 1);
-    if (/^Ⅰ란/.test(g) && /최소|미달|하한/.test(r)) return pick('분량', 4);
-    if (/^(Ⅱ란|Ⅲ란|Ⅴ란)/.test(g) && /최소|미달|하한/.test(r)) return pick('분량', 5);
-    if (/^(Ⅳ란|Ⅵ란)/.test(g) && /최소|미달|하한/.test(r)) return pick('분량', 6);
-    return null;
+  // 근거 조건이 붙은 조항만 모아, 좁은 것(우선 큰 것)부터 본다
+  const cands = table
+    .filter(row => row[3])
+    .map(row => ({ sec: row[0], no: row[1], c: row[3] }))
+    .sort((a, b) => (b.c.우선 ?? 0) - (a.c.우선 ?? 0) || a.no - b.no);
+
+  for (const { sec, no, c } of cands) {
+    if (c.구분 && !c.구분.test(g)) continue;
+    if (c.사유 && !c.사유.test(r)) continue;
+    const arr = DB[chapterKey]?.['기준']?.[sec === '종류' ? '유효성분의_종류' : '유효성분의_분량'];
+    if (!Array.isArray(arr) || !arr[no - 1]) continue;
+    return { label: `유효성분의 ${sec} ${no})`, text: arr[no - 1] };
   }
   return null;
 }

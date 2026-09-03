@@ -666,6 +666,20 @@ async function main() {
     }
   }
 
+  // 3-c) 부적합 사유 → 원문 조항
+  const sCite = section(`부적합 근거 조항 (${(window.CITE_CASES ?? []).length}건)`);
+  for (const [chKey, reason, gubun, want] of (window.CITE_CASES ?? [])) {
+    const id = 'cite-' + chKey.slice(0, 3) + '-' + gubun.slice(0, 6) + '-' + want.replace(/\s/g, '');
+    const desc = `${chKey.slice(0, 3)} ${gubun} · ${reason.slice(0, 34)}`;
+    let got;
+    try {
+      const c = win.eval(`_clauseForReason(${JSON.stringify(chKey)},${JSON.stringify(reason)},${JSON.stringify(gubun)})`);
+      got = c ? c.label.replace('유효성분의 ', '').replace(')', '') : '(없음)';
+    } catch (e) { results.err++; renderCase(sCite, 'err', id, desc, null, '오류: ' + e.message); continue; }
+    if (got === want) { results.pass++; renderCase(sCite, 'pass', id, desc); }
+    else { results.fail++; renderCase(sCite, 'fail', id, desc, [{ path: '근거 조항', was: want, now: got }]); }
+  }
+
   // 3-b) 조항별 적합여부
   const sRS = section(`조항별 적합여부 — 워드 검토서 확인란 (${(window.RULE_STATUS_CASES ?? []).length}건)`);
   for (const c of (window.RULE_STATUS_CASES ?? [])) {
